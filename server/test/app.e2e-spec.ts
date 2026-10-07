@@ -14,6 +14,7 @@ describe('机构管理系统 (e2e, SQLite)', () => {
   let token: string;
   let channelId: number;
   let leadId: number;
+  let classGroupId: number;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -71,7 +72,7 @@ describe('机构管理系统 (e2e, SQLite)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ courseId: 1, name: '测试班', teacherId: 99, capacity: 10 })
       .expect(201);
-    const classGroupId = cg.body.data.id;
+    classGroupId = cg.body.data.id;
 
     const lesson = {
       classGroupId,
@@ -92,6 +93,16 @@ describe('机构管理系统 (e2e, SQLite)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send(lesson)
       .expect(409);
+  });
+
+  it('班级详情：课次装配正确(普通外键列，不走 relations)', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/courses/class-groups/${classGroupId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body.data.id).toBe(classGroupId);
+    expect(Array.isArray(res.body.data.lessons)).toBe(true);
+    expect(res.body.data.lessons.length).toBeGreaterThan(0);
   });
 
   it('M3 渠道：可创建并列出渠道', async () => {

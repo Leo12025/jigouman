@@ -201,6 +201,14 @@ export class LeadService {
     });
   }
 
+  /** 跟进记录时间线（详情用，§4.3） */
+  listFollow(t: number, leadId: number) {
+    return this.follow.repo.find({
+      where: { tenantId: t, leadId },
+      order: { id: 'DESC' } as any,
+    });
+  }
+
   /**
    * 转化漏斗（文档 §4.2）：按渠道/活动筛选，统计各阶段数量与转化率。
    * 日期筛选在 JS 层做，规避 MySQL/sql.js 对 datetime 字符串的差异。

@@ -191,4 +191,11 @@ export class LeadController {
   listTrial(@TenantId() t: number, @Param('id') id: number) {
     return this.svc.listTrial(t, id);
   }
+
+  @Get(':id/follows')
+  @RequirePermissions('lead:view')
+  @ApiOperation({ summary: '跟进记录时间线' })
+  listFollow(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.listFollow(t, id);
+  }
 }

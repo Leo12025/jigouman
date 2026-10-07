@@ -83,8 +83,14 @@ export class CourseService {
   listClassGroup(t: number, q: PageQueryDto, courseId?: number) {
     return this.classGroup.paginate(t, q, courseId ? { courseId } : {});
   }
-  getClassGroup(t: number, id: number) {
-    return this.classGroup.findOne(t, id, ['lessons']);
+  async getClassGroup(t: number, id: number) {
+    const cg = await this.classGroup.findOne(t, id);
+    // 实体采用普通外键列（无 ORM 关联），课次单独查询后装配
+    (cg as any).lessons = await this.lesson.repo.find({
+      where: { tenantId: t, classGroupId: id },
+      order: { startTime: 'ASC' } as any,
+    });
+    return cg;
   }
   updateClassGroup(t: number, id: number, d: UpdateClassGroupDto) {
     return this.classGroup.update(t, id, d);
