@@ -13,3 +13,10 @@ export class LoginDto {
   @IsOptional()
   tenantId?: number;
 }
+
+/** 刷新令牌（文档 §9.2：JWT 短时效 + 刷新令牌） */
+export class RefreshDto {
+  @IsString()
+  @IsNotEmpty()
+  refreshToken: string;
+}

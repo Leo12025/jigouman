@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, TenantId } from '../../common/decorators/auth.decorator';
+import { TenantId } from '../../common/decorators/auth.decorator';
 import { RequirePermissions } from '../../common/decorators/roles.decorator';
 import { OperationLog } from '../../common/decorators/operation-log.decorator';
 import { StudentService } from './student.service';

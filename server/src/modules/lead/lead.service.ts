@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository } from 'typeorm';
 import { BaseService } from '../../common/crud/base.service';
-import { BusinessException } from '../../common/exceptions/business.exception';
-import { ResCode } from '../../common/constants/response-code';
-import { PageQueryDto } from '../../common/dto/pagination.dto';
 import { Channel } from './entities/channel.entity';
 import { Campaign } from './entities/campaign.entity';
 import { Lead, LeadStage } from './entities/lead.entity';
@@ -19,7 +16,6 @@ import {
   CreateLeadDto,
   UpdateLeadDto,
   LeadPageQueryDto,
-  AssignLeadDto,
   FollowLeadDto,
   ConvertLeadDto,
   TrialLessonDto,

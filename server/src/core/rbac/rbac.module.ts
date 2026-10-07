@@ -4,10 +4,12 @@ import { User } from './user.entity';
 import { Role } from './role.entity';
 import { Permission } from './permission.entity';
 import { RbacService } from './rbac.service';
+import { UserController, RoleController, PermissionController } from './rbac.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Role, Permission])],
   providers: [RbacService],
+  controllers: [UserController, RoleController, PermissionController],
   exports: [RbacService],
 })
 export class RbacModule {}

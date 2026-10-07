@@ -11,6 +11,8 @@ export interface JwtPayload {
   sub: number;
   tenantId: number;
   username: string;
+  /** 令牌用途：access 访问令牌 / refresh 刷新令牌 */
+  type?: 'access' | 'refresh';
 }
 
 /**
@@ -32,6 +34,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<AuthUser> {
+    // 刷新令牌不能用于访问业务接口
+    if (payload.type === 'refresh') {
+      throw new UnauthorizedException('请使用访问令牌');
+    }
     const user = await this.userRepo.findOne({
       where: { id: payload.sub, tenantId: payload.tenantId },
       relations: ['roles', 'roles.permissions'],

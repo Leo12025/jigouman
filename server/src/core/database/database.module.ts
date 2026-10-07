@@ -20,7 +20,8 @@ function buildOptions(cfg: ConfigService): TypeOrmModuleOptions {
   if (dbType === 'sqlite') {
     // 使用 sql.js（纯 WASM）做本地/单测库，零原生依赖。
     // 内存态：进程重启数据清空，适合本地调试与自动化测试。
-    // 显式传入 driver 以规避 sql.js 的 CJS/ESM 互操作问题。
+    // 显式传入 driver 以规避 sql.js 的 CJS/ESM 互操作问题（需 require）。
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sqljsMod: any = require('sql.js');
     return {
       type: 'sqljs',

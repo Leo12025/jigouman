@@ -198,6 +198,103 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     expect(res.body.data.conversionRate).toBeGreaterThan(0);
   });
 
+  it('M1 刷新令牌：refreshToken 可换取新 accessToken', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ username: 'admin', password: 'admin123456' })
+      .expect(201);
+    const refreshToken = login.body.data.refreshToken;
+    expect(refreshToken).toBeTruthy();
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken })
+      .expect(201);
+    expect(res.body.data.accessToken).toBeTruthy();
+
+    // 新 accessToken 可访问业务接口
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/profile')
+      .set('Authorization', `Bearer ${res.body.data.accessToken}`)
+      .expect(200);
+
+    // 刷新令牌不能当访问令牌用
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/profile')
+      .set('Authorization', `Bearer ${refreshToken}`)
+      .expect(401);
+  });
+
+  it('M1 用户/角色/权限管理接口可用', async () => {
+    // 权限点
+    const perms = await request(app.getHttpServer())
+      .get('/api/v1/permissions')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(perms.body.data.length).toBeGreaterThan(0);
+
+    // 新建角色并分配权限
+    const role = await request(app.getHttpServer())
+      .post('/api/v1/roles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ code: 'e2e_role', name: 'E2E角色', dataScope: 'org' })
+      .expect(201);
+    const roleId = role.body.data.id;
+
+    // 新建用户并绑定该角色
+    const user = await request(app.getHttpServer())
+      .post('/api/v1/users')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ username: 'e2e_user', password: 'e2e123456', name: 'E2E用户', roleIds: [roleId] })
+      .expect(201);
+    expect(user.body.data.passwordHash).toBeUndefined();
+    expect(user.body.data.roles[0].id).toBe(roleId);
+
+    // 列表可见
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/users?keyword=e2e_user')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(list.body.data.total).toBe(1);
+
+    // 不能删除当前登录账号
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/1`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+  });
+
+  it('M2 批量排课：按周生成课次并跳过冲突时段', async () => {
+    // 2026-10-05 是周一；生成 10/05~10/11 两周的周一课次
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/courses/lessons/generate')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        classGroupId,
+        startDate: '2026-10-05',
+        endDate: '2026-10-18',
+        slots: [{ weekday: 1, start: '14:00', end: '15:00' }],
+      })
+      .expect(201);
+    // 10/05, 10/12 两次（与已有 09:00 课次不冲突）
+    expect(res.body.data.createdCount).toBe(2);
+    expect(res.body.data.skippedCount).toBe(0);
+
+    // 重复生成同一时段 → 全部冲突被跳过
+    const again = await request(app.getHttpServer())
+      .post('/api/v1/courses/lessons/generate')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        classGroupId,
+        startDate: '2026-10-05',
+        endDate: '2026-10-18',
+        slots: [{ weekday: 1, start: '14:00', end: '15:00' }],
+      })
+      .expect(201);
+    expect(again.body.data.createdCount).toBe(0);
+    expect(again.body.data.skippedCount).toBe(2);
+  });
+
   afterAll(async () => {
     await app.close();
   });

@@ -24,6 +24,7 @@ import {
   CreateLessonDto,
   UpdateLessonDto,
   CoursePageQueryDto,
+  GenerateLessonsDto,
 } from './dto/course.dto';
 import { PageQueryDto } from '../../common/dto/pagination.dto';
 
@@ -153,6 +154,14 @@ export class CourseController {
   createLesson(@CurrentUser() u: AuthUser, @TenantId() t: number, @Body() d: CreateLessonDto) {
     void u;
     return this.svc.createLesson(t, d);
+  }
+
+  @Post('lessons/generate')
+  @RequirePermissions('lesson:create')
+  @OperationLog({ action: 'lesson:generate', target: 'lesson' })
+  @ApiOperation({ summary: '按周批量生成课次(含冲突检测 §8.5)' })
+  generateLessons(@TenantId() t: number, @Body() d: GenerateLessonsDto) {
+    return this.svc.generateLessons(t, d);
   }
 
   @Put('lessons/:id')

@@ -19,6 +19,8 @@ import {
   CreateLessonDto,
   UpdateLessonDto,
   CoursePageQueryDto,
+  GenerateLessonsDto,
+  LessonSlotDto,
 } from './dto/course.dto';
 
 @Injectable()
@@ -141,6 +143,70 @@ export class CourseService {
   }
   removeLesson(t: number, id: number) {
     return this.lesson.remove(t, id);
+  }
+
+  /**
+   * 按周批量生成课次（文档 §4.1 课次编排 / §6.12）。
+   * 时段优先取入参 slots，否则取班级 scheduleJson。
+   * 逐条做冲突检测（§8.5）：冲突的时段跳过并计数，不中断整体生成。
+   */
+  async generateLessons(t: number, d: GenerateLessonsDto) {
+    const cg = await this.classGroup.findOne(t, d.classGroupId);
+    const slots: LessonSlotDto[] = (d.slots?.length
+      ? d.slots
+      : (cg.scheduleJson as any[] | undefined) || []) as LessonSlotDto[];
+    if (!slots.length) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '未配置上课时段：请传 slots 或设置班级上课周期');
+    }
+    const teacherId = d.teacherId ?? cg.teacherId;
+
+    const created: Lesson[] = [];
+    const skipped: { date: string; reason: string }[] = [];
+
+    const start = new Date(d.startDate);
+    const end = new Date(d.endDate);
+    if (end.getTime() < start.getTime()) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '结束日期不能早于开始日期');
+    }
+
+    for (let cur = new Date(start); cur.getTime() <= end.getTime(); cur.setDate(cur.getDate() + 1)) {
+      // JS getDay: 0=周日；业务 weekday: 1=周一 ... 7=周日
+      const jsDay = cur.getDay();
+      const weekday = jsDay === 0 ? 7 : jsDay;
+      for (const slot of slots) {
+        if (slot.weekday !== weekday) continue;
+        const s = this.atTime(cur, slot.start);
+        const e = this.atTime(cur, slot.end);
+        try {
+          await this.assertNoConflict(t, teacherId, d.roomId, cg.id, s, e);
+          created.push(
+            await this.lesson.create(t, {
+              classGroupId: cg.id,
+              courseId: cg.courseId,
+              teacherId,
+              startTime: s,
+              endTime: e,
+              roomId: d.roomId,
+              status: LessonStatus.SCHEDULED,
+            }),
+          );
+        } catch (e) {
+          skipped.push({
+            date: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')} ${slot.start}`,
+            reason: (e as any)?.message || '排课冲突',
+          });
+        }
+      }
+    }
+    return { createdCount: created.length, skippedCount: skipped.length, created, skipped };
+  }
+
+  /** 把 YYYY-MM-DD + HH:mm 组装为本地时间 Date */
+  private atTime(d: Date, hhmm: string): Date {
+    const [h, m] = hhmm.split(':').map(Number);
+    const x = new Date(d);
+    x.setHours(h || 0, m || 0, 0, 0);
+    return x;
   }
 
   /**

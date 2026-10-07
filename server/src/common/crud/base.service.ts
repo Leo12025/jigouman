@@ -2,7 +2,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Repository, FindOptionsWhere, In } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { BaseEntity } from '../base.entity';
 import { PageQueryDto, PageResult } from '../dto/pagination.dto';
 import { BusinessException } from '../exceptions/business.exception';

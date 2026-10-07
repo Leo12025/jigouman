@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToMany, JoinTable, Index } from 'typeorm';
+import { Entity, Column, Index } from 'typeorm';
 import { BaseEntity } from '../../common/base.entity';
 
 /** 权限点（RBAC 叶子节点，对应菜单/按钮/数据权限） */

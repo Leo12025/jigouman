@@ -1,12 +1,7 @@
-import {
-  Module,
-  NestModule,
-  MiddlewareConsumer,
-  RequestMethod,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
 
 import { DatabaseModule } from './core/database/database.module';
 import { AuditModule } from './core/audit/audit.module';
@@ -25,6 +20,8 @@ import { LeadModule } from './modules/lead/lead.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    // 全局限流（文档 §9.2 防刷限流）；登录/刷新接口用 @Throttle 单独收紧
+    ThrottlerModule.forRoot([{ name: 'default', ttl: minutes(1), limit: 300 }]),
     DatabaseModule,
     AuditModule,
     AuthModule,
@@ -34,7 +31,8 @@ import { LeadModule } from './modules/lead/lead.module';
     LeadModule,
   ],
   providers: [
-    // 鉴权顺序：JWT 校验 → 解析租户 → 校验权限
+    // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
