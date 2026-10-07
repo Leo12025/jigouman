@@ -81,3 +81,26 @@ export interface Funnel {
   signed: number;
   conversionRate: number;
 }
+
+export interface RoleInfo {
+  id: number;
+  code: string;
+  name: string;
+  dataScope?: string;
+}
+
+export interface PermissionInfo {
+  id: number;
+  code: string;
+  name: string;
+  group?: string;
+}
+
+export interface UserInfo {
+  id: number;
+  username: string;
+  name?: string;
+  phone?: string;
+  tenantId: number;
+  roles: RoleInfo[];
+}

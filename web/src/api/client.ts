@@ -1,10 +1,19 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { message } from 'antd';
 
 export const TOKEN_KEY = 'jm_token';
+export const REFRESH_KEY = 'jm_refresh';
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
-export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
+export const setTokens = (accessToken: string, refreshToken?: string) => {
+  localStorage.setItem(TOKEN_KEY, accessToken);
+  if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+};
+export const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+};
 
 /** 统一响应体（文档 §6：{ code, message, data, traceId }） */
 interface ApiBody<T> {
@@ -24,6 +33,59 @@ http.interceptors.request.use((cfg) => {
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
   return cfg;
 });
+
+/** 刷新令牌（并发请求只触发一次） */
+let refreshing: Promise<string | null> | null = null;
+async function doRefresh(): Promise<string | null> {
+  const rt = getRefreshToken();
+  if (!rt) return null;
+  try {
+    const res = await axios.post<ApiBody<{ accessToken: string }>>(
+      `${import.meta.env.VITE_API_BASE || '/api/v1'}/auth/refresh`,
+      { refreshToken: rt },
+    );
+    if (res.data?.code === 0 && res.data.data?.accessToken) {
+      setTokens(res.data.data.accessToken);
+      return res.data.data.accessToken;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function redirectToLogin() {
+  clearToken();
+  if (!window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login';
+  }
+}
+
+// 业务码 0 视为成功；HTTP 401 时先用 refreshToken 续期并重放一次，失败才跳登录
+http.interceptors.response.use(
+  (res) => res,
+  async (error: AxiosError<ApiBody<unknown>>) => {
+    const original = error.config as (typeof error.config & { _retried?: boolean }) | undefined;
+    const status = error.response?.status;
+    if (status === 401 && original && !original._retried) {
+      original._retried = true;
+      refreshing = refreshing || doRefresh().finally(() => {
+        refreshing = null;
+      });
+      const newToken = await refreshing;
+      if (newToken) {
+        original.headers = original.headers || ({} as any);
+        (original.headers as any).Authorization = `Bearer ${newToken}`;
+        return http.request(original);
+      }
+      redirectToLogin();
+    }
+    const body = error.response?.data;
+    if (body?.message) message.error(body.message);
+    else message.error(error.message || '网络异常');
+    return Promise.reject(error);
+  },
+);
 
 async function unwrap<T>(p: Promise<{ data: ApiBody<T> }>): Promise<T> {
   const res = await p;
