@@ -12,6 +12,8 @@ import { ResponseInterceptor } from '../src/common/interceptors/response.interce
 describe('机构管理系统 (e2e, SQLite)', () => {
   let app: INestApplication;
   let token: string;
+  let channelId: number;
+  let leadId: number;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -21,7 +23,12 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true }),
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: false,
+        transformOptions: { enableImplicitConversion: true },
+      }),
     );
     // 复现 main.ts 的全局统一响应包装，便于断言 res.body.code/data
     app.useGlobalInterceptors(new ResponseInterceptor());
@@ -85,6 +92,99 @@ describe('机构管理系统 (e2e, SQLite)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send(lesson)
       .expect(409);
+  });
+
+  it('M3 渠道：可创建并列出渠道', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/channels')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: '抖音', type: 'DOUYIN', cost: 1000, source: 'douyin' })
+      .expect(201);
+    expect(res.body.data.id).toBeGreaterThan(0);
+    channelId = res.body.data.id;
+
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/channels')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(list.body.data.some((c: any) => c.id === channelId)).toBe(true);
+  });
+
+  it('M3 线索：新建为 NEW → 分配后 FOLLOWING → 跟进', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/leads')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: '张小明', phone: '13800001111', channelId, gender: 1 })
+      .expect(201);
+    leadId = created.body.data.id;
+    expect(created.body.data.stage).toBe('NEW');
+
+    const assigned = await request(app.getHttpServer())
+      .post(`/api/v1/leads/${leadId}/assign`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ownerId: 7 })
+      .expect(201);
+    expect(assigned.body.data.stage).toBe('FOLLOWING');
+    expect(assigned.body.data.ownerId).toBe(7);
+
+    const followed = await request(app.getHttpServer())
+      .post(`/api/v1/leads/${leadId}/follow`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'CALL', content: '首次电话沟通，意向数学一对一' })
+      .expect(201);
+    expect(followed.body.data.leadId).toBe(leadId);
+  });
+
+  it('M3 试听：到课后线索阶段推进为 TRIALED', async () => {
+    const trial = await request(app.getHttpServer())
+      .post(`/api/v1/leads/${leadId}/trials`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ attended: true, feedback: '试听表现良好' })
+      .expect(201);
+    expect(trial.body.data.attended).toBe(1);
+
+    const lead = await request(app.getHttpServer())
+      .get(`/api/v1/leads/${leadId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(lead.body.data.stage).toBe('TRIALED');
+  });
+
+  it('M3 转化：线索转学员(SIGNED)并打通学员档案', async () => {
+    const converted = await request(app.getHttpServer())
+      .post(`/api/v1/leads/${leadId}/convert`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+      .expect(201);
+    const studentId = converted.body.data.studentId;
+    expect(studentId).toBeGreaterThan(0);
+
+    // 学员档案已建立并绑定家长
+    const student = await request(app.getHttpServer())
+      .get(`/api/v1/students/${studentId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(student.body.data.name).toBe('张小明');
+    expect(student.body.data.parents.length).toBe(1);
+    expect(student.body.data.parents[0].phone).toBe('13800001111');
+
+    // 线索回写学员ID + 阶段 SIGNED
+    const lead = await request(app.getHttpServer())
+      .get(`/api/v1/leads/${leadId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(lead.body.data.stage).toBe('SIGNED');
+    expect(lead.body.data.convertedStudentId).toBe(studentId);
+  });
+
+  it('M3 漏斗：按阶段统计并给出转化率', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/leads/funnel?channelId=${channelId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body.data.total).toBeGreaterThan(0);
+    expect(res.body.data.byStage.SIGNED).toBe(1);
+    expect(res.body.data.conversionRate).toBeGreaterThan(0);
   });
 
   afterAll(async () => {

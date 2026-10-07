@@ -40,10 +40,14 @@ export class StudentService {
     const where: any = {};
     if (q.status) where.status = q.status;
     if (q.keyword) where.name = Like(`%${q.keyword}%`);
-    return this.student.paginate(t, q, where, ['studentCourses', 'parents']);
+    return this.student.paginate(t, q, where);
   }
-  getStudent(t: number, id: number) {
-    return this.student.findOne(t, id, ['studentCourses', 'parents']);
+  async getStudent(t: number, id: number) {
+    const student = await this.student.findOne(t, id);
+    // 实体采用普通外键列（无 ORM 关联），子表数据单独查询后装配
+    (student as any).parents = await this.listParents(t, student.id);
+    (student as any).studentCourses = await this.listEnroll(t, student.id);
+    return student;
   }
   updateStudent(t: number, id: number, d: UpdateStudentDto) {
     const patch: any = { ...d };

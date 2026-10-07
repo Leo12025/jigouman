@@ -20,6 +20,7 @@ import { RbacService } from './core/rbac/rbac.service';
 
 import { CourseModule } from './modules/course/course.module';
 import { StudentModule } from './modules/student/student.module';
+import { LeadModule } from './modules/lead/lead.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { StudentModule } from './modules/student/student.module';
     RbacModule,
     CourseModule,
     StudentModule,
+    LeadModule,
   ],
   providers: [
     // 鉴权顺序：JWT 校验 → 解析租户 → 校验权限

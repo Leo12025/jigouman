@@ -12,6 +12,8 @@ const MODULES = [
   'class-group',
   'lesson',
   'student',
+  'channel',
+  'campaign',
   'lead',
   'order',
   'hour',
@@ -25,6 +27,9 @@ const MODULES = [
   'report',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
+
+/** 业务动作型权限点（非标准 增删改查，如分配/跟进/转化） */
+const EXTRA_PERMS = ['lead:assign', 'lead:follow', 'lead:convert'];
 
 @Injectable()
 export class RbacService {
@@ -56,6 +61,20 @@ export class RbacService {
         }
         permMap.set(code, p);
       }
+    }
+    // 业务动作型权限点（如 lead:assign/follow/convert）
+    for (const code of EXTRA_PERMS) {
+      let p = await this.permRepo.findOne({ where: { tenantId, code } });
+      if (!p) {
+        p = this.permRepo.create({
+          tenantId,
+          code,
+          name: code,
+          group: code.split(':')[0],
+        });
+        p = await this.permRepo.save(p);
+      }
+      permMap.set(code, p);
     }
     const allPerms = [...permMap.values()];
 
