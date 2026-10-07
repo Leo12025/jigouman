@@ -25,9 +25,9 @@
 ├── web/                           # ★ 网页端（PC 管理后台，React + Ant Design 5）
 │   ├── src/
 │   │   ├── theme.ts               # 设计 Token 唯一真源（文档 §12.2）
-│   │   ├── api/                   # axios 客户端（解包 code/data、JWT 注入）+ 接口封装
-│   │   ├── layouts/               # 侧栏 + 顶栏布局
-│   │   ├── pages/                 # 页面（登录/渠道/活动/线索/漏斗）
+│   │   ├── api/                   # axios 客户端（解包 code/data、JWT 注入、401 自动续期）+ 接口封装
+│   │   ├── layouts/               # 侧栏 + 顶栏（机构/用户信息）布局
+│   │   ├── pages/                 # 页面（见下方「页面清单」）
 │   │   ├── App.tsx                # 路由 + 登录守卫
 │   │   └── main.tsx               # ConfigProvider 主题注入入口
 │   ├── vite.config.ts             # dev 代理 /api → http://localhost:3000
@@ -79,10 +79,22 @@ npm test        # 后端 e2e：登录 / RBAC / 排课冲突 / 班级详情 / 线
 
 | 里程碑 | 后端模块 | 网页端页面 |
 |--------|----------|-----------|
-| M1 基础框架 | `core/`（auth、rbac、tenant、audit） | 登录页、主布局 |
-| M2 课程+学员 | `modules/course`、`modules/student` | 待补齐 |
+| M1 基础框架 | `core/`（auth、rbac、tenant、audit） | 登录页、首页看板、主布局、用户管理、角色权限 |
+| M2 课程+学员 | `modules/course`、`modules/student` | 课程管理、班级管理、课次排课、学员档案 |
 | M3 线索+招生 | `modules/lead` | 渠道管理、市场活动、线索 CRM、转化漏斗 |
 | M4 订单+课时 | 待开发 | 待开发 |
 | M5 作业+家长端 | 待开发 | 家长端/老师端 H5（Ant Design Mobile）待开发 |
+
+### 页面清单（web/src/pages）
+`Login` 登录 · `HomePage` 首页看板 · `CoursePage` 课程/分类 · `ClassGroupPage` 班级 ·
+`LessonPage` 课次排课（单条 + 按周批量生成）· `StudentPage` 学员/家长/报名 ·
+`LeadPage` 线索 CRM · `ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
+`UserPage` 用户 · `RolePage` 角色权限
+
+### 鉴权与安全
+- 登录返回 `accessToken` + `refreshToken`；前端请求自动携带 Bearer 令牌。
+- 访问令牌过期时，客户端自动用 `refreshToken` 续期并重放请求，续期失败才跳转登录页。
+- 全局限流：默认 300 次/分钟/IP；登录接口 10 次/分钟、刷新接口 30 次/分钟。
+- 刷新令牌不能作为访问令牌访问业务接口（后端 `JwtStrategy` 校验令牌类型）。
 
 > 完整字段、枚举与接口约定见 `docs/开发文档-机构管理系统.md` §5 / §6 / §11.3。

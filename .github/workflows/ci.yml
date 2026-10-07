@@ -7,11 +7,15 @@ on:
     branches: [main, develop]
 
 jobs:
-  build-and-test:
+  server:
+    name: 后端 (server)
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [20.x, 22.x]
+    defaults:
+      run:
+        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js ${{ matrix.node-version }}
@@ -19,18 +23,45 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: server/package-lock.json
       - run: npm ci
-      - run: npm run lint
+      - name: Lint
+        run: npm run lint
       - run: npm run build
       # 端到端冒烟：sql.js 内存库，无需 MySQL/Redis/Docker
       - name: 端到端测试
         run: npm run test:e2e
-      # 启动冒烟（同样走 sqlite 内存库）
-      - name: 启动并检查 Swagger
+      - name: 启动冒烟 + 校验登录接口
         run: |
           cp .env.example .env
           npm run start:prod &
           SERVER_PID=$!
-          sleep 8
-          curl -f http://localhost:${{ env.PORT || 3000 }}/docs || true
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/docs >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS -X POST http://localhost:3000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"admin123456"}' | grep -q accessToken
           kill $SERVER_PID || true
+
+  web:
+    name: 前端 (web)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # tsc --noEmit 类型检查 + vite build
+      - run: npm run build
