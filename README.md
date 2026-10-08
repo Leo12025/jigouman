@@ -1,7 +1,10 @@
 # 校外培训机构管理系统（前后端分离）
 
 依据 `docs/开发文档-机构管理系统.md`（v1.9）实现。
-当前交付：**M1 基础框架 + M2 课程/学员 + M3 线索/招生**。
+当前交付：**M1 基础框架 + M2 课程/学员 + M3 线索/招生 + M4 订单/课时**
+（M4 含文档 §4.5 财务：退费按消课比例扣费、分账、教师工资、发票、财务报表；§4.6 课时：补课排课、点名自动生成课后点评任务）。
+
+> 环境要求：**Node >= 22**（前后端均已声明 `engines`）。
 
 ## 目录结构
 
@@ -18,7 +21,11 @@
 │   │   └── modules/               # 业务模块
 │   │       ├── course/            # M2 课程·分类·班级·课次（排课冲突检测）
 │   │       ├── student/           # M2 学员·家长多对多绑定·报名
-│   │       └── lead/              # M3 渠道·活动·线索·跟进·试听·转化·漏斗
+│   │       ├── lead/              # M3 渠道·活动·线索·跟进·试听·转化·漏斗
+│   │       ├── order/             # M4 订单·订单项·支付·退费（状态机 + 退费按消课比例）
+│   │       ├── hour/              # M4 课时账户·消课流水·考勤点名·请假·补课排课
+│   │       ├── finance/           # M4 §4.5 分账配置/记录、教师工资单、发票、财务报表汇总
+│   │       └── task/              # M4 §4.26 待办中心骨架（课后点评任务）
 │   ├── test/                      # e2e 测试（jest + supertest，零外部依赖）
 │   ├── .env.example
 │   └── package.json
@@ -39,8 +46,10 @@
 
 | 端 | 技术栈 |
 |----|--------|
-| 后端 `server/` | NestJS 10 + TypeScript + TypeORM + MySQL 8（本地默认 sql.js 内存库）+ JWT + Swagger |
+| 后端 `server/` | NestJS 10 + TypeScript + TypeORM + MySQL 8（本地默认 **better-sqlite3** 原生 SQLite）+ JWT + Swagger |
 | 网页端 `web/` | React 18 + TypeScript + Vite + **Ant Design 5**（遵循文档 §12 UI 规范：Token 唯一真源、列表=筛选条+表格+分页、详情=Descriptions+Tabs） |
+
+> 本地 SQLite 用 `better-sqlite3`（原生驱动，性能好、类型行为接近 MySQL）。因 Node 固定 22、ABI 稳定，无需 Docker/MySQL 即可启动与跑测试。
 
 ## 快速开始（前后端共用同一套后端）
 
@@ -65,15 +74,20 @@ npm run dev:web      # 网页端 http://localhost:5173
 启动后端会自动完成：建表（`DB_SYNCHRONIZE=true`）→ 初始化默认租户、权限点、角色与超级管理员。
 
 - 默认账号：`admin` / `admin123456`
-- 本地默认使用 **sql.js 内存库**（零依赖、无需 Docker/MySQL），进程重启数据清空；
-  需要持久化时把 `server/.env` 的 `DB_TYPE` 改为 `mysql` 并配置 `DB_*`。
+- 本地默认使用 **better-sqlite3 内存库**（`DB_SQLITE_PATH=:memory:`，进程重启数据清空）；
+  - 需要本地落盘调试：把 `DB_SQLITE_PATH` 改为文件路径（如 `./data.db`），数据即可持久化查看；
+  - 需要连 MySQL：把 `DB_TYPE` 改为 `mysql` 并配置 `DB_*`。
 
 ## 构建与测试
 
 ```bash
 npm run build   # 后端 nest build + 前端 vite build
-npm test        # 后端 e2e：登录 / RBAC / 排课冲突 / 班级详情 / 线索全流程 / 漏斗
+npm test        # 后端 e2e（15 个用例，better-sqlite3 内存库，零外部依赖）
 ```
+
+e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全流程 · 漏斗 ·
+**M4 基础闭环**（下单→支付→发放课时→点名消课→退费回滚）·
+**M4 进阶**（退费按消课比例、分账、教师工资、发票开具、补课排课、课后点评任务、财务报表）。
 
 ## 里程碑与模块对应
 
@@ -82,17 +96,23 @@ npm test        # 后端 e2e：登录 / RBAC / 排课冲突 / 班级详情 / 线
 | M1 基础框架 | `core/`（auth、rbac、tenant、audit） | 登录页、首页看板、主布局、用户管理、角色权限 |
 | M2 课程+学员 | `modules/course`、`modules/student` | 课程管理、班级管理、课次排课、学员档案 |
 | M3 线索+招生 | `modules/lead` | 渠道管理、市场活动、线索 CRM、转化漏斗 |
-| M4 订单+课时 | `modules/order`、`modules/hour` | 订单与财务（下单/支付/退费）、课时管理（账户/流水/预警）、课次点名消课 |
+| M4 订单+课时 | `modules/order`、`modules/hour`、`modules/finance`、`modules/task` | 订单与财务（下单/支付/退费预览）、课时管理（账户/流水/预警）、课次点名消课、财务对账（分账/工资/发票/报表）、待办中心 |
 | M5 作业+家长端 | 待开发 | 家长端/老师端 H5（Ant Design Mobile）待开发 |
 
-> M4 已闭环：下单→支付（自动发放课时）→上课点名消课→退费（审批后课时回滚防资损）。
-> 文档 §4.5 中的**分账（渠道/老师）、工资、发票、财务对账/报表**及 §4.6 的**请假补课核销**为后续增强项，本次未实现。
+> M4 已闭环并全量补齐：
+> - **订单链路**：下单→支付（自动发放课时）→上课点名消课→退费（审批后按剩余课时回滚，防资损）
+> - **§4.5 财务**：退费按消课比例扣费、分账（教师提成/渠道分成）、教师工资单、电子发票、财务报表汇总
+> - **§4.6 课时**：请假不消课、补课排课（占用可用课时）、点名后自动生成"待写课后点评"任务（§4.26 待办中心骨架）
+>
+> 未接入外部能力（仅本地记录与状态模拟）：持牌支付机构的**实时分账**、税务**发票开具 API**；
+> 优惠体系（优惠券/折扣）依赖 §4.17 券模块，尚未实现。
 
 ### 页面清单（web/src/pages）
 `Login` 登录 · `HomePage` 首页看板 · `CoursePage` 课程/分类 · `ClassGroupPage` 班级 ·
-`LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课）· `StudentPage` 学员/家长/报名 ·
-`OrderPage` 订单与财务 · `HourPage` 课时管理 · `LeadPage` 线索 CRM ·
-`ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
+`LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课 + 补课排课）· `StudentPage` 学员/家长/报名 ·
+`OrderPage` 订单与财务（下单/支付/退费预览按消课比例）· `HourPage` 课时管理（账户/流水/预警）·
+`FinancePage` 财务对账（分账/工资 · 发票 · 财务报表）· `TaskPage` 待办中心（课后点评任务）·
+`LeadPage` 线索 CRM · `ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
 `UserPage` 用户 · `RolePage` 角色权限
 
 ### 鉴权与安全
@@ -101,4 +121,5 @@ npm test        # 后端 e2e：登录 / RBAC / 排课冲突 / 班级详情 / 线
 - 全局限流：默认 300 次/分钟/IP；登录接口 10 次/分钟、刷新接口 30 次/分钟。
 - 刷新令牌不能作为访问令牌访问业务接口（后端 `JwtStrategy` 校验令牌类型）。
 
-> 完整字段、枚举与接口约定见 `docs/开发文档-机构管理系统.md` §5 / §6 / §11.3。
+> 完整字段、枚举与接口约定见 `docs/开发文档-机构管理系统.md`：
+> §4.5 订单与财务 · §4.6 课时管理 · §4.26 待办中心 · §5 数据库设计 · §6 API · §11.3 状态机。
