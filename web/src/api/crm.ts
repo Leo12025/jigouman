@@ -110,3 +110,26 @@ export const updateRole = (id: number, d: any) => apiPut<any>(`/roles/${id}`, d)
 export const deleteRole = (id: number) => apiDelete(`/roles/${id}`);
 
 export const listPermissions = () => apiGet<PermissionInfo[]>('/permissions');
+
+// ---------- 订单与财务 (M4) ----------
+export const listOrders = (params: any) => apiGet<PageResult<any>>('/orders', params);
+export const getOrder = (id: number) => apiGet<any>(`/orders/${id}`);
+export const createOrder = (d: any) => apiPost<any>('/orders', d);
+export const payOrder = (id: number, d: any) => apiPost<any>(`/orders/${id}/pay`, d);
+export const refundOrder = (id: number, d: any) => apiPost<any>(`/orders/${id}/refund`, d);
+export const approveRefund = (id: number, refundId: number) =>
+  apiPost<any>(`/orders/${id}/refund/${refundId}/approve`);
+
+// ---------- 课时管理 (M4) ----------
+export const getStudentHours = (studentId: number) =>
+  apiGet<any[]>(`/students/${studentId}/hours`);
+export const listHourAccounts = (params: any) => apiGet<PageResult<any>>('/hour-accounts', params);
+export const listHourConsumptions = (params: any) =>
+  apiGet<PageResult<any>>('/hour-consumptions', params);
+export const grantHours = (d: any) => apiPost<any>('/hour-accounts/grant', d);
+export const attendLesson = (lessonId: number, d: any) =>
+  apiPost<any>(`/lessons/${lessonId}/attendance`, d);
+export const leaveLesson = (lessonId: number, d: any) =>
+  apiPost<any>(`/lessons/${lessonId}/leave`, d);
+export const listClassGroupStudents = (classGroupId: number) =>
+  apiGet<{ id: number; name: string }[]>(`/students/by-class-group/${classGroupId}`);

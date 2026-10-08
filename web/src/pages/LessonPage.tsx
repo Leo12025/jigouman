@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, TimePicker, Tag, message, Popconfirm, Alert,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, TimePicker, Tag, message, Popconfirm, Alert, Radio, Empty,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { listLessons, createLesson, updateLesson, deleteLesson, generateLessons, listClassGroups, listCourses } from '../api/crm';
+import { listLessons, createLesson, updateLesson, deleteLesson, generateLessons, listClassGroups, listCourses, listClassGroupStudents, attendLesson } from '../api/crm';
 
 const { RangePicker } = DatePicker;
 
@@ -25,6 +25,9 @@ export default function LessonPage() {
   const [genOpen, setGenOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [genResult, setGenResult] = useState<any>(null);
+  const [attendOpen, setAttendOpen] = useState(false);
+  const [attendLessonId, setAttendLessonId] = useState<number | null>(null);
+  const [attendStudents, setAttendStudents] = useState<any[]>([]);
   const [form] = Form.useForm();
   const [genForm] = Form.useForm();
 
@@ -74,6 +77,26 @@ export default function LessonPage() {
     load();
   };
 
+  const openAttend = async (r: any) => {
+    setAttendLessonId(r.id);
+    try {
+      const stus = await listClassGroupStudents(r.classGroupId);
+      setAttendStudents(stus.map((s: any) => ({ ...s, status: 'PRESENT' })));
+    } catch {
+      setAttendStudents([]);
+    }
+    setAttendOpen(true);
+  };
+  const submitAttend = async () => {
+    if (!attendLessonId) return;
+    const res = await attendLesson(attendLessonId, {
+      records: attendStudents.map((s) => ({ studentId: s.id, status: s.status })),
+    });
+    message.success(`点名完成，已消课 ${res.filter((a: any) => a.hours > 0).length} 人`);
+    setAttendOpen(false);
+    load();
+  };
+
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '班级', dataIndex: 'classGroupId', width: 120, render: (v: number) => groupName(v) },
@@ -86,6 +109,7 @@ export default function LessonPage() {
       title: '操作', width: 140, render: (_: any, r: any) => (
         <Space>
           <Button type="link" size="small" onClick={() => { setEditing(r); form.setFieldsValue({ classGroupId: r.classGroupId, courseId: r.courseId, teacherId: r.teacherId, roomId: r.roomId, range: [dayjs(r.startTime), dayjs(r.endTime)] }); setOpen(true); }}>调课</Button>
+          <Button type="link" size="small" onClick={() => openAttend(r)}>点名消课</Button>
           <Popconfirm title="确认删除该课次？" okText="删除" cancelText="取消" onConfirm={async () => { await deleteLesson(r.id); message.success('已删除'); load(); }}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
@@ -156,6 +180,33 @@ export default function LessonPage() {
                 {genResult.skipped.map((s: any, i: number) => (<div key={i}>{s.date} — {s.reason}</div>))}
               </div>
             ) : undefined} />
+        )}
+      </Modal>
+
+      {/* 点名消课 */}
+      <Modal title="课次点名消课" open={attendOpen} width={560} onOk={submitAttend} onCancel={() => setAttendOpen(false)} okText="确认点名" cancelText="取消">
+        {attendStudents.length ? (
+          <div>
+            {attendStudents.map((s) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <span>{s.name}</span>
+                <Radio.Group
+                  value={s.status}
+                  onChange={(e) => setAttendStudents((prev) => prev.map((x) => (x.id === s.id ? { ...x, status: e.target.value } : x)))}
+                  optionType="button" buttonStyle="solid"
+                  options={[
+                    { label: '出勤', value: 'PRESENT' },
+                    { label: '补课', value: 'MAKEUP' },
+                    { label: '请假', value: 'LEAVE' },
+                    { label: '缺勤', value: 'ABSENT' },
+                  ]}
+                />
+              </div>
+            ))}
+            <div style={{ marginTop: 8, color: 'rgba(0,0,0,.45)', fontSize: 12 }}>出勤/补课各扣 1 课时；请假/缺勤不扣课（§4.6）</div>
+          </div>
+        ) : (
+          <Empty description="该班级暂无在读学员，请先在学员档案中报名" />
         )}
       </Modal>
     </div>

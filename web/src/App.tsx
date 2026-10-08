@@ -11,6 +11,8 @@ import CoursePage from './pages/CoursePage';
 import ClassGroupPage from './pages/ClassGroupPage';
 import LessonPage from './pages/LessonPage';
 import StudentPage from './pages/StudentPage';
+import OrderPage from './pages/OrderPage';
+import HourPage from './pages/HourPage';
 import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 
@@ -35,6 +37,8 @@ export default function App() {
         <Route path="class-groups" element={<ClassGroupPage />} />
         <Route path="lessons" element={<LessonPage />} />
         <Route path="students" element={<StudentPage />} />
+        <Route path="orders" element={<OrderPage />} />
+        <Route path="hours" element={<HourPage />} />
         <Route path="leads" element={<LeadPage />} />
         <Route path="channels" element={<ChannelPage />} />
         <Route path="campaigns" element={<CampaignPage />} />

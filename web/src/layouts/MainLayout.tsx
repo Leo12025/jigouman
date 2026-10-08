@@ -8,6 +8,7 @@ import {
   BookOutlined,
   ReconciliationOutlined,
   CalendarOutlined,
+  ClockCircleOutlined,
   UserOutlined,
   SolutionOutlined,
   SafetyCertificateOutlined,
@@ -51,6 +52,8 @@ export default function MainLayout() {
         { key: '/class-groups', icon: <Team2Outlined />, label: '班级管理' },
         { key: '/lessons', icon: <CalendarOutlined />, label: '课次排课' },
         { key: '/students', icon: <SolutionOutlined />, label: '学员档案' },
+        { key: '/orders', icon: <ReconciliationOutlined />, label: '订单与财务' },
+        { key: '/hours', icon: <ClockCircleOutlined />, label: '课时管理' },
       ],
     },
     {
