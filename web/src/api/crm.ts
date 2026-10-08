@@ -160,3 +160,18 @@ export const removeTask = (id: number) => apiDelete(`/tasks/${id}`);
 // ---------- 补课排课 (§4.6) ----------
 export const scheduleMakeup = (d: any) => apiPost<any>('/lessons/makeup', d);
 
+// ---------- 作业 (§4.7) ----------
+export const createHomework = (d: any) => apiPost<any>('/homework', d);
+export const listHomeworks = (params: any) => apiGet<PageResult<any>>('/homework', params);
+export const getHomework = (id: number) => apiGet<any>(`/homework/${id}`);
+export const submitHomework = (id: number, d: any) => apiPost<any>(`/homework/${id}/submit`, d);
+export const reviewHomework = (submitId: number, d: any) => apiPost<any>(`/homework/submit/${submitId}/review`, d);
+export const listHomeworkSubmits = (params: any) => apiGet<PageResult<any>>('/homework/submits/list', params);
+export const homeworkStats = (id: number) => apiGet<any>(`/homework/${id}/stats`);
+export const homeworkUnsubmitted = (id: number) => apiGet<any[]>(`/homework/${id}/unsubmitted`);
+
+// ---------- 家校点评 (§6.6) ----------
+export const createCourseReview = (d: any) => apiPost<any>('/course-reviews', d);
+export const listStudentReviews = (studentId: number, params?: any) =>
+  apiGet<PageResult<any>>(`/students/${studentId}/reviews`, params);
+

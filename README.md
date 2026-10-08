@@ -1,8 +1,9 @@
 # 校外培训机构管理系统（前后端分离）
 
 依据 `docs/开发文档-机构管理系统.md`（v1.9）实现。
-当前交付：**M1 基础框架 + M2 课程/学员 + M3 线索/招生 + M4 订单/课时**
-（M4 含文档 §4.5 财务：退费按消课比例扣费、分账、教师工资、发票、财务报表；§4.6 课时：补课排课、点名自动生成课后点评任务）。
+当前交付：**M1 基础框架 + M2 课程/学员 + M3 线索/招生 + M4 订单/课时 + M5 作业/家长端**
+（M4 含文档 §4.5 财务：退费按消课比例扣费、分账、教师工资、发票、财务报表；§4.6 课时：补课排课、点名自动生成课后点评任务。
+M5 含 §4.7 作业闭环与 §6.23/§11.6 家长端 H5）。
 
 > 环境要求：**Node >= 22**（前后端均已声明 `engines`）。
 
@@ -26,8 +27,18 @@
 │   │       ├── hour/              # M4 课时账户·消课流水·考勤点名·请假·补课排课
 │   │       ├── finance/           # M4 §4.5 分账配置/记录、教师工资单、发票、财务报表汇总
 │   │       └── task/              # M4 §4.26 待办中心骨架（课后点评任务）
+│   │       ├── homework/          # M5 作业布置·提交·批改·统计（§4.7）
+│   │       ├── parent/            # M5 家长账号·OTP登录·绑定·我的作业/课表/点评（§6.23）
+│   │       └── family/            # M5 家校服务：课后点评 course_review（§6.6）
 │   ├── test/                      # e2e 测试（jest + supertest，零外部依赖）
 │   ├── .env.example
+│   └── package.json
+├── mobile/                        # ★ 移动端 H5（家长端，React + Ant Design Mobile 5）
+│   ├── src/
+│   │   ├── api/                   # axios 客户端（家长 token）+ 家长端接口
+│   │   ├── pages/                 # 登录(OTP) · 我的学员 · 课表 · 作业 · 点评
+│   │   └── main.tsx               # 路由 + 登录守卫（HashRouter）
+│   ├── vite.config.ts             # dev 代理 /api → http://localhost:3000（端口 5174）
 │   └── package.json
 ├── web/                           # ★ 网页端（PC 管理后台，React + Ant Design 5）
 │   ├── src/
@@ -48,6 +59,7 @@
 |----|--------|
 | 后端 `server/` | NestJS 10 + TypeScript + TypeORM + MySQL 8（本地默认 **better-sqlite3** 原生 SQLite）+ JWT + Swagger |
 | 网页端 `web/` | React 18 + TypeScript + Vite + **Ant Design 5**（遵循文档 §12 UI 规范：Token 唯一真源、列表=筛选条+表格+分页、详情=Descriptions+Tabs） |
+| 移动端 `mobile/` | React 18 + TypeScript + Vite + **Ant Design Mobile 5**（家长端 H5，HashRouter；后续可套壳 App 或转小程序，见 §11.6） |
 
 > 本地 SQLite 用 `better-sqlite3`（原生驱动，性能好、类型行为接近 MySQL）。因 Node 固定 22、ABI 稳定，无需 Docker/MySQL 即可启动与跑测试。
 
@@ -66,7 +78,13 @@ npm run dev
 ```bash
 npm run dev:server   # 后端 http://localhost:3000 （Swagger: http://localhost:3000/docs）
 npm run dev:web      # 网页端 http://localhost:5173
+npm run dev:mobile   # 家长端 H5 http://localhost:5174
 ```
+
+家长端 H5 使用流程：用**已绑定学员的手机号**获取验证码登录 → 查看课表/作业/点评 → 在线提交作业。
+（非生产环境后端会在 OTP 响应中回传验证码 `code` 便于联调；生产应接入短信服务。）
+
+学员与家长的绑定关系在 PC 端「学员档案 - 家长」维护，或在家长端「我的学员 - 绑定学员」按学员 ID 绑定。
 
 > 网页端通过 Vite 代理将 `/api` 转发到 `http://localhost:3000`，
 > 因此**前端与后端共用同一个后端实例**，本地开发无需任何跨域配置。
@@ -87,7 +105,8 @@ npm test        # 后端 e2e（15 个用例，better-sqlite3 内存库，零外�
 
 e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全流程 · 漏斗 ·
 **M4 基础闭环**（下单→支付→发放课时→点名消课→退费回滚）·
-**M4 进阶**（退费按消课比例、分账、教师工资、发票开具、补课排课、课后点评任务、财务报表）。
+**M4 进阶**（退费按消课比例、分账、教师工资、发票开具、补课排课、课后点评任务、财务报表）·
+**M5 作业闭环 + 家长端**（布置→家长 OTP 登录→绑定→越权校验 403→提交→批改→统计→点评）。
 
 ## 里程碑与模块对应
 
@@ -97,7 +116,7 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 | M2 课程+学员 | `modules/course`、`modules/student` | 课程管理、班级管理、课次排课、学员档案 |
 | M3 线索+招生 | `modules/lead` | 渠道管理、市场活动、线索 CRM、转化漏斗 |
 | M4 订单+课时 | `modules/order`、`modules/hour`、`modules/finance`、`modules/task` | 订单与财务（下单/支付/退费预览）、课时管理（账户/流水/预警）、课次点名消课、财务对账（分账/工资/发票/报表）、待办中心 |
-| M5 作业+家长端 | 待开发 | 家长端/老师端 H5（Ant Design Mobile）待开发 |
+| M5 作业+家长端 | `modules/homework`、`modules/parent`、`modules/family` | PC 作业管理（布置/批改/统计）、**家长端 H5**（登录/学员/课表/作业/点评） |
 
 > M4 已闭环并全量补齐：
 > - **订单链路**：下单→支付（自动发放课时）→上课点名消课→退费（审批后按剩余课时回滚，防资损）
@@ -107,11 +126,18 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 > 未接入外部能力（仅本地记录与状态模拟）：持牌支付机构的**实时分账**、税务**发票开具 API**；
 > 优惠体系（优惠券/折扣）依赖 §4.17 券模块，尚未实现。
 
+> M5 已闭环：布置→家长提交→老师批改→家长查看反馈，并输出提交率/优秀率/按时率看板。
+> - **家长端认证**：手机号 + OTP 登录/注册（`kind=parent` 独立身份，无 RBAC 权限，靠"已绑定学员"做数据隔离）。
+> - **越权防护**：家长只能为**已绑定**的学员提交作业/查看数据，越权返回 403。
+> - **OTP 为内存态**（单机开发/测试用，生产应接入短信服务并改用 Redis 存储 + 严格限频）。
+> - 未实现：老师端 H5（§11.6 作业批改/点名/成绩录入）与顾问端 H5；家长端的缴费、转介绍、客诉、积分、问卷、合同、团购等依赖后续模块。
+
 ### 页面清单（web/src/pages）
 `Login` 登录 · `HomePage` 首页看板 · `CoursePage` 课程/分类 · `ClassGroupPage` 班级 ·
 `LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课 + 补课排课）· `StudentPage` 学员/家长/报名 ·
 `OrderPage` 订单与财务（下单/支付/退费预览按消课比例）· `HourPage` 课时管理（账户/流水/预警）·
 `FinancePage` 财务对账（分账/工资 · 发票 · 财务报表）· `TaskPage` 待办中心（课后点评任务）·
+`HomeworkPage` 作业管理（布置/提交批改/统计提交率·优秀率·按时率/未提交名单）·
 `LeadPage` 线索 CRM · `ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
 `UserPage` 用户 · `RolePage` 角色权限
 

@@ -2,13 +2,14 @@
   "name": "jigouman",
   "version": "1.9.0",
   "private": true,
-  "description": "校外培训机构管理系统（前后端分离）：server=后端(NestJS)，web=PC 管理后台(React+AntD)",
+  "description": "校外培训机构管理系统（前后端分离）：server=后端(NestJS)，web=PC 管理后台(React+AntD)，mobile=家长端H5(React+AntD Mobile)",
   "scripts": {
-    "install:all": "npm --prefix server install && npm --prefix web install",
+    "install:all": "npm --prefix server install && npm --prefix web install && npm --prefix mobile install",
     "dev": "concurrently -k -n server,web -c blue,green \"npm --prefix server run start:dev\" \"npm --prefix web run dev\"",
     "dev:server": "npm --prefix server run start:dev",
     "dev:web": "npm --prefix web run dev",
-    "build": "npm --prefix server run build && npm --prefix web run build",
+    "dev:mobile": "npm --prefix mobile run dev",
+    "build": "npm --prefix server run build && npm --prefix web run build && npm --prefix mobile run build",
     "test": "npm --prefix server run test:e2e"
   },
   "devDependencies": {

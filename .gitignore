@@ -9,6 +9,10 @@ server/data
 web/node_modules
 web/dist
 
+===mobile
+mobile/node_modules
+mobile/dist
+
 docs
 
 *.log

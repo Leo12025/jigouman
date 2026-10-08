@@ -18,6 +18,7 @@ import {
   DownOutlined,
   DollarOutlined,
   BellOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken } from '../api/client';
@@ -58,6 +59,7 @@ export default function MainLayout() {
         { key: '/hours', icon: <ClockCircleOutlined />, label: '课时管理' },
         { key: '/finance', icon: <DollarOutlined />, label: '财务对账' },
         { key: '/tasks', icon: <BellOutlined />, label: '待办中心' },
+        { key: '/homework', icon: <FileTextOutlined />, label: '作业管理' },
       ],
     },
     {

@@ -15,6 +15,7 @@ import OrderPage from './pages/OrderPage';
 import HourPage from './pages/HourPage';
 import FinancePage from './pages/FinancePage';
 import TaskPage from './pages/TaskPage';
+import HomeworkPage from './pages/HomeworkPage';
 import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="hours" element={<HourPage />} />
         <Route path="finance" element={<FinancePage />} />
         <Route path="tasks" element={<TaskPage />} />
+        <Route path="homework" element={<HomeworkPage />} />
         <Route path="leads" element={<LeadPage />} />
         <Route path="channels" element={<ChannelPage />} />
         <Route path="campaigns" element={<CampaignPage />} />
