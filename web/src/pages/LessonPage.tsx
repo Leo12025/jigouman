@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { listLessons, createLesson, updateLesson, deleteLesson, generateLessons, listClassGroups, listCourses, listClassGroupStudents, attendLesson } from '../api/crm';
+import { listLessons, createLesson, updateLesson, deleteLesson, generateLessons, listClassGroups, listCourses, listClassGroupStudents, attendLesson, listStudents, scheduleMakeup } from '../api/crm';
 
 const { RangePicker } = DatePicker;
 
@@ -28,8 +28,11 @@ export default function LessonPage() {
   const [attendOpen, setAttendOpen] = useState(false);
   const [attendLessonId, setAttendLessonId] = useState<number | null>(null);
   const [attendStudents, setAttendStudents] = useState<any[]>([]);
+  const [makeupOpen, setMakeupOpen] = useState(false);
+  const [makeupStudents, setMakeupStudents] = useState<any[]>([]);
   const [form] = Form.useForm();
   const [genForm] = Form.useForm();
+  const [makeupForm] = Form.useForm();
 
   const groupName = (id: number) => groups.find((g) => g.id === id)?.name || id;
 
@@ -97,6 +100,29 @@ export default function LessonPage() {
     load();
   };
 
+  const openMakeup = async () => {
+    makeupForm.resetFields();
+    try {
+      const r = await listStudents({ page: 1, size: 200 });
+      setMakeupStudents(r.list);
+    } catch { setMakeupStudents([]); }
+    setMakeupOpen(true);
+  };
+  const submitMakeup = async () => {
+    const v = await makeupForm.validateFields();
+    await scheduleMakeup({
+      studentId: v.studentId,
+      courseId: v.courseId,
+      classGroupId: v.classGroupId,
+      teacherId: v.teacherId,
+      startTime: v.range[0].toISOString(),
+      endTime: v.range[1].toISOString(),
+    });
+    message.success('补课已排课，点名时占用可用课时');
+    setMakeupOpen(false);
+    load();
+  };
+
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '班级', dataIndex: 'classGroupId', width: 120, render: (v: number) => groupName(v) },
@@ -128,6 +154,7 @@ export default function LessonPage() {
         <Button icon={<ReloadOutlined />} onClick={() => { setGroupId(undefined); load(1, size); }}>重置</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setOpen(true); }}>单条排课</Button>
         <Button icon={<ThunderboltOutlined />} onClick={() => { setGenResult(null); genForm.resetFields(); setGenOpen(true); }}>按周批量生成</Button>
+        <Button onClick={openMakeup}>补课排课</Button>
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
@@ -208,6 +235,23 @@ export default function LessonPage() {
         ) : (
           <Empty description="该班级暂无在读学员，请先在学员档案中报名" />
         )}
+      </Modal>
+
+      {/* 补课排课（§4.6 请假补课） */}
+      <Modal title="补课排课" open={makeupOpen} width={560} onOk={submitMakeup} onCancel={() => setMakeupOpen(false)} okText="排课" cancelText="取消">
+        <Form form={makeupForm} layout="vertical">
+          <Form.Item name="studentId" label="学员" rules={[{ required: true, message: '请选择学员' }]}>
+            <Select showSearch optionFilterProp="label" options={makeupStudents.map((s) => ({ value: s.id, label: s.name }))} />
+          </Form.Item>
+          <Form.Item name="courseId" label="课程" rules={[{ required: true, message: '请选择课程' }]}>
+            <Select showSearch optionFilterProp="label" options={courses.map((c) => ({ value: c.id, label: c.name }))} />
+          </Form.Item>
+          <Form.Item name="classGroupId" label="班级ID(可选)"><InputNumber style={{ width: '100%' }} min={1} /></Form.Item>
+          <Form.Item name="teacherId" label="授课老师ID(可选)"><InputNumber style={{ width: '100%' }} min={1} /></Form.Item>
+          <Form.Item name="range" label="补课时间" rules={[{ required: true, message: '请选择时间' }]}>
+            <RangePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

@@ -13,6 +13,8 @@ import LessonPage from './pages/LessonPage';
 import StudentPage from './pages/StudentPage';
 import OrderPage from './pages/OrderPage';
 import HourPage from './pages/HourPage';
+import FinancePage from './pages/FinancePage';
+import TaskPage from './pages/TaskPage';
 import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="students" element={<StudentPage />} />
         <Route path="orders" element={<OrderPage />} />
         <Route path="hours" element={<HourPage />} />
+        <Route path="finance" element={<FinancePage />} />
+        <Route path="tasks" element={<TaskPage />} />
         <Route path="leads" element={<LeadPage />} />
         <Route path="channels" element={<ChannelPage />} />
         <Route path="campaigns" element={<CampaignPage />} />

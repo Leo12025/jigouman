@@ -119,6 +119,8 @@ export const payOrder = (id: number, d: any) => apiPost<any>(`/orders/${id}/pay`
 export const refundOrder = (id: number, d: any) => apiPost<any>(`/orders/${id}/refund`, d);
 export const approveRefund = (id: number, refundId: number) =>
   apiPost<any>(`/orders/${id}/refund/${refundId}/approve`);
+export const previewRefund = (id: number) =>
+  apiGet<any>(`/orders/${id}/refund-preview`);
 
 // ---------- 课时管理 (M4) ----------
 export const getStudentHours = (studentId: number) =>
@@ -133,3 +135,28 @@ export const leaveLesson = (lessonId: number, d: any) =>
   apiPost<any>(`/lessons/${lessonId}/leave`, d);
 export const listClassGroupStudents = (classGroupId: number) =>
   apiGet<{ id: number; name: string }[]>(`/students/by-class-group/${classGroupId}`);
+
+// ---------- 财务 (§4.5) ----------
+export const getSplitConfig = () => apiGet<any>('/finance/split-config');
+export const upsertSplitConfig = (d: any) => apiPut<any>('/finance/split-config', d);
+export const listSplits = (params: any) => apiGet<PageResult<any>>('/finance/splits', params);
+export const settleSplits = (d: any) => apiPost<any>('/finance/splits/settle', d);
+export const generateSalary = (d: any) => apiPost<any>('/finance/salary/generate', d);
+export const listSalary = (params: any) => apiGet<PageResult<any>>('/finance/salary', params);
+export const confirmSalary = (id: number) => apiPut<any>(`/finance/salary/${id}/confirm`);
+export const paySalary = (id: number) => apiPut<any>(`/finance/salary/${id}/pay`);
+export const applyInvoice = (d: any) => apiPost<any>('/finance/invoices', d);
+export const issueInvoice = (id: number) => apiPut<any>(`/finance/invoices/${id}/issue`);
+export const listInvoices = (params: any) => apiGet<PageResult<any>>('/finance/invoices', params);
+export const getInvoice = (id: number) => apiGet<any>(`/finance/invoices/${id}`);
+export const financeSummary = (params: any) => apiGet<any>('/finance/summary', params);
+
+// ---------- 待办中心 (§4.26) ----------
+export const listTasks = (params: any) => apiGet<PageResult<any>>('/tasks', params);
+export const createTask = (d: any) => apiPost<any>('/tasks', d);
+export const completeTask = (id: number) => apiPut<any>(`/tasks/${id}/complete`);
+export const removeTask = (id: number) => apiDelete(`/tasks/${id}`);
+
+// ---------- 补课排课 (§4.6) ----------
+export const scheduleMakeup = (d: any) => apiPost<any>('/lessons/makeup', d);
+

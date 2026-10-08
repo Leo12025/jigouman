@@ -5,7 +5,7 @@ import {
 import { PlusOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import {
   listOrders, getOrder, createOrder, payOrder, refundOrder, approveRefund,
-  listStudents, listCourses,
+  listStudents, listCourses, previewRefund,
 } from '../api/crm';
 
 const STATUS: Record<string, { label: string; color: string }> = {
@@ -30,6 +30,7 @@ export default function OrderPage() {
   const [open, setOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [refundPreview, setRefundPreview] = useState<any>(null);
   const [detail, setDetail] = useState<any>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [form] = Form.useForm();
@@ -82,7 +83,15 @@ export default function OrderPage() {
     if (detail) openDetail(detailId!);
   };
 
-  const openRefund = (r: any) => { refundForm.setFieldsValue({ amount: r.payableAmount }); setDetailId(r.id); setRefundOpen(true); };
+  const openRefund = async (r: any) => {
+    setDetailId(r.id);
+    try {
+      const pv = await previewRefund(r.id);
+      setRefundPreview(pv);
+      refundForm.setFieldsValue({ amount: pv.refundable });
+    } catch { setRefundPreview(null); }
+    setRefundOpen(true);
+  };
   const submitRefund = async () => {
     const v = await refundForm.validateFields();
     await refundOrder(detailId!, v);
@@ -187,6 +196,12 @@ export default function OrderPage() {
 
       {/* 退费 */}
       <Modal title="申请退费" open={refundOpen} onOk={submitRefund} onCancel={() => setRefundOpen(false)} okText="提交" cancelText="取消">
+        {refundPreview && (
+          <div style={{ marginBottom: 12, padding: 12, background: '#fafafa', borderRadius: 6, fontSize: 13 }}>
+            <div>已付：¥{refundPreview.paidAmount} · 总课时：{refundPreview.totalHours} · 剩余：{refundPreview.remainingHours} · 已消：{refundPreview.consumedHours}</div>
+            <div style={{ marginTop: 4 }}>按消课比例可退：<b>¥{refundPreview.refundable}</b>（已消课价值不退款）</div>
+          </div>
+        )}
         <Form form={refundForm} layout="vertical">
           <Form.Item name="amount" label="退费金额" rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: '100%' }} />
