@@ -39,3 +39,13 @@ export class HourConsumptionPageQueryDto extends PageQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() accountId?: number;
   @IsOptional() @IsIn(['GRANT', 'CONSUME', 'FREEZE', 'ROLLBACK', 'EXPIRE'] as const) type?: HourConsumeType;
 }
+
+/** 补课排课（§4.6） */
+export class ScheduleMakeupDto {
+  @Type(() => Number) @IsInt() @IsNotEmpty() studentId: number;
+  @Type(() => Number) @IsInt() @IsNotEmpty() courseId: number;
+  @IsOptional() @Type(() => Number) @IsInt() classGroupId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() teacherId?: number;
+  @IsNotEmpty() startTime: string;
+  @IsNotEmpty() endTime: string;
+}

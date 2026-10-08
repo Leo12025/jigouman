@@ -46,9 +46,16 @@ export class OrderController {
   @Post(':id/refund')
   @RequirePermissions('order:update')
   @OperationLog({ action: 'order:refund', target: 'orders' })
-  @ApiOperation({ summary: '申请退费(待审批)' })
+  @ApiOperation({ summary: '申请退费(待审批,默认按消课比例扣费)' })
   refund(@TenantId() t: number, @Param('id') id: number, @Body() d: RefundDto) {
     return this.svc.applyRefund(t, id, d);
+  }
+
+  @Get(':id/refund-preview')
+  @RequirePermissions('order:view')
+  @ApiOperation({ summary: '退费预览(按消课比例计算可退)' })
+  preview(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.previewRefund(t, id);
   }
 
   @Post(':id/refund/:refundId/approve')

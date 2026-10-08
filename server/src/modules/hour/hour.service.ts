@@ -7,12 +7,18 @@ import { PageQueryDto } from '../../common/dto/pagination.dto';
 import { HourAccount } from './entities/hour-account.entity';
 import { HourConsumption } from './entities/hour-consumption.entity';
 import { Attendance, AttendanceStatus } from './entities/attendance.entity';
-import { Lesson } from '../../modules/course/entities/lesson.entity';
-import { GrantHourDto, HourAccountPageQueryDto, HourConsumptionPageQueryDto } from './dto/hour.dto';
+import { Lesson, LessonStatus } from '../../modules/course/entities/lesson.entity';
+import { GrantHourDto, HourAccountPageQueryDto, HourConsumptionPageQueryDto, ScheduleMakeupDto } from './dto/hour.dto';
+import { FinanceService } from '../../modules/finance/finance.service';
+import { TaskService } from '../../modules/task/task.service';
 
 @Injectable()
 export class HourService {
-  constructor(@InjectDataSource() private readonly ds: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly ds: DataSource,
+    private readonly financeSvc: FinanceService,
+    private readonly taskSvc: TaskService,
+  ) {}
 
   /** 发放课时：落到学员指定课程账户（不存在则创建） */
   async grant(
@@ -25,6 +31,7 @@ export class HourService {
       operatorId?: number;
       refOrderId?: number;
       remark?: string;
+      unitValue?: number;
     },
   ) {
     return this.ds.transaction(async (m) => {
@@ -55,6 +62,7 @@ export class HourService {
         type: 'GRANT',
         hours: p.hours,
         refOrderId: p.refOrderId,
+        unitValue: p.unitValue ?? 0,
         operatorId: p.operatorId,
         remark: p.remark || '订单支付发放',
       } as any);
@@ -171,6 +179,14 @@ export class HourService {
     if (!lesson) throw new BusinessException(ResCode.NOT_FOUND, '课次不存在');
     const result: Attendance[] = [];
     for (const r of records) {
+      // 已消课的重复点名不再重复触发分账/任务
+      const prev = await this.ds.getRepository(Attendance).findOne({
+        where: { tenantId, lessonId, studentId: r.studentId } as any,
+      });
+      const alreadyConsumed = prev && (prev.status === 'PRESENT' || prev.status === 'MAKEUP') && prev.hours > 0;
+
+      let consumedHours = 0;
+      let ledgerId: number | undefined;
       const att = await this.ds.transaction(async (m) => {
         const attRepo = m.getRepository(Attendance);
         const existing = await attRepo.findOne({
@@ -197,17 +213,67 @@ export class HourService {
               operatorId,
               remark: '点名消课',
             } as any);
-            await m.getRepository(HourConsumption).save(ledger as any);
+            const saved = (await m.getRepository(HourConsumption).save(ledger as any)) as HourConsumption;
+            ledgerId = saved.id;
             hours = 1;
           }
         }
         att.hours = hours;
         att.operatorId = operatorId;
+        consumedHours = hours;
         return (await attRepo.save(att as any)) as Attendance;
       });
+
+      // 消课事件钩子：触发分账 + 课后点评任务（§4.5/§4.6/§4.26）。
+      // 即发即弃：钩子为衍生数据（最终一致），避免在请求内 await 导致驱动连接争用。
+      if (consumedHours > 0 && !alreadyConsumed) {
+        void this.financeSvc.onConsume(tenantId, {
+          studentId: r.studentId,
+          courseId: lesson.courseId,
+          teacherId: lesson.teacherId,
+          lessonId,
+          consumptionId: ledgerId,
+          hours: consumedHours,
+        }).catch(() => undefined);
+        if (lesson.teacherId) {
+          void this.taskSvc.create(tenantId, {
+            type: 'AFTER_CLASS_REVIEW',
+            title: `课后点评：课次#${lessonId}`,
+            assigneeId: lesson.teacherId,
+            refType: 'LESSON',
+            refId: lessonId,
+            dueAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+          }).catch(() => undefined);
+        }
+      }
       result.push(att);
     }
     return result;
+  }
+
+  /** 补课排课（§4.6 请假补课）：为学员创建一节补课，点名时占用可用课时 */
+  async scheduleMakeup(tenantId: number, d: ScheduleMakeupDto) {
+    if (!d.studentId) throw new BusinessException(ResCode.BAD_REQUEST, '补课需指定学员');
+    const lesson = this.ds.getRepository(Lesson).create({
+      tenantId,
+      classGroupId: d.classGroupId ?? 0,
+      courseId: d.courseId,
+      teacherId: d.teacherId,
+      startTime: new Date(d.startTime),
+      endTime: new Date(d.endTime),
+      status: LessonStatus.SCHEDULED,
+      type: 'MAKEUP',
+    } as Lesson);
+    const saved = (await this.ds.getRepository(Lesson).save(lesson as any)) as Lesson;
+    // 预占一条考勤(补课待上)，点名时按 MAKEUP 消课
+    await this.ds.getRepository(Attendance).save(this.ds.getRepository(Attendance).create({
+      tenantId,
+      lessonId: saved.id,
+      studentId: d.studentId,
+      status: 'MAKEUP',
+      hours: 0,
+    } as any));
+    return saved;
   }
 
   /** 请假：记考勤(不消课) */

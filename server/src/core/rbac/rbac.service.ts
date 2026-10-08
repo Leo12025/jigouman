@@ -26,6 +26,8 @@ const MODULES = [
   'lead',
   'order',
   'hour',
+  'finance',
+  'task',
   'homework',
   'growth',
   'approval',
@@ -115,6 +117,16 @@ export class RbacService {
     };
 
     const superAdmin = await ensureRole('super_admin', '超级管理员', allPerms, 'all');
+    // 兼容已有租户：把新增权限点同步进超级管理员（幂等）
+    const sa = await this.roleRepo.findOne({ where: { tenantId, code: 'super_admin' }, relations: ['permissions'] });
+    if (sa) {
+      const have = new Set((sa.permissions || []).map((p) => p.code));
+      const missing = allPerms.filter((p) => !have.has(p.code));
+      if (missing.length) {
+        sa.permissions = [...(sa.permissions || []), ...missing];
+        await this.roleRepo.save(sa);
+      }
+    }
     await ensureRole(
       'teacher',
       '授课老师',
@@ -128,7 +140,7 @@ export class RbacService {
     await ensureRole(
       'finance',
       '财务',
-      ['order:view', 'order:create', 'order:update', 'report:view', 'hour:view'].map(
+      ['order:view', 'order:create', 'order:update', 'report:view', 'hour:view', 'finance:view', 'finance:create', 'finance:update', 'task:view'].map(
         (c) => permMap.get(c),
       ).filter(Boolean) as Permission[],
       'org',

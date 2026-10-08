@@ -1,5 +1,6 @@
 import { Entity, Column, Index } from 'typeorm';
 import { BaseEntity } from '../../../common/base.entity';
+import { MONEY } from '../../order/entities/order.entity';
 
 export type HourConsumeType = 'GRANT' | 'CONSUME' | 'FREEZE' | 'ROLLBACK' | 'EXPIRE';
 
@@ -31,6 +32,9 @@ export class HourConsumption extends BaseEntity {
 
   @Column({ name: 'ref_order_id', type: 'bigint', nullable: true, comment: '关联订单(发放来源)' })
   refOrderId?: number;
+
+  @Column({ name: 'unit_value', type: 'decimal', precision: 12, scale: 2, default: 0, transformer: MONEY, comment: '发放时课时单价(用于分账价值计算)' })
+  unitValue: number;
 
   @Column({ name: 'operator_id', type: 'bigint', nullable: true, comment: '操作人' })
   operatorId?: number;

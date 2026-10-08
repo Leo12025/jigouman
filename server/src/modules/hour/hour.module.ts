@@ -6,9 +6,15 @@ import { Attendance } from './entities/attendance.entity';
 import { Lesson } from '../course/entities/lesson.entity';
 import { HourService } from './hour.service';
 import { HourController } from './hour.controller';
+import { FinanceModule } from '../finance/finance.module';
+import { TaskModule } from '../task/task.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([HourAccount, HourConsumption, Attendance, Lesson])],
+  imports: [
+    TypeOrmModule.forFeature([HourAccount, HourConsumption, Attendance, Lesson]),
+    FinanceModule,
+    TaskModule,
+  ],
   providers: [HourService],
   controllers: [HourController],
   exports: [HourService],

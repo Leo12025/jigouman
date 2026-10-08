@@ -6,7 +6,7 @@ import { CurrentUser, AuthUser, TenantId } from '../../common/decorators/auth.de
 import { RequirePermissions } from '../../common/decorators/roles.decorator';
 import { OperationLog } from '../../common/decorators/operation-log.decorator';
 import {
-  HourAccountPageQueryDto, HourConsumptionPageQueryDto, AttendLessonDto, LeaveLessonDto, GrantHourDto,
+  HourAccountPageQueryDto, HourConsumptionPageQueryDto, AttendLessonDto, LeaveLessonDto, GrantHourDto, ScheduleMakeupDto,
 } from './dto/hour.dto';
 import { HourService } from './hour.service';
 
@@ -58,5 +58,13 @@ export class HourController {
   @ApiOperation({ summary: '课次请假(记考勤,不消课)' })
   leave(@TenantId() t: number, @Param('id') id: number, @Body() d: LeaveLessonDto, @CurrentUser() u: AuthUser) {
     return this.svc.leaveLesson(t, Number(id), d.studentId, u.id);
+  }
+
+  @Post('lessons/makeup')
+  @RequirePermissions('hour:update')
+  @OperationLog({ action: 'hour:makeup', target: 'lesson' })
+  @ApiOperation({ summary: '补课排课(请假后补课,占用可用课时)' })
+  makeup(@TenantId() t: number, @Body() d: ScheduleMakeupDto) {
+    return this.svc.scheduleMakeup(t, d);
   }
 }

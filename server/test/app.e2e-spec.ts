@@ -190,10 +190,11 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     expect(hours.body.data[0].balance).toBe(19);
 
     // 退费申请（待审批）→ 审批通过触发课时回滚
+    // 已消 1 课时，按消课比例扣费后可退 = 19 × 50 = 950（§4.5）
     const refund = await request(app.getHttpServer())
       .post(`/api/v1/orders/${m4OrderId}/refund`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ amount: 1000, reason: 'e2e' })
+      .send({ amount: 950, reason: 'e2e' })
       .expect(201);
     expect(refund.body.data.status).toBe('PENDING');
     await request(app.getHttpServer())
@@ -205,7 +206,94 @@ describe('机构管理系统 (e2e, SQLite)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(hours.body.data[0].balance).toBe(0);
-  });
+  }, 30000);
+
+  it('M4 进阶：退费比例/分账/工资/发票/补课/点评任务(§4.5/§4.6)', async () => {
+    const period = new Date().toISOString().slice(0, 7);
+    const stu = await request(app.getHttpServer())
+      .post('/api/v1/students').set('Authorization', `Bearer ${token}`)
+      .send({ name: 'M4b学员', gender: 1 }).expect(201);
+    const sid = stu.body.data.id;
+    const course = await request(app.getHttpServer())
+      .post('/api/v1/courses').set('Authorization', `Bearer ${token}`)
+      .send({ name: 'M4b课程', type: 'ONE_ON_ONE', price: 1000, totalHours: 20 }).expect(201);
+    const cid = course.body.data.id;
+
+    const order = await request(app.getHttpServer())
+      .post('/api/v1/orders').set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, discountAmount: 0, items: [{ courseId: cid, name: 'M4b课程', qty: 1, unitPrice: 1000, hours: 20 }] })
+      .expect(201);
+    const oid = order.body.data.id;
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/${oid}/pay`).set('Authorization', `Bearer ${token}`)
+      .send({ channel: 'OFFLINE' }).expect(201);
+
+    let h = await request(app.getHttpServer()).get(`/api/v1/students/${sid}/hours`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(h.body.data[0].balance).toBe(20);
+
+    // 退费预览：未消课时可退全额
+    const pv0 = await request(app.getHttpServer()).get(`/api/v1/orders/${oid}/refund-preview`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(pv0.body.data.remainingHours).toBe(20);
+    expect(pv0.body.data.consumedHours).toBe(0);
+    expect(Number(pv0.body.data.refundable)).toBe(1000);
+
+    // 排课 + 点名消课（触发分账 + 点评任务）
+    const cg = await request(app.getHttpServer())
+      .post('/api/v1/courses/class-groups').set('Authorization', `Bearer ${token}`)
+      .send({ courseId: cid, name: 'M4b班', teacherId: 88, capacity: 5 }).expect(201);
+    const lesson = await request(app.getHttpServer())
+      .post('/api/v1/courses/lessons').set('Authorization', `Bearer ${token}`)
+      .send({ classGroupId: cg.body.data.id, courseId: cid, teacherId: 88, startTime: '2026-12-01T09:00:00', endTime: '2026-12-01T10:00:00' })
+      .expect(201);
+    const lid = lesson.body.data.id;
+    await request(app.getHttpServer())
+      .post(`/api/v1/lessons/${lid}/attendance`).set('Authorization', `Bearer ${token}`)
+      .send({ records: [{ studentId: sid, status: 'PRESENT' }] }).expect(201);
+    h = await request(app.getHttpServer()).get(`/api/v1/students/${sid}/hours`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(h.body.data[0].balance).toBe(19);
+
+    // 分账记录：教师提成 = 课时价值(单价50 × 1课时) × 30% = 15
+    const splits = await request(app.getHttpServer()).get(`/api/v1/finance/splits?teacherId=88`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(splits.body.data.list.length).toBeGreaterThanOrEqual(1);
+    expect(Number(splits.body.data.list[0].amount)).toBe(15);
+
+    // 待办中心：自动生成课后点评任务
+    const tasks = await request(app.getHttpServer()).get(`/api/v1/tasks?type=AFTER_CLASS_REVIEW&refId=${lid}`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(tasks.body.data.list.length).toBeGreaterThanOrEqual(1);
+
+    // 退费预览：已消 1 课时后按消课比例扣费
+    const pv1 = await request(app.getHttpServer()).get(`/api/v1/orders/${oid}/refund-preview`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(pv1.body.data.remainingHours).toBe(19);
+    expect(pv1.body.data.consumedHours).toBe(1);
+    expect(Number(pv1.body.data.refundable)).toBe(950);
+    // 超过可退余额应被拒绝
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/${oid}/refund`).set('Authorization', `Bearer ${token}`)
+      .send({ amount: 999 }).expect(400);
+
+    // 工资：按周期聚合分账生成工资单
+    await request(app.getHttpServer()).post(`/api/v1/finance/salary/generate`).set('Authorization', `Bearer ${token}`).send({ period }).expect(201);
+    const salary = await request(app.getHttpServer()).get(`/api/v1/finance/salary?teacherId=88`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(salary.body.data.list.length).toBeGreaterThanOrEqual(1);
+    expect(Number(salary.body.data.list[0].baseAmount)).toBeGreaterThanOrEqual(15);
+
+    // 发票：申请 → 开具
+    const inv = await request(app.getHttpServer()).post(`/api/v1/finance/invoices`).set('Authorization', `Bearer ${token}`)
+      .send({ orderId: oid, studentId: sid, title: 'e2e发票', amount: 500 }).expect(201);
+    await request(app.getHttpServer()).put(`/api/v1/finance/invoices/${inv.body.data.id}/issue`).set('Authorization', `Bearer ${token}`).expect(200);
+    const invGot = await request(app.getHttpServer()).get(`/api/v1/finance/invoices/${inv.body.data.id}`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(invGot.body.data.status).toBe('ISSUED');
+    expect(invGot.body.data.invoiceNo).toBeTruthy();
+
+    // 补课排课
+    const mk = await request(app.getHttpServer()).post(`/api/v1/lessons/makeup`).set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, courseId: cid, teacherId: 88, startTime: '2026-12-05T09:00:00', endTime: '2026-12-05T10:00:00' }).expect(201);
+    expect(mk.body.data.type).toBe('MAKEUP');
+
+    // 财务报表汇总
+    const sum = await request(app.getHttpServer()).get(`/api/v1/finance/summary`).set('Authorization', `Bearer ${token}`).expect(200);
+    expect(sum.body.data).toHaveProperty('profit');
+  }, 30000);
 
   it('M3 渠道：可创建并列出渠道', async () => {
     const res = await request(app.getHttpServer())

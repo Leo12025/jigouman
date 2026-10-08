@@ -18,6 +18,8 @@ import { StudentModule } from './modules/student/student.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { OrderModule } from './modules/order/order.module';
 import { HourModule } from './modules/hour/hour.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { TaskModule } from './modules/task/task.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { HourModule } from './modules/hour/hour.module';
     LeadModule,
     OrderModule,
     HourModule,
+    FinanceModule,
+    TaskModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

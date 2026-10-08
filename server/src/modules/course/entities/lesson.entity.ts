@@ -38,4 +38,8 @@ export class Lesson extends BaseEntity {
 
   @Column({ type: 'varchar', length: 32, default: 'SCHEDULED', comment: '课次状态(§11.3)' })
   status: LessonStatus;
+
+  /** 课次类型：NORMAL 正常排课 / MAKEUP 补课（§4.6 请假补课） */
+  @Column({ name: 'type', length: 16, default: 'NORMAL', comment: '课次类型' })
+  type: 'NORMAL' | 'MAKEUP';
 }

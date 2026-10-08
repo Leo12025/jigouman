@@ -98,6 +98,7 @@ export class OrderService {
     const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
     for (const it of items) {
       if (it.hours > 0) {
+        const perHour = Math.round((Number(it.amount) / it.hours) * 100) / 100;
         await this.hourSvc.grant(tenantId, {
           studentId: order.studentId,
           courseId: it.courseId,
@@ -106,6 +107,7 @@ export class OrderService {
           operatorId,
           refOrderId: order.id,
           remark: it.name,
+          unitValue: perHour,
         });
       }
     }
@@ -123,20 +125,72 @@ export class OrderService {
     return { ...(order as any), items, payments, refunds };
   }
 
+  /** 退费预览：按消课比例计算可退金额（文档 §4.5「按消课比例扣费」） */
+  async previewRefund(tenantId: number, id: number) {
+    const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
+    if (!order) throw new NotFoundException('订单不存在');
+    const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
+    // 注意：sql.js 驱动对 bigint 列绑定 number 参数会静默失败（promise 不 resolve），
+    // 需以字符串传参（与 HTTP 层 @Param 行为一致）。
+    const studentId = Number(order.studentId);
+    const balances = (await this.hourSvc.balance(tenantId, studentId)) as any[];
+    const balOf = (courseId?: number) =>
+      balances.find((b) => Number(b.courseId ?? 0) === Number(courseId ?? 0))?.balance ?? 0;
+
+    let totalHours = 0;
+    let remainingHours = 0;
+    let consumedHours = 0;
+    let refundable = 0;
+    const detail = items.map((it) => {
+      const hours = Number(it.hours) || 0;
+      const unitPrice = hours > 0 ? Math.round((Number(it.amount) / hours) * 100) / 100 : 0;
+      const remain = hours > 0 ? Math.min(hours, balOf(it.courseId)) : 0;
+      const consumed = hours - remain;
+      const itemRefund = Math.round(remain * unitPrice * 100) / 100;
+      totalHours += hours;
+      remainingHours += remain;
+      consumedHours += consumed;
+      refundable = Math.round((refundable + itemRefund) * 100) / 100;
+      return {
+        courseId: it.courseId,
+        name: it.name,
+        hours,
+        unitPrice,
+        remainingHours: remain,
+        consumedHours: consumed,
+        refundable: itemRefund,
+      };
+    });
+    return {
+      orderId: id,
+      paidAmount: Number(order.paidAmount),
+      totalHours,
+      remainingHours,
+      consumedHours,
+      refundable,
+    };
+  }
+
   async applyRefund(tenantId: number, id: number, d: RefundDto) {
     const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
     if (!order) throw new NotFoundException('订单不存在');
     if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.COMPLETED) {
       throw new BusinessException(ResCode.BAD_REQUEST, '仅已支付/已完成订单可申请退费');
     }
-    if (d.amount > order.paidAmount) {
+    // 按消课比例计算默认可退金额；未传 amount 时使用
+    const preview = await this.previewRefund(tenantId, id).catch(() => null);
+    const amount = d.amount ?? (preview ? preview.refundable : 0);
+    if (amount > Number(order.paidAmount) + 0.001) {
       throw new BusinessException(ResCode.BAD_REQUEST, '退费金额不能超过已付金额');
+    }
+    if (preview && amount > preview.refundable + 0.001) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '退费金额超过可退余额(已按消课比例扣费)');
     }
     const refund = this.refundRepo.create({
       tenantId,
       orderId: id,
       studentId: order.studentId,
-      amount: d.amount,
+      amount: Math.round(amount * 100) / 100,
       reason: d.reason,
       status: RefundStatus.PENDING,
     } as any);
