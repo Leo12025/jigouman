@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, List, Toast, Tag } from 'antd-mobile';
-import { myLessons } from '../api/parent';
-import BottomTab from '../components/BottomTab';
+import { myLessons } from '../../api/parent';
+import BottomTab from '../../components/BottomTab';
 
 /** 我的课表（按绑定学员所在班级，§11.6 家长端） */
 export default function LessonsPage() {

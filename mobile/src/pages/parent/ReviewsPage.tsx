@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, List, Toast, Tag } from 'antd-mobile';
-import { myReviews } from '../api/parent';
-import BottomTab from '../components/BottomTab';
+import { myReviews } from '../../api/parent';
+import BottomTab from '../../components/BottomTab';
 
 /** 我的点评：老师课后点评（§6.6 / §11.6 家长端） */
 export default function ReviewsPage() {

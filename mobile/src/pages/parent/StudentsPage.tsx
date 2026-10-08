@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Button, Toast, Dialog, Input, Form, List } from 'antd-mobile';
-import { myStudents, bindStudent, unbindStudent } from '../api/parent';
-import BottomTab from '../components/BottomTab';
+import { myStudents, bindStudent, unbindStudent } from '../../api/parent';
+import BottomTab from '../../components/BottomTab';
 
 /** 我的学员（多对多绑定，§6.23） */
 export default function StudentsPage() {

@@ -3,17 +3,41 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd-mobile';
 import zhCN from 'antd-mobile/es/locales/zh-CN';
-import { getToken } from './api/client';
+import { getToken, getRole } from './api/client';
 import LoginPage from './pages/LoginPage';
-import StudentsPage from './pages/StudentsPage';
-import LessonsPage from './pages/LessonsPage';
-import HomeworkPage from './pages/HomeworkPage';
-import ReviewsPage from './pages/ReviewsPage';
+
+// 家长端
+import PStudents from './pages/parent/StudentsPage';
+import PLessons from './pages/parent/LessonsPage';
+import PHomework from './pages/parent/HomeworkPage';
+import PReviews from './pages/parent/ReviewsPage';
+import PMe from './pages/parent/MePage';
+import PConsumptions from './pages/parent/ConsumptionsPage';
+import PGrowth from './pages/parent/GrowthPage';
+import POrders from './pages/parent/OrdersPage';
+import PNotices from './pages/parent/NoticesPage';
+
+// 老师端
+import TTasks from './pages/teacher/TasksPage';
+import TLessons from './pages/teacher/LessonsPage';
+import THomework from './pages/teacher/HomeworkPage';
+import TScores from './pages/teacher/ScoresPage';
+import TReviews from './pages/teacher/ReviewsPage';
+
+// 顾问端
+import CLeads from './pages/consultant/LeadsPage';
+import CTrials from './pages/consultant/TrialsPage';
+import CFunnel from './pages/consultant/FunnelPage';
 import './index.css';
 
-/** 登录守卫：未登录跳登录页 */
-function Guard({ children }: { children: React.ReactElement }) {
-  return getToken() ? children : <Navigate to="/login" replace />;
+/** 登录守卫：未登录跳登录页；已登录但角色不匹配则跳回该角色首页 */
+function Guard({ role, children }: { role: 'parent' | 'teacher' | 'consultant'; children: React.ReactElement }) {
+  if (!getToken()) return <Navigate to="/login" replace />;
+  if (getRole() !== role) {
+    const home = getRole() === 'parent' ? '/p/students' : getRole() === 'teacher' ? '/t/tasks' : '/c/leads';
+    return <Navigate to={home} replace />;
+  }
+  return children;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -22,11 +46,27 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <HashRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<Guard><StudentsPage /></Guard>} />
-          <Route path="/lessons" element={<Guard><LessonsPage /></Guard>} />
-          <Route path="/homework" element={<Guard><HomeworkPage /></Guard>} />
-          <Route path="/reviews" element={<Guard><ReviewsPage /></Guard>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* 家长端 */}
+          <Route path="/p/students" element={<Guard role="parent"><PStudents /></Guard>} />
+          <Route path="/p/lessons" element={<Guard role="parent"><PLessons /></Guard>} />
+          <Route path="/p/homework" element={<Guard role="parent"><PHomework /></Guard>} />
+          <Route path="/p/reviews" element={<Guard role="parent"><PReviews /></Guard>} />
+          <Route path="/p/me" element={<Guard role="parent"><PMe /></Guard>} />
+          <Route path="/p/consumptions" element={<Guard role="parent"><PConsumptions /></Guard>} />
+          <Route path="/p/growth" element={<Guard role="parent"><PGrowth /></Guard>} />
+          <Route path="/p/orders" element={<Guard role="parent"><POrders /></Guard>} />
+          <Route path="/p/notices" element={<Guard role="parent"><PNotices /></Guard>} />
+          {/* 老师端 */}
+          <Route path="/t/tasks" element={<Guard role="teacher"><TTasks /></Guard>} />
+          <Route path="/t/lessons" element={<Guard role="teacher"><TLessons /></Guard>} />
+          <Route path="/t/homework" element={<Guard role="teacher"><THomework /></Guard>} />
+          <Route path="/t/scores" element={<Guard role="teacher"><TScores /></Guard>} />
+          <Route path="/t/reviews" element={<Guard role="teacher"><TReviews /></Guard>} />
+          {/* 顾问端 */}
+          <Route path="/c/leads" element={<Guard role="consultant"><CLeads /></Guard>} />
+          <Route path="/c/trials" element={<Guard role="consultant"><CTrials /></Guard>} />
+          <Route path="/c/funnel" element={<Guard role="consultant"><CFunnel /></Guard>} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </HashRouter>
     </ConfigProvider>

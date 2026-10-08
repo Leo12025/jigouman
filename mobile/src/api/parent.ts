@@ -17,6 +17,11 @@ export const unbindStudent = (bindId: number) => apiDelete(`/parents/bind/${bind
 export const myLessons = () => apiGet<any[]>('/parents/lessons');
 export const myHomeworks = () => apiGet<any[]>('/parents/homeworks');
 export const myReviews = () => apiGet<any[]>('/parents/reviews');
+export const myConsumptions = () => apiGet<any[]>('/parents/consumptions');
+export const myGrowth = (studentId: number) => apiGet<any[]>(`/parents/growth/${studentId}`);
+export const myOrders = () => apiGet<any[]>('/parents/orders');
+export const myNotices = () => apiGet<any[]>('/parents/notices');
+export const myRenewals = () => apiGet<any[]>('/parents/renewals');
 
 // 作业提交（§6.4，家长身份提交，后端校验绑定关系）
 export const submitHomework = (homeworkId: number, d: { studentId: number; content?: string; files?: string[] }) =>

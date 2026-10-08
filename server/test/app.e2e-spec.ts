@@ -381,6 +381,86 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     expect(myReviews.body.data.some((r: any) => Number(r.studentId) === Number(sid))).toBe(true);
   }, 30000);
 
+  it('M5 成长档案与家校通知(§4.8/§6.5/§6.6)', async () => {
+    // 学员（家长端绑定用）
+    const stu = await request(app.getHttpServer()).post('/api/v1/students')
+      .set('Authorization', `Bearer ${token}`).send({ name: 'M5成长学员', gender: 1 }).expect(201);
+    const sid = stu.body.data.id;
+
+    // 测评 → 成绩
+    const exam = await request(app.getHttpServer()).post('/api/v1/exams')
+      .set('Authorization', `Bearer ${token}`).send({ name: 'M5阶段测', type: 'REGULAR', fullScore: 100 }).expect(201);
+    await request(app.getHttpServer()).post('/api/v1/scores')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, examId: exam.body.data.id, type: 'EXAM', score: 88, level: '良好' }).expect(201);
+    const trend = await request(app.getHttpServer()).get(`/api/v1/students/${sid}/scores`)
+      .set('Authorization', `Bearer ${token}`).expect(200);
+    expect(trend.body.data.length).toBeGreaterThanOrEqual(1);
+
+    // 素养评价
+    await request(app.getHttpServer()).post('/api/v1/growth-metrics')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, dimension: '专注力', score: 90, period: '2026-10' }).expect(201);
+
+    // 赛事 → 报名 → 获奖
+    const contest = await request(app.getHttpServer()).post('/api/v1/contests')
+      .set('Authorization', `Bearer ${token}`).send({ name: 'M5杯', level: '市级' }).expect(201);
+    const join = await request(app.getHttpServer()).post(`/api/v1/contests/${contest.body.data.id}/join`)
+      .set('Authorization', `Bearer ${token}`).send({ studentId: sid }).expect(201);
+    await request(app.getHttpServer()).post(`/api/v1/contests/join/${join.body.data.id}/award`)
+      .set('Authorization', `Bearer ${token}`).send({ grade: '一等奖' }).expect(201);
+
+    // 成长档案时间轴：含成绩/素养/参赛/获奖
+    const growth = await request(app.getHttpServer()).get(`/api/v1/students/${sid}/growth`)
+      .set('Authorization', `Bearer ${token}`).expect(200);
+    const types = growth.body.data.map((g: any) => g.type);
+    expect(types).toContain('SCORE');
+    expect(types).toContain('METRIC');
+    expect(types).toContain('CONTEST');
+    expect(types).toContain('AWARD');
+
+    // 通知 + 续费提醒
+    await request(app.getHttpServer()).post('/api/v1/notices')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'SYSTEM', studentId: sid, title: 'M5通知', content: '开课提醒' }).expect(201);
+    await request(app.getHttpServer()).post('/api/v1/renewal-reminders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, triggerType: 'LOW_HOURS', remainingHours: 2 }).expect(201);
+
+    // 家长端可见（绑定后）
+    const otp = await request(app.getHttpServer()).post('/api/v1/parents/otp')
+      .send({ phone: '13800000002' }).expect(201);
+    const login = await request(app.getHttpServer()).post('/api/v1/parents/login')
+      .send({ phone: '13800000002', code: otp.body.data.code }).expect(201);
+    const pt = login.body.data.accessToken;
+    await request(app.getHttpServer()).post('/api/v1/parents/bind')
+      .set('Authorization', `Bearer ${pt}`).send({ studentId: sid }).expect(201);
+
+    const notices = await request(app.getHttpServer()).get('/api/v1/parents/notices')
+      .set('Authorization', `Bearer ${pt}`).expect(200);
+    expect(notices.body.data.some((n: any) => n.title === 'M5通知')).toBe(true);
+
+    const renewals = await request(app.getHttpServer()).get('/api/v1/parents/renewals')
+      .set('Authorization', `Bearer ${pt}`).expect(200);
+    expect(renewals.body.data.some((r: any) => Number(r.studentId) === Number(sid))).toBe(true);
+
+    // 家长端成长档案（绑定学员）
+    const pgrowth = await request(app.getHttpServer()).get(`/api/v1/parents/growth/${sid}`)
+      .set('Authorization', `Bearer ${pt}`).expect(200);
+    expect(pgrowth.body.data.length).toBeGreaterThanOrEqual(1);
+
+    // 未绑定学员的成长档案应为空（越权防护）
+    const other = await request(app.getHttpServer()).post('/api/v1/students')
+      .set('Authorization', `Bearer ${token}`).send({ name: 'M5未绑定2', gender: 1 }).expect(201);
+    const denied = await request(app.getHttpServer()).get(`/api/v1/parents/growth/${other.body.data.id}`)
+      .set('Authorization', `Bearer ${pt}`).expect(200);
+    expect(denied.body.data.length).toBe(0);
+
+    // 家长端缴费与消课接口可用
+    await request(app.getHttpServer()).get('/api/v1/parents/orders').set('Authorization', `Bearer ${pt}`).expect(200);
+    await request(app.getHttpServer()).get('/api/v1/parents/consumptions').set('Authorization', `Bearer ${pt}`).expect(200);
+  }, 30000);
+
   it('M3 渠道：可创建并列出渠道', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/channels')

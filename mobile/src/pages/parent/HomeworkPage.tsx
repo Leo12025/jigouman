@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, List, Button, Tag, Toast, TextArea, Modal } from 'antd-mobile';
-import { myHomeworks, submitHomework } from '../api/parent';
-import BottomTab from '../components/BottomTab';
+import { myHomeworks, submitHomework } from '../../api/parent';
+import BottomTab from '../../components/BottomTab';
 
 /** 我的作业：查看并可提交（§4.7，家长/学员端提交） */
 export default function HomeworkPage() {

@@ -1,0 +1,45 @@
+import { useEffect, useState } from 'react';
+import { Card, List, Button, Tag, Toast } from 'antd-mobile';
+import { listTasks, completeTask } from '../../api/staff';
+import BottomTab from '../../components/BottomTab';
+
+const TYPE_LABEL: Record<string, string> = {
+  AFTER_CLASS_REVIEW: '课后点评',
+};
+
+/** 老师端待办中心（§4.26 / §11.6：点评/批改等逾期聚合提醒） */
+export default function TasksPage() {
+  const [rows, setRows] = useState<any[]>([]);
+  const load = () => listTasks({ status: 'TODO', page: 1, size: 50 })
+    .then((r) => setRows(r.list || r)).catch(() => Toast.show({ content: '加载待办失败' }));
+
+  useEffect(() => { load(); }, []);
+
+  const onComplete = async (id: number) => {
+    await completeTask(id);
+    Toast.show({ content: '已完成' });
+    load();
+  };
+
+  return (
+    <div className="page">
+      <div className="page-title">待办中心</div>
+      <div style={{ padding: 12 }}>
+        {rows.length ? rows.map((t) => (
+          <Card key={t.id} style={{ marginBottom: 10 }}>
+            <List>
+              <List.Item extra={<Tag color="warning">{TYPE_LABEL[t.type] || t.type}</Tag>}>
+                {t.title}
+              </List.Item>
+              <List.Item extra={t.dueAt ? new Date(t.dueAt).toLocaleString() : '-'}>
+                截止
+              </List.Item>
+            </List>
+            <Button size="mini" color="primary" onClick={() => onComplete(t.id)}>标记完成</Button>
+          </Card>
+        )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无待办</div></Card>}
+      </div>
+      <BottomTab />
+    </div>
+  );
+}

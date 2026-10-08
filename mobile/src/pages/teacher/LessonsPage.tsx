@@ -1,0 +1,85 @@
+import { useEffect, useState } from 'react';
+import { Card, List, Button, Tag, Toast, Dialog, Selector } from 'antd-mobile';
+import { listLessons, classGroupStudents, attendLesson } from '../../api/staff';
+import BottomTab from '../../components/BottomTab';
+
+/** 老师端班级课表 + 点名消课（§11.6） */
+export default function LessonsPage() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [statusMap, setStatusMap] = useState<Record<number, string>>({});
+  const [current, setCurrent] = useState<any>(null);
+
+  const load = () => listLessons({ page: 1, size: 50 })
+    .then((r) => setRows(r.list || r)).catch(() => Toast.show({ content: '加载课表失败' }));
+  useEffect(() => { load(); }, []);
+
+  const openAttend = async (l: any) => {
+    setCurrent(l);
+    setStatusMap({});
+    if (l.classGroupId) {
+      try {
+        const s = await classGroupStudents(l.classGroupId);
+        setStudents(s);
+        setStatusMap(Object.fromEntries(s.map((x: any) => [Number(x.id), 'PRESENT'])));
+      } catch { setStudents([]); }
+    } else setStudents([]);
+  };
+
+  const submitAttend = async () => {
+    if (!current) return;
+    const ok = await Dialog.confirm({ content: `确认提交点名？出勤/补课将扣 1 课时` });
+    if (!ok) return;
+    await attendLesson(current.id, students.map((s) => ({ studentId: Number(s.id), status: statusMap[Number(s.id)] || 'PRESENT' })));
+    Toast.show({ content: '点名完成' });
+    setCurrent(null);
+    load();
+  };
+
+  const OPTIONS = [
+    { label: '出勤', value: 'PRESENT' },
+    { label: '补课', value: 'MAKEUP' },
+    { label: '请假', value: 'LEAVE' },
+    { label: '缺勤', value: 'ABSENT' },
+  ];
+
+  return (
+    <div className="page">
+      <div className="page-title">班级课表</div>
+      <div style={{ padding: 12 }}>
+        {rows.length ? rows.map((l) => (
+          <Card key={l.id} style={{ marginBottom: 10 }}>
+            <List>
+              <List.Item extra={l.type === 'MAKEUP' ? <Tag color="warning">补课</Tag> : <Tag color="primary">{l.status}</Tag>}>
+                {l.startTime ? new Date(l.startTime).toLocaleString() : '-'}
+              </List.Item>
+              <List.Item extra={`班级 ${l.classGroupId ?? '-'}`}>课程 {l.courseId ?? '-'}</List.Item>
+            </List>
+            <Button size="mini" color="primary" onClick={() => openAttend(l)}>点名消课</Button>
+          </Card>
+        )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无课次</div></Card>}
+
+        {current && (
+          <Card style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>
+              点名：{current.startTime ? new Date(current.startTime).toLocaleString() : `课次${current.id}`}
+            </div>
+            {students.length ? students.map((s) => (
+              <div key={s.id} style={{ marginBottom: 8 }}>
+                <div style={{ marginBottom: 4 }}>{s.name}（ID:{s.id}）</div>
+                <Selector
+                  value={[statusMap[Number(s.id)] || 'PRESENT']}
+                  onChange={(v) => setStatusMap({ ...statusMap, [Number(s.id)]: String(v[0]) })}
+                  options={OPTIONS}
+                />
+              </div>
+            )) : <div style={{ color: '#999' }}>该班级暂无在读学员</div>}
+            <Button block color="primary" onClick={submitAttend} style={{ marginTop: 8 }}>提交点名</Button>
+            <Button block fill="none" onClick={() => setCurrent(null)} style={{ marginTop: 8 }}>取消</Button>
+          </Card>
+        )}
+      </div>
+      <BottomTab />
+    </div>
+  );
+}
