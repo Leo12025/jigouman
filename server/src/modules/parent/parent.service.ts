@@ -12,6 +12,11 @@ import { Lesson } from '../course/entities/lesson.entity';
 import { Homework } from '../homework/entities/homework.entity';
 import { HomeworkSubmit } from '../homework/entities/homework-submit.entity';
 import { CourseReview } from '../family/entities/course-review.entity';
+import { FamilyService } from '../family/family.service';
+import { GrowthService } from '../growth/growth.service';
+import { HourConsumption } from '../hour/entities/hour-consumption.entity';
+import { Attendance } from '../hour/entities/attendance.entity';
+import { Order } from '../order/entities/order.entity';
 import { SendOtpDto, ParentLoginDto, BindStudentDto } from './dto/parent.dto';
 
 interface OtpRecord {
@@ -38,8 +43,80 @@ export class ParentService {
     @InjectRepository(Homework) private readonly hwRepo: Repository<Homework>,
     @InjectRepository(HomeworkSubmit) private readonly submitRepo: Repository<HomeworkSubmit>,
     @InjectRepository(CourseReview) private readonly reviewRepo: Repository<CourseReview>,
+    @InjectRepository(HourConsumption) private readonly consRepo: Repository<HourConsumption>,
+    @InjectRepository(Attendance) private readonly attRepo: Repository<Attendance>,
+    @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+    private readonly familySvc: FamilyService,
+    private readonly growthSvc: GrowthService,
     private readonly jwt: JwtService,
   ) {}
+
+  // ---------- 家长端补齐：消课/考勤、成长档案、缴费、通知、续费提醒 ----------
+
+  /** 我的消课与考勤（§11.6 家长端「消课通知」） */
+  async myConsumptions(tenantId: number, phone: string) {
+    const studentIds = await this.boundStudentIds(tenantId, phone);
+    if (!studentIds.length) return [];
+    const consumptions = await this.consRepo.find({
+      where: { tenantId, studentId: In(studentIds), type: 'CONSUME' } as any,
+      order: { id: 'DESC' } as any,
+      take: 50,
+    });
+    const attendances = await this.attRepo.find({
+      where: { tenantId, studentId: In(studentIds) } as any,
+      order: { id: 'DESC' } as any,
+      take: 50,
+    });
+    const attMap = new Map(
+      attendances.map((a) => [`${Number(a.lessonId)}_${Number(a.studentId)}`, a]),
+    );
+    return consumptions.map((c) => {
+      const att = attMap.get(`${Number(c.lessonId)}_${Number(c.studentId)}`);
+      return {
+        id: c.id,
+        studentId: Number(c.studentId),
+        courseId: c.courseId,
+        lessonId: c.lessonId,
+        hours: c.hours,
+        createdAt: c.createdAt,
+        attendance: att ? att.status : null,
+      };
+    });
+  }
+
+  /** 成长档案时间轴（§6.5，需指定学员，且必须已绑定） */
+  async myGrowth(tenantId: number, phone: string, studentId: number) {
+    const ids = await this.boundStudentIds(tenantId, phone);
+    if (!ids.includes(Number(studentId))) return [];
+    return this.growthSvc.growthTimeline(tenantId, Number(studentId));
+  }
+
+  /** 我的缴费：绑定学员的订单（§11.6 家长端「缴费/续费」） */
+  async myOrders(tenantId: number, phone: string) {
+    const studentIds = await this.boundStudentIds(tenantId, phone);
+    if (!studentIds.length) return [];
+    return this.orderRepo.find({
+      where: { tenantId, studentId: In(studentIds) } as any,
+      order: { id: 'DESC' } as any,
+      take: 50,
+    });
+  }
+
+  /** 我的通知（绑定学员 + 全员通知，§6.6） */
+  async myNotices(tenantId: number, phone: string) {
+    const studentIds = await this.boundStudentIds(tenantId, phone);
+    if (!studentIds.length) return [];
+    return this.familySvc.noticesForStudents(tenantId, studentIds);
+  }
+
+  /** 我的续费提醒（§6.6） */
+  async myRenewals(tenantId: number, phone: string) {
+    const studentIds = await this.boundStudentIds(tenantId, phone);
+    if (!studentIds.length) return [];
+    const all = await this.familySvc.listRenewals(tenantId);
+    const set = new Set(studentIds.map(Number));
+    return all.filter((r) => set.has(Number(r.studentId)));
+  }
 
   /** 发送验证码。非生产环境回传 code 便于联调与 e2e；生产仅返回已发送 */
   async sendOtp(d: SendOtpDto) {

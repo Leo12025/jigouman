@@ -68,6 +68,41 @@ export class ParentController {
     return this.svc.myReviews(t, u.phone as string);
   }
 
+  @Get('consumptions')
+  @ApiOperation({ summary: '我的消课与考勤(§11.6 消课通知)' })
+  consumptions(@TenantId() t: number, @CurrentUser() u: AuthUser) {
+    this.assertParent(u);
+    return this.svc.myConsumptions(t, u.phone as string);
+  }
+
+  @Get('growth/:studentId')
+  @ApiOperation({ summary: '成长档案时间轴(成绩+素养+参赛+获奖，需已绑定)' })
+  growth(@TenantId() t: number, @CurrentUser() u: AuthUser, @Param('studentId') studentId: string) {
+    this.assertParent(u);
+    return this.svc.myGrowth(t, u.phone as string, Number(studentId));
+  }
+
+  @Get('orders')
+  @ApiOperation({ summary: '我的缴费(绑定学员订单)' })
+  orders(@TenantId() t: number, @CurrentUser() u: AuthUser) {
+    this.assertParent(u);
+    return this.svc.myOrders(t, u.phone as string);
+  }
+
+  @Get('notices')
+  @ApiOperation({ summary: '我的通知(绑定学员+全员)' })
+  notices(@TenantId() t: number, @CurrentUser() u: AuthUser) {
+    this.assertParent(u);
+    return this.svc.myNotices(t, u.phone as string);
+  }
+
+  @Get('renewals')
+  @ApiOperation({ summary: '我的续费提醒' })
+  renewals(@TenantId() t: number, @CurrentUser() u: AuthUser) {
+    this.assertParent(u);
+    return this.svc.myRenewals(t, u.phone as string);
+  }
+
   /** 家长端接口仅允许家长身份访问 */
   private assertParent(u: AuthUser) {
     if (u?.kind !== 'parent' || !u.phone) {

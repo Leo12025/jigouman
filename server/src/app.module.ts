@@ -23,6 +23,7 @@ import { TaskModule } from './modules/task/task.module';
 import { HomeworkModule } from './modules/homework/homework.module';
 import { ParentModule } from './modules/parent/parent.module';
 import { FamilyModule } from './modules/family/family.module';
+import { GrowthModule } from './modules/growth/growth.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { FamilyModule } from './modules/family/family.module';
     HomeworkModule,
     ParentModule,
     FamilyModule,
+    GrowthModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

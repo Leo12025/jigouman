@@ -31,6 +31,7 @@ const MODULES = [
   'homework',
   'review',
   'growth',
+  'growth',
   'approval',
   'coupon',
   'complaint',

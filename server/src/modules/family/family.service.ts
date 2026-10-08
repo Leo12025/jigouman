@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { CourseReview } from './entities/course-review.entity';
 import { CreateCourseReviewDto, ReviewPageQueryDto } from './dto/family.dto';
+import { Notice } from './entities/notice.entity';
+import { RenewalReminder } from './entities/renewal-reminder.entity';
+import { CreateNoticeDto, NoticePageQueryDto, CreateRenewalReminderDto } from './dto/notice.dto';
 import { TaskService } from '../task/task.service';
 import { TaskStatus } from '../task/entities/task.entity';
 
@@ -10,8 +13,77 @@ import { TaskStatus } from '../task/entities/task.entity';
 export class FamilyService {
   constructor(
     @InjectRepository(CourseReview) private readonly repo: Repository<CourseReview>,
+    @InjectRepository(Notice) private readonly noticeRepo: Repository<Notice>,
+    @InjectRepository(RenewalReminder) private readonly renewalRepo: Repository<RenewalReminder>,
     private readonly taskSvc: TaskService,
   ) {}
+
+  // ---------- 通知（§5.7 / §6.6） ----------
+  /** 发送通知。家长端按绑定学员可见（studentId 为空表示全员通知） */
+  async createNotice(tenantId: number, d: CreateNoticeDto) {
+    const notice = this.noticeRepo.create({
+      tenantId,
+      type: d.type || 'SYSTEM',
+      studentId: d.studentId,
+      title: d.title,
+      content: d.content,
+      channel: d.channel || 'APP',
+      sendAt: new Date(),
+      status: 'SENT',
+    } as Notice);
+    return this.noticeRepo.save(notice as any);
+  }
+
+  async listNotices(tenantId: number, q: NoticePageQueryDto) {
+    const where: any = { tenantId };
+    if (q.studentId) where.studentId = q.studentId;
+    if (q.type) where.type = q.type;
+    const [list, total] = await this.noticeRepo.findAndCount({
+      where, order: { id: 'DESC' } as any, skip: (q.page - 1) * q.size, take: q.size,
+    });
+    return { list, total, page: q.page, size: q.size, totalPages: Math.ceil(total / q.size) };
+  }
+
+  /** 家长端：我的通知（绑定学员 + 全员通知） */
+  async noticesForStudents(tenantId: number, studentIds: number[]) {
+    if (!studentIds.length) return [];
+    return this.noticeRepo.find({
+      where: [
+        { tenantId, studentId: In(studentIds) } as any,
+        { tenantId, studentId: null } as any,
+      ],
+      order: { id: 'DESC' } as any,
+      take: 50,
+    });
+  }
+
+  async markNoticeRead(tenantId: number, id: number) {
+    const n = await this.noticeRepo.findOne({ where: { tenantId, id } as any });
+    if (!n) return null;
+    n.status = 'READ';
+    n.readAt = new Date();
+    return this.noticeRepo.save(n as any);
+  }
+
+  // ---------- 续费提醒（§5.7 / §6.6） ----------
+  async createRenewalReminder(tenantId: number, d: CreateRenewalReminderDto) {
+    const r = this.renewalRepo.create({
+      tenantId,
+      studentId: d.studentId,
+      courseId: d.courseId,
+      triggerType: d.triggerType || 'LOW_HOURS',
+      sentAt: new Date(),
+      status: 'SENT',
+      remainingHours: d.remainingHours,
+    } as RenewalReminder);
+    return this.renewalRepo.save(r as any);
+  }
+
+  async listRenewals(tenantId: number, studentId?: number) {
+    const where: any = { tenantId };
+    if (studentId) where.studentId = studentId;
+    return this.renewalRepo.find({ where, order: { id: 'DESC' } as any, take: 100 });
+  }
 
   /**
    * 撰写课后点评（§6.6）。
