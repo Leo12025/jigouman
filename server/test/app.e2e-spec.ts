@@ -15,6 +15,10 @@ describe('机构管理系统 (e2e, SQLite)', () => {
   let channelId: number;
   let leadId: number;
   let classGroupId: number;
+  let m4StudentId: number;
+  let m4CourseId: number;
+  let m4OrderId: number;
+  let m4LessonId: number;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -103,6 +107,104 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     expect(res.body.data.id).toBe(classGroupId);
     expect(Array.isArray(res.body.data.lessons)).toBe(true);
     expect(res.body.data.lessons.length).toBeGreaterThan(0);
+  });
+
+  it('M4 订单/课时：下单→支付→发放课时→点名消课→退费回滚', async () => {
+    // 学员
+    const stu = await request(app.getHttpServer())
+      .post('/api/v1/students')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'M4学员', gender: 1 })
+      .expect(201);
+    m4StudentId = stu.body.data.id;
+
+    // 课程（20 课时）
+    const course = await request(app.getHttpServer())
+      .post('/api/v1/courses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'M4课程', type: 'ONE_ON_ONE', price: 1000, totalHours: 20 })
+      .expect(201);
+    m4CourseId = course.body.data.id;
+
+    // 下单
+    const order = await request(app.getHttpServer())
+      .post('/api/v1/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        studentId: m4StudentId,
+        discountAmount: 0,
+        items: [{ courseId: m4CourseId, name: 'M4课程', qty: 1, unitPrice: 1000, hours: 20 }],
+      })
+      .expect(201);
+    m4OrderId = order.body.data.id;
+    expect(order.body.data.status).toBe('PENDING');
+    expect(Number(order.body.data.payableAmount)).toBe(1000);
+
+    // 支付 → 自动发放课时
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/${m4OrderId}/pay`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ channel: 'OFFLINE' })
+      .expect(201);
+
+    let hours = await request(app.getHttpServer())
+      .get(`/api/v1/students/${m4StudentId}/hours`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(hours.body.data[0].balance).toBe(20);
+
+    // 建班级 → 报名 → 排课，用于点名消课
+    const cg = await request(app.getHttpServer())
+      .post('/api/v1/courses/class-groups')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ courseId: m4CourseId, name: 'M4班', teacherId: 77, capacity: 5 })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/v1/students/courses/enroll')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ studentId: m4StudentId, courseId: m4CourseId, classGroupId: cg.body.data.id })
+      .expect(201);
+    const lesson = await request(app.getHttpServer())
+      .post('/api/v1/courses/lessons')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        classGroupId: cg.body.data.id,
+        courseId: m4CourseId,
+        teacherId: 77,
+        startTime: '2026-11-01T09:00:00',
+        endTime: '2026-11-01T10:00:00',
+      })
+      .expect(201);
+    m4LessonId = lesson.body.data.id;
+
+    // 点名消课（出勤扣 1 课时）
+    await request(app.getHttpServer())
+      .post(`/api/v1/lessons/${m4LessonId}/attendance`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ records: [{ studentId: m4StudentId, status: 'PRESENT' }] })
+      .expect(201);
+    hours = await request(app.getHttpServer())
+      .get(`/api/v1/students/${m4StudentId}/hours`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(hours.body.data[0].balance).toBe(19);
+
+    // 退费申请（待审批）→ 审批通过触发课时回滚
+    const refund = await request(app.getHttpServer())
+      .post(`/api/v1/orders/${m4OrderId}/refund`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 1000, reason: 'e2e' })
+      .expect(201);
+    expect(refund.body.data.status).toBe('PENDING');
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/${m4OrderId}/refund/${refund.body.data.id}/approve`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+    hours = await request(app.getHttpServer())
+      .get(`/api/v1/students/${m4StudentId}/hours`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(hours.body.data[0].balance).toBe(0);
   });
 
   it('M3 渠道：可创建并列出渠道', async () => {

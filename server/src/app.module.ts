@@ -16,6 +16,8 @@ import { RbacService } from './core/rbac/rbac.service';
 import { CourseModule } from './modules/course/course.module';
 import { StudentModule } from './modules/student/student.module';
 import { LeadModule } from './modules/lead/lead.module';
+import { OrderModule } from './modules/order/order.module';
+import { HourModule } from './modules/hour/hour.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { LeadModule } from './modules/lead/lead.module';
     CourseModule,
     StudentModule,
     LeadModule,
+    OrderModule,
+    HourModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

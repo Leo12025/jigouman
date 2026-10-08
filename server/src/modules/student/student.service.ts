@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository, Like, In } from 'typeorm';
 import { BaseService } from '../../common/crud/base.service';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
@@ -112,5 +112,17 @@ export class StudentService {
   }
   listEnroll(t: number, studentId: number) {
     return this.enroll.repo.find({ where: { tenantId: t, studentId } });
+  }
+
+  /** 班级在读学员（供课次点名 UI） */
+  async listByClassGroup(t: number, classGroupId: number) {
+    const enrolls = await this.enroll.repo.find({
+      where: { tenantId: t, classGroupId, status: StudentCourseStatus.ACTIVE } as any,
+      order: { id: 'ASC' } as any,
+    });
+    const ids = enrolls.map((e) => e.studentId);
+    if (!ids.length) return [];
+    const students = await this.student.repo.find({ where: { tenantId: t, id: In(ids) } as any });
+    return students.map((s) => ({ id: s.id, name: s.name }));
   }
 }

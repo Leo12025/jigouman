@@ -104,4 +104,11 @@ export class StudentController {
   enroll(@TenantId() t: number, @Body() d: EnrollCourseDto) {
     return this.svc.enrollCourse(t, d);
   }
+
+  @Get('by-class-group/:id')
+  @RequirePermissions('student:view')
+  @ApiOperation({ summary: '班级在读学员(供课次点名)' })
+  byClassGroup(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.listByClassGroup(t, id);
+  }
 }
