@@ -18,15 +18,12 @@ function buildOptions(cfg: ConfigService): TypeOrmModuleOptions {
   const base = { autoLoadEntities: true, synchronize, logging };
 
   if (dbType === 'sqlite') {
-    // 使用 sql.js（纯 WASM）做本地/单测库，零原生依赖。
-    // 内存态：进程重启数据清空，适合本地调试与自动化测试。
-    // 显式传入 driver 以规避 sql.js 的 CJS/ESM 互操作问题（需 require）。
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sqljsMod: any = require('sql.js');
+    // better-sqlite3：原生 SQLite 驱动。项目固定 Node 22，ABI 稳定，
+    // 无需 Docker/MySQL，装上即可启动与跑测试；同步驱动，性能与类型行为优于 sql.js。
+    // DB_SQLITE_PATH：:memory:（默认，进程重启清空）或本地文件路径（如 ./data.db，便于调试落盘）。
     return {
-      type: 'sqljs',
-      driver: sqljsMod.default || sqljsMod,
-      autoSave: false,
+      type: 'better-sqlite3',
+      database: cfg.get('DB_SQLITE_PATH') || ':memory:',
       ...base,
     } as TypeOrmModuleOptions;
   }

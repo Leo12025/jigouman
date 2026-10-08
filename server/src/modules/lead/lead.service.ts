@@ -207,7 +207,7 @@ export class LeadService {
 
   /**
    * 转化漏斗（文档 §4.2）：按渠道/活动筛选，统计各阶段数量与转化率。
-   * 日期筛选在 JS 层做，规避 MySQL/sql.js 对 datetime 字符串的差异。
+   * 日期筛选在 JS 层做，规避 MySQL/SQLite 对 datetime 字符串的差异。
    */
   async funnel(t: number, q: FunnelQueryDto) {
     const qb = this.lead.repo

@@ -237,8 +237,8 @@ export class CourseService {
     if (conditions.length) qb.andWhere(`(${conditions.join(' OR ')})`, params);
 
     const candidates = await qb.getMany();
-    // 时段重叠判定在 JS 层用 Date 语义做，跨数据库（MySQL/sql.js）一致可靠。
-    // sql.js 等驱动可能将 datetime 以字符串返回，统一 new Date() 归一化。
+    // 时段重叠判定在 JS 层用 Date 语义做，跨数据库（MySQL/SQLite）一致可靠。
+    // SQLite 驱动可能将 datetime 以字符串返回，统一 new Date() 归一化。
     const hit = candidates.find((l) => {
       const ls = l.startTime instanceof Date ? l.startTime : new Date(l.startTime);
       const le = l.endTime instanceof Date ? l.endTime : new Date(l.endTime);

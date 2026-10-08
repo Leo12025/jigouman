@@ -130,8 +130,7 @@ export class OrderService {
     const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
     if (!order) throw new NotFoundException('订单不存在');
     const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
-    // 注意：sql.js 驱动对 bigint 列绑定 number 参数会静默失败（promise 不 resolve），
-    // 需以字符串传参（与 HTTP 层 @Param 行为一致）。
+    // bigint 列在 SQLite 下可能以字符串返回，统一转 Number 再查询/比较
     const studentId = Number(order.studentId);
     const balances = (await this.hourSvc.balance(tenantId, studentId)) as any[];
     const balOf = (courseId?: number) =>
