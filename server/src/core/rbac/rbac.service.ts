@@ -29,6 +29,7 @@ const MODULES = [
   'finance',
   'task',
   'homework',
+  'review',
   'growth',
   'approval',
   'coupon',

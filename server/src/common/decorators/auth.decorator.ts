@@ -12,6 +12,10 @@ export interface AuthUser {
   username: string;
   roleIds: number[];
   permissions: string[];
+  /** 身份类型：staff 员工/管理员（PC 端）；parent 家长（移动端 H5，§6.23） */
+  kind?: 'staff' | 'parent';
+  /** 家长手机号（kind=parent 时有值） */
+  phone?: string;
 }
 
 export const CurrentUser = createParamDecorator(

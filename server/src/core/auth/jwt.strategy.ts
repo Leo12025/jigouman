@@ -13,6 +13,10 @@ export interface JwtPayload {
   username: string;
   /** 令牌用途：access 访问令牌 / refresh 刷新令牌 */
   type?: 'access' | 'refresh';
+  /** 身份类型：staff 员工/管理员；parent 家长（移动端 H5，§6.23） */
+  kind?: 'staff' | 'parent';
+  /** 家长手机号（kind=parent 时有值） */
+  phone?: string;
 }
 
 /**
@@ -38,6 +42,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.type === 'refresh') {
       throw new UnauthorizedException('请使用访问令牌');
     }
+    // 家长端（移动端 H5，§6.23）：无 sys_user 账号与 RBAC 权限，身份由 parent 账号签发
+    if (payload.kind === 'parent') {
+      return {
+        id: payload.sub,
+        tenantId: payload.tenantId,
+        username: payload.username,
+        roleIds: [],
+        permissions: [],
+        kind: 'parent',
+        phone: payload.phone,
+      };
+    }
     const user = await this.userRepo.findOne({
       where: { id: payload.sub, tenantId: payload.tenantId },
       relations: ['roles', 'roles.permissions'],
@@ -55,6 +71,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: user.username,
       roleIds: user.roles?.map((r) => r.id) || [],
       permissions: [...permissions],
+      kind: 'staff',
     };
   }
 }

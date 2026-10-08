@@ -295,6 +295,92 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     expect(sum.body.data).toHaveProperty('profit');
   }, 30000);
 
+  it('M5 作业闭环(§4.7)：布置→家长提交→批改→统计→未提交名单', async () => {
+    // 学员 + 课程 + 班级 + 报名
+    const stu = await request(app.getHttpServer()).post('/api/v1/students')
+      .set('Authorization', `Bearer ${token}`).send({ name: 'M5学员', gender: 1 }).expect(201);
+    const sid = stu.body.data.id;
+    const course = await request(app.getHttpServer()).post('/api/v1/courses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'M5课程', type: 'ONE_ON_ONE', price: 1000, totalHours: 20 }).expect(201);
+    const cg = await request(app.getHttpServer()).post('/api/v1/courses/class-groups')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ courseId: course.body.data.id, name: 'M5班', teacherId: 77, capacity: 5 }).expect(201);
+    await request(app.getHttpServer()).post('/api/v1/students/courses/enroll')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, courseId: course.body.data.id, classGroupId: cg.body.data.id }).expect(201);
+
+    // 布置作业
+    const hw = await request(app.getHttpServer()).post('/api/v1/homework')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ classGroupId: cg.body.data.id, courseId: course.body.data.id, title: 'M5作业', content: '练习1-10' })
+      .expect(201);
+    const hwId = hw.body.data.id;
+
+    // 家长端：OTP → 登录 → 绑定学员
+    const otp = await request(app.getHttpServer()).post('/api/v1/parents/otp')
+      .send({ phone: '13800000001' }).expect(201);
+    expect(otp.body.data.code).toBeTruthy();
+    const login = await request(app.getHttpServer()).post('/api/v1/parents/login')
+      .send({ phone: '13800000001', code: otp.body.data.code }).expect(201);
+    const parentToken = login.body.data.accessToken;
+    expect(parentToken).toBeTruthy();
+
+    await request(app.getHttpServer()).post('/api/v1/parents/bind')
+      .set('Authorization', `Bearer ${parentToken}`)
+      .send({ studentId: sid, parentName: 'M5家长', relation: '母亲' }).expect(201);
+
+    const mine = await request(app.getHttpServer()).get('/api/v1/parents/students')
+      .set('Authorization', `Bearer ${parentToken}`).expect(200);
+    expect(mine.body.data.some((s: any) => Number(s.studentId) === Number(sid))).toBe(true);
+
+    // 我的作业：应能看到该作业且未提交
+    const myHw = await request(app.getHttpServer()).get('/api/v1/parents/homeworks')
+      .set('Authorization', `Bearer ${parentToken}`).expect(200);
+    expect(myHw.body.data.some((h: any) => Number(h.homeworkId) === Number(hwId) && !h.submitted)).toBe(true);
+
+    // 越权：提交未绑定学员应被拒绝
+    const other = await request(app.getHttpServer()).post('/api/v1/students')
+      .set('Authorization', `Bearer ${token}`).send({ name: 'M5未绑定', gender: 1 }).expect(201);
+    await request(app.getHttpServer()).post(`/api/v1/homework/${hwId}/submit`)
+      .set('Authorization', `Bearer ${parentToken}`)
+      .send({ studentId: other.body.data.id, content: '越权提交' }).expect(403);
+
+    // 家长提交作业
+    const submit = await request(app.getHttpServer()).post(`/api/v1/homework/${hwId}/submit`)
+      .set('Authorization', `Bearer ${parentToken}`)
+      .send({ studentId: sid, content: '已完成', files: ['photo1.jpg'] }).expect(201);
+    expect(submit.body.data.submitAt).toBeTruthy();
+    const submitId = submit.body.data.id;
+
+    // 老师批改
+    const review = await request(app.getHttpServer())
+      .post(`/api/v1/homework/submit/${submitId}/review`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ score: 95, comment: '完成得很好', isExcellent: 1 }).expect(201);
+    expect(Number(review.body.data.score)).toBe(95);
+
+    // 统计：提交率/按时率/优秀率
+    const stats = await request(app.getHttpServer()).get(`/api/v1/homework/${hwId}/stats`)
+      .set('Authorization', `Bearer ${token}`).expect(200);
+    expect(stats.body.data.submittedCount).toBe(1);
+    expect(stats.body.data.submitRate).toBe(100);
+    expect(stats.body.data.excellentCount).toBe(1);
+
+    // 未提交名单：已提交后应为空
+    const pending = await request(app.getHttpServer()).get(`/api/v1/homework/${hwId}/unsubmitted`)
+      .set('Authorization', `Bearer ${token}`).expect(200);
+    expect(pending.body.data.length).toBe(0);
+
+    // 课后点评 → 家长可见（§6.6 / §11.6）
+    await request(app.getHttpServer()).post('/api/v1/course-reviews')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ studentId: sid, courseId: course.body.data.id, content: '课堂表现积极', rating: 5 }).expect(201);
+    const myReviews = await request(app.getHttpServer()).get('/api/v1/parents/reviews')
+      .set('Authorization', `Bearer ${parentToken}`).expect(200);
+    expect(myReviews.body.data.some((r: any) => Number(r.studentId) === Number(sid))).toBe(true);
+  }, 30000);
+
   it('M3 渠道：可创建并列出渠道', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/channels')

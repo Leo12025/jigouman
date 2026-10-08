@@ -20,6 +20,9 @@ import { OrderModule } from './modules/order/order.module';
 import { HourModule } from './modules/hour/hour.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { TaskModule } from './modules/task/task.module';
+import { HomeworkModule } from './modules/homework/homework.module';
+import { ParentModule } from './modules/parent/parent.module';
+import { FamilyModule } from './modules/family/family.module';
 
 @Module({
   imports: [
@@ -37,6 +40,9 @@ import { TaskModule } from './modules/task/task.module';
     HourModule,
     FinanceModule,
     TaskModule,
+    HomeworkModule,
+    ParentModule,
+    FamilyModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限
