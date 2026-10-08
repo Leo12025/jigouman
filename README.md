@@ -82,13 +82,17 @@ npm test        # 后端 e2e：登录 / RBAC / 排课冲突 / 班级详情 / 线
 | M1 基础框架 | `core/`（auth、rbac、tenant、audit） | 登录页、首页看板、主布局、用户管理、角色权限 |
 | M2 课程+学员 | `modules/course`、`modules/student` | 课程管理、班级管理、课次排课、学员档案 |
 | M3 线索+招生 | `modules/lead` | 渠道管理、市场活动、线索 CRM、转化漏斗 |
-| M4 订单+课时 | 待开发 | 待开发 |
+| M4 订单+课时 | `modules/order`、`modules/hour` | 订单与财务（下单/支付/退费）、课时管理（账户/流水/预警）、课次点名消课 |
 | M5 作业+家长端 | 待开发 | 家长端/老师端 H5（Ant Design Mobile）待开发 |
+
+> M4 已闭环：下单→支付（自动发放课时）→上课点名消课→退费（审批后课时回滚防资损）。
+> 文档 §4.5 中的**分账（渠道/老师）、工资、发票、财务对账/报表**及 §4.6 的**请假补课核销**为后续增强项，本次未实现。
 
 ### 页面清单（web/src/pages）
 `Login` 登录 · `HomePage` 首页看板 · `CoursePage` 课程/分类 · `ClassGroupPage` 班级 ·
-`LessonPage` 课次排课（单条 + 按周批量生成）· `StudentPage` 学员/家长/报名 ·
-`LeadPage` 线索 CRM · `ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
+`LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课）· `StudentPage` 学员/家长/报名 ·
+`OrderPage` 订单与财务 · `HourPage` 课时管理 · `LeadPage` 线索 CRM ·
+`ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
 `UserPage` 用户 · `RolePage` 角色权限
 
 ### 鉴权与安全
