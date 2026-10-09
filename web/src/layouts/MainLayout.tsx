@@ -13,6 +13,7 @@ import {
   SolutionOutlined,
   SafetyCertificateOutlined,
   AuditOutlined,
+  ApiOutlined,
   TeamOutlined as Team2Outlined,
   HomeOutlined,
   LogoutOutlined,
@@ -115,6 +116,7 @@ export default function MainLayout() {
         { key: '/users', icon: <UserOutlined />, label: '用户管理' },
         { key: '/roles', icon: <SafetyCertificateOutlined />, label: '角色权限' },
         { key: '/approval-flows', icon: <AuditOutlined />, label: '审批流配置' },
+        { key: '/channels', icon: <ApiOutlined />, label: '消息渠道配置' },
       ],
     },
   ];

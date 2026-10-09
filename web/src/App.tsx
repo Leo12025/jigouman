@@ -20,6 +20,7 @@ import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 import DashboardPage from './pages/DashboardPage';
 import ApprovalFlowPage from './pages/ApprovalFlowPage';
+import ChannelConfigPage from './pages/ChannelConfigPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="users" element={<UserPage />} />
         <Route path="roles" element={<RolePage />} />
         <Route path="approval-flows" element={<ApprovalFlowPage />} />
+        <Route path="channels" element={<ChannelConfigPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

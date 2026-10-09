@@ -177,6 +177,12 @@ export const markNotificationRead = (id: number) =>
 export const markAllNotificationsRead = () =>
   apiPut<any>('/notifications/read-all');
 
+// 外部消息渠道配置 (§4.26 多渠道提醒：腾讯云/阿里云短信、微信，管理员填密钥即用)
+export const listNotifyChannels = () => apiGet<any[]>('/notifications/channels');
+export const upsertNotifyChannel = (d: any) => apiPut<any>('/notifications/channels', d);
+export const deleteNotifyChannel = (type: string) =>
+  apiDelete(`/notifications/channels/${type}`);
+
 // ---------- 审批中心 (§4.16 / §4.26 审批接入) ----------
 export const createApproval = (d: any) => apiPost<any>('/approvals', d);
 export const approveApproval = (id: number, comment?: string) =>
