@@ -10,6 +10,7 @@ import { AuthUser } from '../../common/decorators/auth.decorator';
 import { TaskService } from '../task/task.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { NotificationService } from '../notification/notification.service';
+import { ApprovalFlowService } from './approval-flow.service';
 
 @Injectable()
 export class ApprovalService {
@@ -21,11 +22,22 @@ export class ApprovalService {
     private readonly taskSvc: TaskService,
     private readonly auditSvc: AuditService,
     private readonly notifySvc: NotificationService,
+    private readonly flowSvc: ApprovalFlowService,
   ) {}
 
-  /** 发起审批：创建实例+节点，为当前节点审批人生成 APPROVAL 任务并入待办中心（§4.26 与审批打通） */
+  /** 发起审批：引用 flowId 自动套用节点，或直接指定 approverIds（向后兼容）。
+   *  为当前节点审批人(集合)生成 APPROVAL 任务并入待办中心（§4.26 与审批打通）。 */
   async create(tenantId: number, d: CreateApprovalDto, applicant: AuthUser) {
-    if (!d.approverIds?.length) throw new BadRequestException('至少需要一个审批人');
+    let sets: number[][];
+    if (d.flowId) {
+      const flow = await this.flowSvc.detail(tenantId, d.flowId);
+      sets = await this.flowSvc.resolveNodes(tenantId, flow.nodesJson || []);
+    } else {
+      if (!d.approverIds?.length) {
+        throw new BadRequestException('需指定审批人：flowId 或 approverIds 至少其一');
+      }
+      sets = d.approverIds.map((id) => [id]);
+    }
     const inst = this.instanceRepo.create({
       tenantId,
       bizType: d.bizType,
@@ -35,32 +47,30 @@ export class ApprovalService {
       applicantName: applicant.username,
       status: ApprovalStatus.PENDING,
       currentNode: 0,
-      nodesJson: d.approverIds,
+      nodesJson: sets,
     } as ApprovalInstance);
     const saved = await this.instanceRepo.save(inst as any);
-    for (let i = 0; i < d.approverIds.length; i++) {
+    for (let i = 0; i < sets.length; i++) {
       await this.nodeRepo.save(
         this.nodeRepo.create({
           tenantId,
           instanceId: saved.id,
           nodeKey: i,
-          approverId: d.approverIds[i],
+          approverIdsJson: sets[i],
+          approverId: sets[i].length === 1 ? sets[i][0] : undefined,
         } as ApprovalNode),
       );
     }
-    await this.taskSvc.ensurePending(tenantId, {
-      type: 'APPROVAL',
-      title: `审批：${d.title}`,
-      assigneeId: d.approverIds[0],
-      refType: 'APPROVAL_INSTANCE',
-      refId: saved.id,
-    });
+    await this.createNodeTasks(tenantId, saved, 0);
     await this.auditSvc.record({
       user: applicant,
       action: 'approval:create',
       target: 'approval_instance',
       bizId: saved.id,
-      after: { bizType: d.bizType, title: d.title, approvers: d.approverIds },
+      after: {
+        bizType: d.bizType, title: d.title, flowId: d.flowId,
+        nodes: sets.map((s) => s),
+      },
     });
     await this.notifySvc
       .create(tenantId, {
@@ -73,12 +83,38 @@ export class ApprovalService {
     return saved;
   }
 
-  /** 我的审批待办：当前节点审批人=我的 PENDING 实例 */
+  /** 为某节点集合内的每个可审批人生成待办任务（ROLE 节点会生成多个） */
+  private async createNodeTasks(tenantId: number, inst: ApprovalInstance, nodeIndex: number) {
+    const set = this.normalizeNodes(inst.nodesJson)[nodeIndex] || [];
+    for (const uid of set) {
+      await this.taskSvc.ensurePending(tenantId, {
+        type: 'APPROVAL',
+        title: `审批：${inst.title}`,
+        assigneeId: uid,
+        refType: 'APPROVAL_INSTANCE',
+        refId: inst.id,
+      });
+    }
+  }
+
+  /** nodesJson 兼容 number[] 与 number[][] 两种历史格式 */
+  private normalizeNodes(nodesJson?: number[][] | number[]): number[][] {
+    if (!nodesJson || !nodesJson.length) return [];
+    const first = nodesJson[0];
+    if (Array.isArray(first)) return nodesJson as number[][];
+    return (nodesJson as number[]).map((x) => [x]);
+  }
+
+  /** 我的审批待办：当前节点审批人集合包含我 的 PENDING 实例 */
   async getMyTodos(tenantId: number, userId: number) {
     const all = await this.instanceRepo.find({
       where: { tenantId, status: ApprovalStatus.PENDING } as any,
     });
-    return all.filter((i) => (i.nodesJson || [])[i.currentNode] === userId);
+    return all.filter((i) => {
+      const sets = this.normalizeNodes(i.nodesJson);
+      const cur = sets[i.currentNode] || [];
+      return cur.includes(userId);
+    });
   }
 
   async detail(tenantId: number, id: number) {
@@ -122,9 +158,9 @@ export class ApprovalService {
     const inst = await this.instanceRepo.findOne({ where: { tenantId, id } as any });
     if (!inst) throw new NotFoundException('审批实例不存在');
     if (inst.status !== ApprovalStatus.PENDING) throw new BadRequestException('审批已结束');
-    const nodes = inst.nodesJson || [];
-    const currentApprover = nodes[inst.currentNode];
-    if (currentApprover !== operator.id) throw new ForbiddenException('非当前节点审批人');
+    const sets = this.normalizeNodes(inst.nodesJson);
+    const currentSet = sets[inst.currentNode] || [];
+    if (!currentSet.includes(operator.id)) throw new ForbiddenException('非当前节点审批人');
     await this.nodeRepo.update(
       { tenantId, instanceId: id, nodeKey: inst.currentNode } as any,
       {
@@ -138,7 +174,8 @@ export class ApprovalService {
     if (action === ApprovalAction.REJECT) {
       inst.status = ApprovalStatus.REJECTED;
       await this.instanceRepo.save(inst as any);
-      await this.taskSvc.closeByRef(tenantId, 'APPROVAL', 'APPROVAL_INSTANCE', id, operator.id);
+      // 关闭本实例全部待办（含 ROLE 节点多成员任务）
+      await this.taskSvc.closeByRefAll(tenantId, 'APPROVAL_INSTANCE', id, 'APPROVAL', operator.id);
       await this.notifySvc
         .create(tenantId, {
           userId: inst.applicantId,
@@ -157,20 +194,15 @@ export class ApprovalService {
       return inst;
     }
     // APPROVE：推进节点或终审
-    if (inst.currentNode < nodes.length - 1) {
+    if (inst.currentNode < sets.length - 1) {
       inst.currentNode += 1;
       await this.instanceRepo.save(inst as any);
-      await this.taskSvc.ensurePending(tenantId, {
-        type: 'APPROVAL',
-        title: `审批：${inst.title}`,
-        assigneeId: nodes[inst.currentNode],
-        refType: 'APPROVAL_INSTANCE',
-        refId: id,
-      });
+      await this.taskSvc.closeByRefAll(tenantId, 'APPROVAL_INSTANCE', id, 'APPROVAL', operator.id);
+      await this.createNodeTasks(tenantId, inst, inst.currentNode);
     } else {
       inst.status = ApprovalStatus.APPROVED;
       await this.instanceRepo.save(inst as any);
-      await this.taskSvc.closeByRef(tenantId, 'APPROVAL', 'APPROVAL_INSTANCE', id, operator.id);
+      await this.taskSvc.closeByRefAll(tenantId, 'APPROVAL_INSTANCE', id, 'APPROVAL', operator.id);
       await this.notifySvc
         .create(tenantId, {
           userId: inst.applicantId,

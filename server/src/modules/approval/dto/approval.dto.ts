@@ -8,8 +8,11 @@ export class CreateApprovalDto {
   @IsString() bizType: string;
   @IsOptional() @Type(() => Number) @IsInt() bizId?: number;
   @IsString() title: string;
-  @IsArray() @ArrayMinSize(1) @Type(() => Number) @IsInt({ each: true })
-  approverIds: number[];
+  /** 直接指定审批人链（向后兼容）；与 flowId 二选一 */
+  @IsOptional() @IsArray() @Type(() => Number) @IsInt({ each: true })
+  approverIds?: number[];
+  /** 引用审批流模板：自动套用其节点配置 */
+  @IsOptional() @Type(() => Number) @IsInt() flowId?: number;
 }
 
 export class ApprovalPageQueryDto extends PageQueryDto {

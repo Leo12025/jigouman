@@ -146,4 +146,68 @@ describe('审批中心 Approval (e2e, SQLite)', () => {
       .set(auth())
       .expect(403);
   });
+
+  it('审批流模板：配置→按模板发起→逐级审批', async () => {
+    const flow = await request(app.getHttpServer())
+      .post('/api/v1/approvals/flows')
+      .set(auth())
+      .send({
+        bizType: 'REFUND',
+        name: '退费审批流',
+        enabled: true,
+        nodes: [
+          { order: 0, name: '主管', approverType: 'USER', approverId: userId },
+          { order: 1, name: '财务', approverType: 'USER', approverId: userId },
+        ],
+      })
+      .expect(201);
+    const flowId = flow.body.data.id;
+    expect(flow.body.data.nodesJson.length).toBe(2);
+
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/approvals/flows')
+      .set(auth())
+      .expect(200);
+    expect(list.body.data.list.some((x: any) => x.id === flowId)).toBe(true);
+
+    const create = await request(app.getHttpServer())
+      .post('/api/v1/approvals')
+      .set(auth())
+      .send({ bizType: 'REFUND', title: '退费-模板', flowId })
+      .expect(201);
+    const id = create.body.data.id;
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/approvals/${id}`)
+      .set(auth())
+      .expect(200);
+    expect(detail.body.data.nodes.length).toBe(2);
+    expect(detail.body.data.status).toBe('PENDING');
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/approvals/${id}/approve`).set(auth()).send({ comment: '初审' }).expect(201);
+    let d2 = await request(app.getHttpServer())
+      .get(`/api/v1/approvals/${id}`).set(auth()).expect(200);
+    expect(d2.body.data.currentNode).toBe(1);
+    await request(app.getHttpServer())
+      .post(`/api/v1/approvals/${id}/approve`).set(auth()).send({ comment: '终审' }).expect(201);
+    d2 = await request(app.getHttpServer())
+      .get(`/api/v1/approvals/${id}`).set(auth()).expect(200);
+    expect(d2.body.data.status).toBe('APPROVED');
+  });
+
+  it('审批流模板：节点缺少审批人应 400', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/approvals/flows')
+      .set(auth())
+      .send({ bizType: 'X', name: 'bad', nodes: [{ order: 0, name: 'n', approverType: 'USER' }] })
+      .expect(400);
+  });
+
+  it('发起审批：flowId 与 approverIds 均无应 400', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/approvals')
+      .set(auth())
+      .send({ bizType: 'X', title: 'no approver' })
+      .expect(400);
+  });
 });

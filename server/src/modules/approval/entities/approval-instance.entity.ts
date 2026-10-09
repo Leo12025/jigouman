@@ -36,6 +36,6 @@ export class ApprovalInstance extends BaseEntity {
   @Column({ name: 'current_node', type: 'int', default: 0, comment: '当前节点序号' })
   currentNode: number;
 
-  @Column({ name: 'nodes_json', type: 'json', nullable: true, comment: '审批人链(user_id 数组)' })
-  nodesJson?: number[];
+  @Column({ name: 'nodes_json', type: 'json', nullable: true, comment: '审批节点集合(二维：每个节点=一组可审批人 userId 数组，支持 ROLE 会展开为多人)' })
+  nodesJson?: number[][];
 }

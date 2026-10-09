@@ -16,8 +16,11 @@ export class ApprovalNode extends BaseEntity {
   @Column({ name: 'node_key', type: 'int', comment: '节点序号' })
   nodeKey: number;
 
-  @Column({ name: 'approver_id', type: 'bigint', comment: '审批人' })
-  approverId: number;
+  @Column({ name: 'approver_id', type: 'bigint', nullable: true, comment: '实际审批人(动作产生后写入)' })
+  approverId?: number;
+
+  @Column({ name: 'approver_ids_json', type: 'json', nullable: true, comment: '本节点可审批人集合(userId 数组，ROLE 展开后；用户单人节点=单元素)' })
+  approverIdsJson?: number[];
 
   @Column({ name: 'approver_name', length: 64, nullable: true })
   approverName?: string;

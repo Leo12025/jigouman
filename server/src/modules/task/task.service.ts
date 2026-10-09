@@ -71,6 +71,7 @@ export class TaskService {
         type: d.type,
         refType: d.refType,
         refId: d.refId,
+        assigneeId: d.assigneeId,
         status: TaskStatus.TODO,
       } as any,
     });
@@ -94,6 +95,25 @@ export class TaskService {
     task.completedAt = new Date();
     task.completedBy = operatorId;
     await this.repo.save(task as any);
+  }
+
+  /** 关闭某业务单据下全部待办（ROLE 节点多审批人，任一通过后关闭所有成员任务） */
+  async closeByRefAll(
+    tenantId: number,
+    refType: string,
+    refId: number,
+    type = 'APPROVAL',
+    operatorId?: number,
+  ) {
+    const tasks = await this.repo.find({
+      where: { tenantId, type, refType, refId, status: TaskStatus.TODO } as any,
+    });
+    for (const t of tasks) {
+      t.status = TaskStatus.DONE;
+      t.completedAt = new Date();
+      t.completedBy = operatorId;
+      await this.repo.save(t as any);
+    }
   }
 
   async list(tenantId: number, q: TaskPageQueryDto) {
