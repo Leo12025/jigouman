@@ -8,10 +8,12 @@ import { ContestJoin } from './entities/contest-join.entity';
 import { Award } from './entities/award.entity';
 import { GrowthService } from './growth.service';
 import { GrowthController, StudentGrowthController } from './growth.controller';
+import { TaskModule } from '../task/task.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Exam, Score, GrowthMetric, Contest, ContestJoin, Award]),
+    TaskModule,
   ],
   providers: [GrowthService],
   controllers: [GrowthController, StudentGrowthController],

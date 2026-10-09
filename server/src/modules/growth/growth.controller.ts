@@ -16,9 +16,9 @@ export class GrowthController {
   @Post('exams')
   @RequirePermissions('growth:create')
   @OperationLog({ action: 'growth:create', target: 'exam' })
-  @ApiOperation({ summary: '创建测评(§6.5)' })
-  createExam(@TenantId() t: number, @Body() d: CreateExamDto) {
-    return this.svc.createExam(t, d);
+  @ApiOperation({ summary: '创建测评(§6.5，自动生成成绩录入待办)' })
+  createExam(@TenantId() t: number, @Body() d: CreateExamDto, @CurrentUser() u: AuthUser) {
+    return this.svc.createExam(t, d, u.id);
   }
 
   @Get('exams')

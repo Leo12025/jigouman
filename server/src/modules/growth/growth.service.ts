@@ -11,6 +11,10 @@ import {
   CreateExamDto, CreateScoreDto, CreateGrowthMetricDto, CreateContestDto,
   JoinContestDto, AwardDto, ScorePageQueryDto,
 } from './dto/growth.dto';
+import { TaskService } from '../task/task.service';
+
+const SCORE_ENTRY_TYPE = 'SCORE_ENTRY';
+const SCORE_ENTRY_REF = 'EXAM';
 
 @Injectable()
 export class GrowthService {
@@ -21,10 +25,12 @@ export class GrowthService {
     @InjectRepository(Contest) private readonly contestRepo: Repository<Contest>,
     @InjectRepository(ContestJoin) private readonly joinRepo: Repository<ContestJoin>,
     @InjectRepository(Award) private readonly awardRepo: Repository<Award>,
+    private readonly taskSvc: TaskService,
   ) {}
 
   // ---------- 测评 / 成绩 ----------
-  createExam(tenantId: number, d: CreateExamDto) {
+  /** 创建测评（§6.5）。创建即生成 SCORE_ENTRY 待办并通知录入人（§4.26 事件化来源：测评→成绩录入） */
+  async createExam(tenantId: number, d: CreateExamDto, operatorId?: number) {
     const exam = this.examRepo.create({
       tenantId,
       name: d.name,
@@ -35,15 +41,27 @@ export class GrowthService {
       fullScore: d.fullScore ?? 100,
       knowledgePoints: d.knowledgePoints,
     } as Exam);
-    return this.examRepo.save(exam as any);
+    const saved = await this.examRepo.save(exam as any);
+    if (operatorId) {
+      await this.taskSvc
+        .ensurePending(tenantId, {
+          type: SCORE_ENTRY_TYPE,
+          title: `成绩录入：${saved.name}`,
+          assigneeId: operatorId,
+          refType: SCORE_ENTRY_REF,
+          refId: saved.id,
+        })
+        .catch(() => undefined);
+    }
+    return saved;
   }
 
   listExams(tenantId: number) {
     return this.examRepo.find({ where: { tenantId } as any, order: { id: 'DESC' } as any, take: 100 });
   }
 
-  /** 录入成绩（§6.5），老师端 H5 / PC 共用 */
-  createScore(tenantId: number, d: CreateScoreDto, operatorId?: number) {
+  /** 录入成绩（§6.5），老师端 H5 / PC 共用。若关联测评，则关闭对应 SCORE_ENTRY 待办（事件化来源闭环） */
+  async createScore(tenantId: number, d: CreateScoreDto, operatorId?: number) {
     const s = this.scoreRepo.create({
       tenantId,
       studentId: d.studentId,
@@ -56,7 +74,14 @@ export class GrowthService {
       comment: d.comment,
       operatorId,
     } as Score);
-    return this.scoreRepo.save(s as any);
+    const saved = await this.scoreRepo.save(s as any);
+    if (saved.examId) {
+      // 录分完成 → 关闭该测评的"成绩录入"待办（§4.26 事件化来源）
+      await this.taskSvc
+        .closeByRefAll(tenantId, SCORE_ENTRY_REF, Number(saved.examId), SCORE_ENTRY_TYPE)
+        .catch(() => undefined);
+    }
+    return saved;
   }
 
   listScores(tenantId: number, q: ScorePageQueryDto) {
