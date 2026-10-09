@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Task, TaskStatus } from './entities/task.entity';
 import { CreateTaskDto, TaskPageQueryDto } from './dto/task.dto';
 import { TASK_TYPE_LABELS, TASK_SEVERE_OVERDUE_HOURS } from './task-types';
+import { NotificationService } from '../notification/notification.service';
 
 export interface TaskView extends Task {
   /** 是否已逾期（status=TODO 且已超过截止时间） */
@@ -16,7 +17,10 @@ export interface TaskView extends Task {
 
 @Injectable()
 export class TaskService {
-  constructor(@InjectRepository(Task) private readonly repo: Repository<Task>) {}
+  constructor(
+    @InjectRepository(Task) private readonly repo: Repository<Task>,
+    private readonly notifySvc: NotificationService,
+  ) {}
 
   /** 派生逾期信息（§4.26 逾期提醒/升级的数据基础） */
   private decorate(t: Task): TaskView {
@@ -40,7 +44,23 @@ export class TaskService {
       dueAt: d.dueAt ? new Date(d.dueAt) : undefined,
       status: TaskStatus.TODO,
     } as Task);
-    return this.repo.save(task as any);
+    const saved = await this.repo.save(task as any);
+    // 提醒推送：创建即通知负责人（站内，§4.26 逾期提醒/升级的触达基础）
+    if (saved.assigneeId) {
+      try {
+        await this.notifySvc.create(tenantId, {
+          userId: saved.assigneeId,
+          type: 'TASK_ASSIGNED',
+          title: '新的待办',
+          content: `您有一条待办：${saved.title}`,
+          refType: saved.type,
+          refId: saved.id,
+        });
+      } catch {
+        /* 通知失败不阻断任务创建 */
+      }
+    }
+    return saved;
   }
 
   /** 幂等生成待办：同 (type,refType,refId) 已存在未完成任务则不重复创建 */

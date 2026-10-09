@@ -25,6 +25,8 @@ import { ParentModule } from './modules/parent/parent.module';
 import { FamilyModule } from './modules/family/family.module';
 import { GrowthModule } from './modules/growth/growth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { ApprovalModule } from './modules/approval/approval.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     FamilyModule,
     GrowthModule,
     DashboardModule,
+    NotificationModule,
+    ApprovalModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

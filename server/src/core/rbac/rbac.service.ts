@@ -28,6 +28,7 @@ const MODULES = [
   'hour',
   'finance',
   'task',
+  'notification',
   'homework',
   'review',
   'dashboard',
