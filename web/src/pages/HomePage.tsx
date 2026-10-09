@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Button, Space } from 'antd';
+import { Card, Row, Col, Space } from 'antd';
 import {
   TeamOutlined,
   BookOutlined,
   SolutionOutlined,
   FundProjectionScreenOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getFunnel } from '../api/crm';
+import { getFunnel, getTaskStats } from '../api/crm';
 
 const ENTRIES = [
   { key: '/leads', label: '线索 CRM', desc: '录入/分配/跟进/试听/转化', icon: <TeamOutlined /> },
@@ -19,9 +20,11 @@ const ENTRIES = [
 export default function HomePage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
+  const [todoStats, setTodoStats] = useState<any>(null);
 
   useEffect(() => {
     getFunnel({}).then(setStats).catch(() => undefined);
+    getTaskStats().then(setTodoStats).catch(() => undefined);
   }, []);
 
   return (
@@ -40,6 +43,26 @@ export default function HomePage() {
             </Card>
           </Col>
         ))}
+      </Row>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={8}>
+          <Card size="small" hoverable onClick={() => navigate('/tasks')}>
+            <div style={{ color: 'rgba(0,0,0,.45)' }}><BellOutlined /> 我的待办</div>
+            <div style={{ fontSize: 24, fontWeight: 600 }}>{todoStats?.total ?? '-'}</div>
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small" hoverable onClick={() => navigate('/tasks')}>
+            <div style={{ color: 'rgba(0,0,0,.45)' }}>逾期</div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa541c' }}>{todoStats?.overdue ?? '-'}</div>
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small" hoverable onClick={() => navigate('/tasks')}>
+            <div style={{ color: 'rgba(0,0,0,.45)' }}>严重逾期</div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: '#cf1322' }}>{todoStats?.severeOverdue ?? '-'}</div>
+          </Card>
+        </Col>
       </Row>
       <Card title="快捷入口" size="small">
         <Row gutter={[16, 16]}>

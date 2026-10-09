@@ -153,9 +153,20 @@ export const financeSummary = (params: any) => apiGet<any>('/finance/summary', p
 
 // ---------- 待办中心 (§4.26) ----------
 export const listTasks = (params: any) => apiGet<PageResult<any>>('/tasks', params);
+export const getMyTodos = (params: any) => apiGet<PageResult<any>>('/tasks/todos', params);
+export const getTaskStats = () => apiGet<any>('/tasks/stats');
 export const createTask = (d: any) => apiPost<any>('/tasks', d);
 export const completeTask = (id: number) => apiPut<any>(`/tasks/${id}/complete`);
 export const removeTask = (id: number) => apiDelete(`/tasks/${id}`);
+
+export const TASK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  AFTER_CLASS_REVIEW: { label: '课后点评', color: 'gold' },
+  HOMEWORK_REVIEW: { label: '作业批改', color: 'blue' },
+  SCORE_ENTRY: { label: '成绩录入', color: 'purple' },
+  ATTENDANCE: { label: '点名消课', color: 'cyan' },
+  COMPLAINT: { label: '客诉处理', color: 'red' },
+  APPROVAL: { label: '审批', color: 'magenta' },
+};
 
 // ---------- 补课排课 (§4.6) ----------
 export const scheduleMakeup = (d: any) => apiPost<any>('/lessons/makeup', d);
