@@ -10,6 +10,8 @@ import { RefundStatus } from '../entities/refund.entity';
 export class CreateOrderItemDto {
   @IsInt() @IsNotEmpty() courseId: number;
   @IsOptional() @IsIn(['COURSE', 'HOUR_PACK'] as const) itemType?: 'COURSE' | 'HOUR_PACK';
+  /** HOUR_PACK 时关联课包 */
+  @IsOptional() @IsInt() packageId?: number;
   @IsString() @IsNotEmpty() name: string;
   @IsInt() @Min(1) qty: number;
   @IsNumber() @Min(0) unitPrice: number;

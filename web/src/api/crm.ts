@@ -235,3 +235,47 @@ export const createExam = (d: any) => apiPost<any>('/exams', d);
 export const listScores = (params: any) => apiGet<any[]>('/scores', params);
 export const createScore = (d: any) => apiPost<any>('/scores', d);
 
+// ---------- 统一资源 (§4.1 本地/OSS 可配置) ----------
+/** 上传文件（多文件），返回 Resource[] */
+export const uploadResources = (
+  files: File[],
+  opts?: { category?: string; refType?: string; refId?: number },
+) => {
+  const fd = new FormData();
+  files.forEach((f) => fd.append('files', f));
+  const qs = new URLSearchParams();
+  if (opts?.category) qs.set('category', opts.category);
+  if (opts?.refType) qs.set('refType', opts.refType);
+  if (opts?.refId) qs.set('refId', String(opts.refId));
+  const q = qs.toString();
+  return apiPost<any[]>(`/resources/upload${q ? `?${q}` : ''}`, fd);
+};
+export const listResources = (params: any) => apiGet<PageResult<any>>('/resources', params);
+export const deleteResource = (id: number) => apiDelete(`/resources/${id}`);
+
+// ---------- 课包（售卖套餐 / 课时维度） ----------
+export const listCoursePackages = (params: any) => apiGet<any>('/course-packages', params);
+export const createCoursePackage = (d: any) => apiPost<any>('/course-packages', d);
+export const updateCoursePackage = (id: number, d: any) => apiPut<any>(`/course-packages/${id}`, d);
+export const deleteCoursePackage = (id: number) => apiDelete(`/course-packages/${id}`);
+export const listPackageCourses = (id: number) => apiGet<any[]>(`/course-packages/${id}/courses`);
+export const addPackageCourses = (id: number, courseIds: number[]) =>
+  apiPost<any[]>(`/course-packages/${id}/courses`, { courseIds });
+export const removePackageCourse = (id: number, courseId: number) =>
+  apiDelete(`/course-packages/${id}/courses/${courseId}`);
+export const purchaseCoursePackage = (id: number, d: { studentId: number; hours?: number }) =>
+  apiPost<any>(`/course-packages/${id}/purchase`, d);
+
+// ---------- 课件（课程→阶段→课时课件） ----------
+export const listStages = (courseId: number) => apiGet<any[]>(`/courses/${courseId}/stages`);
+export const createStage = (courseId: number, d: any) =>
+  apiPost<any>(`/courses/${courseId}/stages`, d);
+export const updateStage = (id: number, d: any) => apiPut<any>(`/stages/${id}`, d);
+export const deleteStage = (id: number) => apiDelete(`/stages/${id}`);
+export const listStageCoursewares = (stageId: number, params?: any) =>
+  apiGet<any>(`/stages/${stageId}/coursewares`, params);
+export const createCourseware = (stageId: number, d: any) =>
+  apiPost<any>(`/stages/${stageId}/coursewares`, d);
+export const updateCourseware = (id: number, d: any) => apiPut<any>(`/coursewares/${id}`, d);
+export const deleteCourseware = (id: number) => apiDelete(`/coursewares/${id}`);
+

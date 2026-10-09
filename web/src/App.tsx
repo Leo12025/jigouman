@@ -23,6 +23,9 @@ import ApprovalFlowPage from './pages/ApprovalFlowPage';
 import ChannelConfigPage from './pages/ChannelConfigPage';
 import ComplaintPage from './pages/ComplaintPage';
 import ScorePage from './pages/ScorePage';
+import CoursePackagePage from './pages/CoursePackagePage';
+import CoursewarePage from './pages/CoursewarePage';
+import ResourcePage from './pages/ResourcePage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -61,6 +64,9 @@ export default function App() {
         <Route path="notify-channels" element={<ChannelConfigPage />} />
         <Route path="complaints" element={<ComplaintPage />} />
         <Route path="scores" element={<ScorePage />} />
+        <Route path="course-packages" element={<CoursePackagePage />} />
+        <Route path="coursewares" element={<CoursewarePage />} />
+        <Route path="resources" element={<ResourcePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

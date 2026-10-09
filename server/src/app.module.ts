@@ -28,6 +28,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { ApprovalModule } from './modules/approval/approval.module';
 import { ComplaintModule } from './modules/complaint/complaint.module';
+import { ResourceModule } from './modules/resource/resource.module';
+import { CoursePackageModule } from './modules/course-package/course-package.module';
+import { CoursewareModule } from './modules/courseware/courseware.module';
 
 @Module({
   imports: [
@@ -53,6 +56,9 @@ import { ComplaintModule } from './modules/complaint/complaint.module';
     NotificationModule,
     ApprovalModule,
     ComplaintModule,
+    ResourceModule,
+    CoursePackageModule,
+    CoursewareModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

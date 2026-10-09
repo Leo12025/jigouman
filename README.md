@@ -1,7 +1,7 @@
 # 校外培训机构管理系统（前后端分离）
 
 依据 `docs/开发文档-机构管理系统.md`（v1.9）实现。
-当前交付：**M1 基础框架 + M2 课程/学员 + M3 线索/招生 + M4 订单/课时 + M5 作业/家长端 + M6 数据看板 + M8 待办中心补全（提醒推送·审批流配置·审批接入·消息渠道配置·客诉与成绩录入事件化来源）**
+当前交付：**M1 基础框架 + M2 课程/学员 + M3 线索/招生 + M4 订单/课时 + M5 作业/家长端 + M6 数据看板 + M8 待办中心补全（提醒推送·审批流配置·审批接入·消息渠道配置·客诉与成绩录入事件化来源）+ **课程双维度拆分（课包管课时 · 课件管上课）+ 统一资源上传与存储（本地/OSS 可配置）**
 （M4 含文档 §4.5 财务：退费按消课比例扣费、分账、教师工资、发票、财务报表；§4.6 课时：补课排课、点名自动生成课后点评任务。
 M5 含 §4.7 作业闭环与 §6.23/§11.6 家长端 H5。
 M6 含 §4.10 数据经营分析：经营/招生/教学三视图看板（营收·课消·满班·漏斗·出勤·作业预警）。
@@ -22,6 +22,9 @@ M6 含 §4.10 数据经营分析：经营/招生/教学三视图看板（营收�
 │   │   ├── core/                  # 基础服务层（database/auth/rbac/tenant/audit）
 │   │   └── modules/               # 业务模块
 │   │       ├── course/            # M2 课程·分类·班级·课次（排课冲突检测）
+│   │       ├── course-package/    # 课包（售卖套餐）：套餐课时 + 可上课程范围 + 购课发放
+│   │       ├── courseware/        # 课件：课程阶段(大纲文件) → 课时课件(PPT/资源包)
+│   │       ├── resource/          # 统一资源：上传/管理，本地存储 或 阿里云 OSS 可配置
 │   │       ├── student/           # M2 学员·家长多对多绑定·报名
 │   │       ├── lead/              # M3 渠道·活动·线索·跟进·试听·转化·漏斗
 │   │       ├── order/             # M4 订单·订单项·支付·退费（状态机 + 退费按消课比例）
@@ -119,6 +122,7 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 **M4 基础闭环**（下单→支付→发放课时→点名消课→退费回滚）·
 **M4 进阶**（退费按消课比例、分账、教师工资、发票开具、补课排课、课后点评任务、财务报表）·
 **M5 作业闭环 + 家长端**（布置→家长 OTP 登录→绑定→越权校验 403→提交→批改→统计→点评）·
+**统一资源/课包/课件**（上传本地文件→课包购课发放→课件阶段树→课包账户跨课程抵扣点名消课）·
 **M5 成长档案与家校通知**（测评→成绩→素养→赛事获奖→时间轴→通知/续费提醒→家长可见与越权隔离）·
 **M6 数据看板**（经营/招生/教学三视图：营收·课消率·满班率·漏斗·出勤率·作业预警，对齐 §4.10/§6.7）。
 **M8 待办中心补全**（§4.26：逾期派生·我的待办 GET /todos·聚合统计 GET /tasks/stats·作业提交→待批改事件化闭环·批改关闭；站内通知提醒（notification）；审批中心接入，APPROVAL 任务入待办中心、通过/驳回、多节点推进；**审批流模板配置（§4.16 增强）**：`POST/GET/PUT/DELETE /approvals/flows`，可视化配置节点与审批人、按业务类型复用，发起时 `flowId` 套用）；**消息渠道配置（§4.26 多渠道提醒）**：`GET/PUT/DELETE /notifications/channels`，内置腾讯云/阿里云短信发送接口（TC3-HMAC-SHA256 / RPC-HMAC-SHA1，纯 Node 实现无需 SDK），管理员填密钥即启用，微信通道接口预留）；**客诉与成绩录入事件化来源（§4.26 补全）**：新增客诉模块（登记→分派/改派→处理闭环，自动生成/关闭 COMPLAINT 待办+通知）；测评创建→SCORE_ENTRY 待办+通知、录分→关闭，与待办中心/审批接入同源闭环）。
@@ -174,6 +178,31 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 > - **客诉模块（§4.26 客诉分派 / §6.23 客诉售后）**：`POST/GET /complaints`、`PUT /complaints/:id/assign`、`POST /complaints/:id/resolve`；登记→分派/改派→处理闭环，自动生成/关闭 COMPLAINT 待办并通知处理人；前端客诉管理页（列表筛选·登记·分派·处理）。
 > - **未实现**：微信真实下发（短信已实现；微信接口已就绪，待 openid 绑定）、退费/调课/转班等具体业务与审批中心的资金联动（退费资金逻辑维持 M4 自洽、暂不接入审批中心以避免资损）。
 
+### 课程双维度：课包（管课时）+ 课件（管上课）
+课程拆为两条独立主线，解决"卖的套餐"与"上的内容"混杂的问题：
+
+- **课包 `course-package`（售卖套餐 / 课时维度）**
+  - `course_package`：套餐名称、总课时 `total_hours`、有效期、标价、上下架。
+  - `package_course`：套餐**可上哪些课程**（套餐 ↔ 课程多对多）。
+  - 购课发放：`POST /course-packages/:id/purchase` 或订单项 `HOUR_PACK + packageId` 支付成功后，
+    课时发放到学员**课包账户**（`hour_account.course_id=null` 且 `package_id=套餐`）。
+  - **跨课程抵扣**：点名消课时优先扣"课程专属账户"，不足时自动回退到**覆盖该课程的课包账户**（§4.6 课包课时通用），流水记录 `package_id` 便于溯源。
+- **课件 `courseware`（上课 / 内容维度）**
+  - 层级：**课程 → 阶段 `course_stage`（含大纲文件）→ 课时课件 `courseware`（PPT/资源包等多文件）**。
+  - 接口：`POST/GET /courses/:id/stages`、`POST /stages/:id/coursewares`、`GET /courses/:id/stages`（阶段树含课件）、`PUT/DELETE /stages/:id`、`PUT/DELETE /coursewares/:id`。
+
+### 统一资源上传与存储（本地 / OSS 可配置）
+所有文件（大纲、PPT、资源包、头像等）统一走 `resource` 模块，屏蔽存储差异：
+
+- 接口：`POST /resources/upload`（多文件，字段 `files`）、`GET /resources`（按分类/关联筛选）、`GET /resources/:id`、`DELETE /resources/:id`（软删 + 清理底层对象）。
+- 数据库 `resource` 记录：`storage_type`(local/oss)、`storage_key`、`url`、`mime_type`、`size`、`category`、`refType/refId`。
+- 存储驱动可插拔（`StorageDriver` 接口）：
+  - **local**（默认）：写入 `UPLOAD_DIR`，经 `/files/*` 静态路由访问。
+  - **oss**：`STORAGE_TYPE=oss` 时启用阿里云 OSS（`ali-oss`，延迟加载，使用前需 `npm i ali-oss`）。
+- 配置见 `.env.example`：`STORAGE_TYPE`、`UPLOAD_DIR`、`PUBLIC_BASE_URL`、`OSS_*`。
+- 权限点：`resource` / `course-package` / `courseware` 模块随 RBAC `MODULES` 自动播种（view/create/update/delete/export）；
+  上传为动作型权限点 **`resource:upload`**（已加入 `EXTRA_PERMS`），超级管理员与授课老师均持有。
+
 ### 页面清单（web/src/pages）
 `Login` 登录 · `HomePage` 首页看板 · `CoursePage` 课程/分类 · `ClassGroupPage` 班级 ·
 `LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课 + 补课排课）· `StudentPage` 学员/家长/报名 ·
@@ -181,7 +210,8 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 `FinancePage` 财务对账（分账/工资 · 发票 · 财务报表）· `TaskPage` 待办中心（我的待办/逾期标红/按类型统计）·
 `HomeworkPage` 作业管理（布置/提交批改/统计提交率·优秀率·按时率/未提交名单）·
 `LeadPage` 线索 CRM · `ChannelPage` 渠道 · `CampaignPage` 活动 · `FunnelPage` 转化漏斗 ·
-`UserPage` 用户 · `RolePage` 角色权限 · `ComplaintPage` 客诉管理（登记/分派/处理闭环）· `ScorePage` 成绩管理（测评创建/录分·SCORE_ENTRY 事件化）
+`UserPage` 用户 · `RolePage` 角色权限 · `ComplaintPage` 客诉管理（登记/分派/处理闭环）· `ScorePage` 成绩管理（测评创建/录分·SCORE_ENTRY 事件化）·
+`CoursePackagePage` 课包管理（套餐增删改·关联可上课程·购课发放课时）· `CoursewarePage` 课件管理（课程→阶段(含大纲上传)→课时课件(资源包上传)）· `ResourcePage` 资源库（上传/按分类筛选/删除，本地或 OSS）
 
 ### 鉴权与安全
 - 登录返回 `accessToken` + `refreshToken`；前端请求自动携带 Bearer 令牌。

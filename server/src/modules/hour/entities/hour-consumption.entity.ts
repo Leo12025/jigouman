@@ -18,8 +18,12 @@ export class HourConsumption extends BaseEntity {
   @Column({ name: 'student_id', type: 'bigint', comment: '学员' })
   studentId: number;
 
-  @Column({ name: 'course_id', type: 'bigint', nullable: true, comment: '课程' })
+  @Column({ name: 'course_id', type: 'bigint', nullable: true, comment: '课程(课包抵扣时记实际上课课程)' })
   courseId?: number;
+
+  /** 关联课包(课包账户抵扣时记录来源套餐) */
+  @Column({ name: 'package_id', type: 'bigint', nullable: true, comment: '关联课包' })
+  packageId?: number;
 
   @Column({ name: 'lesson_id', type: 'bigint', nullable: true, comment: '关联课次' })
   lessonId?: number;

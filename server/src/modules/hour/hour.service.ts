@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In } from 'typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { PageQueryDto } from '../../common/dto/pagination.dto';
@@ -11,6 +11,7 @@ import { Lesson, LessonStatus } from '../../modules/course/entities/lesson.entit
 import { GrantHourDto, HourAccountPageQueryDto, HourConsumptionPageQueryDto, ScheduleMakeupDto } from './dto/hour.dto';
 import { FinanceService } from '../../modules/finance/finance.service';
 import { TaskService } from '../../modules/task/task.service';
+import { PackageCourse } from '../../modules/course-package/entities/package-course.entity';
 
 @Injectable()
 export class HourService {
@@ -20,12 +21,13 @@ export class HourService {
     private readonly taskSvc: TaskService,
   ) {}
 
-  /** 发放课时：落到学员指定课程账户（不存在则创建） */
+  /** 发放课时：落到学员指定课程/课包账户（不存在则创建）。packageId 区分课包账户 */
   async grant(
     tenantId: number,
     p: {
       studentId: number;
       courseId?: number;
+      packageId?: number;
       type: HourAccount['type'];
       hours: number;
       operatorId?: number;
@@ -37,13 +39,19 @@ export class HourService {
     return this.ds.transaction(async (m) => {
       const repo = m.getRepository(HourAccount);
       let acc: HourAccount | null = await repo.findOne({
-        where: { tenantId, studentId: p.studentId, courseId: p.courseId ?? null } as any,
+        where: {
+          tenantId,
+          studentId: p.studentId,
+          courseId: p.courseId ?? null,
+          packageId: p.packageId ?? null,
+        } as any,
       });
       if (!acc) {
         acc = repo.create({
           tenantId,
           studentId: p.studentId,
           courseId: p.courseId,
+          packageId: p.packageId,
           type: p.type,
           balance: 0,
           frozen: 0,
@@ -59,6 +67,7 @@ export class HourService {
         accountId: acc.id,
         studentId: p.studentId,
         courseId: p.courseId,
+        packageId: p.packageId,
         type: 'GRANT',
         hours: p.hours,
         refOrderId: p.refOrderId,
@@ -71,16 +80,48 @@ export class HourService {
     });
   }
 
-  /** 消课：从学员指定课程账户扣减（强一致 + 审计） */
+  /**
+   * 解析消课账户（文档 §4.6 课包跨课程抵扣）：
+   * 优先使用"课程专属账户"；不足时回退到"覆盖该课程的课包账户"。
+   */
+  private async resolveConsumeAccount(
+    tenantId: number,
+    studentId: number,
+    courseId: number | undefined,
+    hours: number,
+  ): Promise<HourAccount | null> {
+    const repo = this.ds.getRepository(HourAccount);
+    const courseAcc = await repo.findOne({
+      where: { tenantId, studentId, courseId: courseId ?? null, packageId: IsNull() } as any,
+    });
+    if (courseAcc && courseAcc.balance >= hours) return courseAcc;
+
+    if (courseId) {
+      const pkgCourses = await this.ds.getRepository(PackageCourse).find({
+        where: { tenantId, courseId } as any,
+      });
+      const pkgIds = pkgCourses.map((p) => Number(p.packageId));
+      if (pkgIds.length) {
+        const pkgAccs = await repo.find({
+          where: { tenantId, studentId, courseId: IsNull(), packageId: In(pkgIds) } as any,
+        });
+        const usable = pkgAccs
+          .filter((a) => (a.balance || 0) >= hours)
+          .sort((a, b) => (b.balance || 0) - (a.balance || 0));
+        if (usable.length) return usable[0];
+      }
+    }
+    return courseAcc || null;
+  }
+
+  /** 消课：从学员课程/课包账户扣减（强一致 + 审计 + 课包跨课程抵扣） */
   async consume(
     tenantId: number,
     p: { studentId: number; courseId?: number; lessonId?: number; hours: number; operatorId?: number },
   ) {
     return this.ds.transaction(async (m) => {
       const repo = m.getRepository(HourAccount);
-      const acc = await repo.findOne({
-        where: { tenantId, studentId: p.studentId, courseId: p.courseId ?? null } as any,
-      });
+      const acc = await this.resolveConsumeAccount(tenantId, p.studentId, p.courseId, p.hours);
       if (!acc || acc.balance < p.hours) {
         throw new BusinessException(ResCode.BAD_REQUEST, '学员课时不足，无法消课');
       }
@@ -91,6 +132,7 @@ export class HourService {
         accountId: acc.id,
         studentId: p.studentId,
         courseId: p.courseId,
+        packageId: acc.packageId,
         lessonId: p.lessonId,
         type: 'CONSUME',
         hours: -p.hours,
@@ -196,9 +238,7 @@ export class HourService {
         att.status = r.status;
         let hours = 0;
         if (r.status === 'PRESENT' || r.status === 'MAKEUP') {
-          const acc = await m.getRepository(HourAccount).findOne({
-            where: { tenantId, studentId: r.studentId, courseId: lesson.courseId } as any,
-          });
+          const acc = await this.resolveConsumeAccount(tenantId, r.studentId, lesson.courseId, 1);
           if (acc && acc.balance >= 1) {
             acc.balance -= 1;
             await m.getRepository(HourAccount).save(acc as any);
@@ -207,6 +247,7 @@ export class HourService {
               accountId: acc.id,
               studentId: r.studentId,
               courseId: lesson.courseId,
+              packageId: acc.packageId,
               lessonId,
               type: 'CONSUME',
               hours: -1,

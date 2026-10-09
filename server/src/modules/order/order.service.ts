@@ -99,16 +99,30 @@ export class OrderService {
     for (const it of items) {
       if (it.hours > 0) {
         const perHour = Math.round((Number(it.amount) / it.hours) * 100) / 100;
-        await this.hourSvc.grant(tenantId, {
-          studentId: order.studentId,
-          courseId: it.courseId,
-          type: 'CLASS',
-          hours: it.hours,
-          operatorId,
-          refOrderId: order.id,
-          remark: it.name,
-          unitValue: perHour,
-        });
+        if (it.itemType === 'HOUR_PACK' && it.packageId) {
+          // 课包订单：发放到学员"课包账户"(courseId=null, packageId=套餐)，可跨套餐内课程抵扣
+          await this.hourSvc.grant(tenantId, {
+            studentId: order.studentId,
+            type: 'GENERAL',
+            hours: it.hours,
+            packageId: Number(it.packageId),
+            operatorId,
+            refOrderId: order.id,
+            remark: it.name,
+            unitValue: perHour,
+          });
+        } else {
+          await this.hourSvc.grant(tenantId, {
+            studentId: order.studentId,
+            courseId: it.courseId,
+            type: 'CLASS',
+            hours: it.hours,
+            operatorId,
+            refOrderId: order.id,
+            remark: it.name,
+            unitValue: perHour,
+          });
+        }
       }
     }
     return this.getOrder(tenantId, id);

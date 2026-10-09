@@ -4,14 +4,24 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
+import * as express from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // 全局前缀 /api/v1（与文档 §6 约定一致）
   app.setGlobalPrefix(process.env.APP_GLOBAL_PREFIX || 'api/v1', {
-    exclude: ['health', 'docs'],
+    exclude: ['health', 'docs', 'files'],
   });
+
+  // 本地存储文件静态托管（STORAGE_TYPE=local）：/files/* → UPLOAD_DIR
+  if ((process.env.STORAGE_TYPE || 'local').toLowerCase() === 'local') {
+    const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    app.use('/files', express.static(uploadDir));
+  }
 
   // DTO 校验
   app.useGlobalPipes(

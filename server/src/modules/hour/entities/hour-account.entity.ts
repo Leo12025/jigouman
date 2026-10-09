@@ -15,8 +15,12 @@ export class HourAccount extends BaseEntity {
   @Column({ name: 'student_id', type: 'bigint', comment: '学员' })
   studentId: number;
 
-  @Column({ name: 'course_id', type: 'bigint', nullable: true, comment: '课程(null=通用储值)' })
+  @Column({ name: 'course_id', type: 'bigint', nullable: true, comment: '课程(null=通用储值/课包)' })
   courseId?: number;
+
+  /** 关联课包(null=非课包账户；课包账户 courseId=null 且 packageId 有值，可跨套餐内课程抵扣) */
+  @Column({ name: 'package_id', type: 'bigint', nullable: true, comment: '关联课包' })
+  packageId?: number;
 
   @Column({ name: 'type', length: 16, default: 'CLASS', comment: '账户类型' })
   type: HourAccountType;

@@ -24,6 +24,9 @@ import {
   BarChartOutlined,
   CustomerServiceOutlined,
   LineChartOutlined,
+  AppstoreOutlined,
+  ContainerOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken } from '../api/client';
@@ -89,6 +92,9 @@ export default function MainLayout() {
       label: '课程学员',
       children: [
         { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
+        { key: '/course-packages', icon: <AppstoreOutlined />, label: '课包管理' },
+        { key: '/coursewares', icon: <ContainerOutlined />, label: '课件管理' },
+        { key: '/resources', icon: <FolderOpenOutlined />, label: '资源库' },
         { key: '/class-groups', icon: <Team2Outlined />, label: '班级管理' },
         { key: '/lessons', icon: <CalendarOutlined />, label: '课次排课' },
         { key: '/students', icon: <SolutionOutlined />, label: '学员档案' },

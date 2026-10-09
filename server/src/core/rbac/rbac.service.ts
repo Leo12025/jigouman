@@ -37,6 +37,9 @@ const MODULES = [
   'approval',
   'coupon',
   'complaint',
+  'resource',
+  'course-package',
+  'courseware',
   'member',
   'org',
   'report',
@@ -46,8 +49,8 @@ const MODULES = [
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
 
-/** 业务动作型权限点（非标准 增删改查，如分配/跟进/转化） */
-const EXTRA_PERMS = ['lead:assign', 'lead:follow', 'lead:convert'];
+/** 业务动作型权限点（非标准 增删改查，如分配/跟进/转化/上传） */
+const EXTRA_PERMS = ['lead:assign', 'lead:follow', 'lead:convert', 'resource:upload'];
 
 @Injectable()
 export class RbacService {
@@ -131,16 +134,15 @@ export class RbacService {
         await this.roleRepo.save(sa);
       }
     }
-    await ensureRole(
-      'teacher',
-      '授课老师',
-      MODULES.flatMap((m) =>
-        [permMap.get(`${m}:view`), permMap.get(`${m}:create`), permMap.get(`${m}:update`)].filter(
-          Boolean,
-        ) as Permission[],
-      ),
-      'self',
+    // 老师可上传课件资源（resource:upload 为动作型权限，不在标准 ACTIONS 内）
+    const teacherPerms = MODULES.flatMap((m) =>
+      [permMap.get(`${m}:view`), permMap.get(`${m}:create`), permMap.get(`${m}:update`)].filter(
+        Boolean,
+      ) as Permission[],
     );
+    const uploadPerm = permMap.get('resource:upload');
+    if (uploadPerm) teacherPerms.push(uploadPerm);
+    await ensureRole('teacher', '授课老师', teacherPerms, 'self');
     await ensureRole(
       'finance',
       '财务',
