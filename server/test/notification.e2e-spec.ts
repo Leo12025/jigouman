@@ -81,4 +81,44 @@ describe('通知中心 Notification (e2e, SQLite)', () => {
       .expect(200);
     expect(unread.body.data.count).toBe(0);
   });
+
+  it('外部渠道配置：新增→更新→删除（管理员填密钥即用）', async () => {
+    const list0 = await request(app.getHttpServer())
+      .get('/api/v1/notifications/channels').set(auth()).expect(200);
+    expect(Array.isArray(list0.body.data)).toBe(true);
+
+    const upsert = await request(app.getHttpServer())
+      .put('/api/v1/notifications/channels').set(auth())
+      .send({
+        type: 'SMS_TENCENT', enabled: true, name: '腾讯云短信',
+        config: { secretId: 'AKIDxxxx', secretKey: 'secretxxxx', appId: '1400000000', signName: '测试', templateId: '1234' },
+      }).expect(200);
+    expect(upsert.body.data.enabled).toBe(1);
+    expect(upsert.body.data.type).toBe('SMS_TENCENT');
+
+    const list1 = await request(app.getHttpServer())
+      .get('/api/v1/notifications/channels').set(auth()).expect(200);
+    expect(list1.body.data.some((x: any) => x.type === 'SMS_TENCENT')).toBe(true);
+
+    await request(app.getHttpServer())
+      .put('/api/v1/notifications/channels').set(auth())
+      .send({ type: 'SMS_TENCENT', enabled: true, config: { secretId: 'AKIDyyyy', secretKey: 's2', appId: '1', signName: '新签名', templateId: '9' } })
+      .expect(200);
+    const list2 = await request(app.getHttpServer())
+      .get('/api/v1/notifications/channels').set(auth()).expect(200);
+    const cfg = list2.body.data.find((x: any) => x.type === 'SMS_TENCENT');
+    expect(cfg.configJson.signName).toBe('新签名');
+
+    await request(app.getHttpServer())
+      .delete('/api/v1/notifications/channels/SMS_TENCENT').set(auth()).expect(200);
+    const list3 = await request(app.getHttpServer())
+      .get('/api/v1/notifications/channels').set(auth()).expect(200);
+    expect(list3.body.data.some((x: any) => x.type === 'SMS_TENCENT')).toBe(false);
+  });
+
+  it('外部渠道配置：type 非法应 400', async () => {
+    await request(app.getHttpServer())
+      .put('/api/v1/notifications/channels').set(auth())
+      .send({ type: 'BAD', enabled: true }).expect(400);
+  });
 });

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Notification, NotifyChannel } from './entities/notification.entity';
 import { NotifyPageQueryDto } from './dto/notification.dto';
+import { ExternalChannelService } from './external-channel.service';
 
 export interface CreateNotificationDto {
   userId: number;
@@ -19,6 +20,7 @@ export class NotificationService {
   constructor(
     @InjectRepository(Notification)
     private readonly repo: Repository<Notification>,
+    private readonly external: ExternalChannelService,
   ) {}
 
   /** 创建通知（系统事件调用；本人可见，外部不暴露创建接口） */
@@ -33,7 +35,12 @@ export class NotificationService {
       refType: d.refType,
       refId: d.refId,
     } as Notification);
-    return this.repo.save(n as any);
+    const saved = await this.repo.save(n as any);
+    // 多渠道提醒：best-effort 补发外部渠道（短信/微信），失败不影响站内通知
+    this.external
+      .pushExternal(tenantId, d.userId, { title: d.title, content: d.content, type: d.type })
+      .catch(() => undefined);
+    return saved;
   }
 
   async list(tenantId: number, userId: number, q: NotifyPageQueryDto) {
