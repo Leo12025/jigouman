@@ -19,6 +19,7 @@ import {
   DollarOutlined,
   BellOutlined,
   FileTextOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken } from '../api/client';
@@ -46,6 +47,7 @@ export default function MainLayout() {
 
   const menuItems = [
     { key: '/', icon: <HomeOutlined />, label: '首页' },
+    { key: '/dashboard', icon: <BarChartOutlined />, label: '数据看板' },
     {
       key: 'group-course',
       type: 'group' as const,

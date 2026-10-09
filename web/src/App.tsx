@@ -18,6 +18,7 @@ import TaskPage from './pages/TaskPage';
 import HomeworkPage from './pages/HomeworkPage';
 import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
+import DashboardPage from './pages/DashboardPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="finance" element={<FinancePage />} />
         <Route path="tasks" element={<TaskPage />} />
         <Route path="homework" element={<HomeworkPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="leads" element={<LeadPage />} />
         <Route path="channels" element={<ChannelPage />} />
         <Route path="campaigns" element={<CampaignPage />} />
