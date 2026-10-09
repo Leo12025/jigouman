@@ -3,7 +3,8 @@ import {
   Table, Button, Tag, Select, Space, message, Popconfirm, Card, Row, Col, Radio,
 } from 'antd';
 import {
-  listTasks, getMyTodos, getTaskStats, completeTask, removeTask, TASK_TYPE_LABELS,
+  listTasks, getMyTodos, getTaskStats, completeTask, removeTask,
+  approveApproval, rejectApproval, TASK_TYPE_LABELS,
 } from '../api/crm';
 
 const STATUS_OPTS = [
@@ -72,7 +73,16 @@ export default function TaskPage() {
           <Tag color={v === 'TODO' ? 'orange' : 'green'}>{v === 'TODO' ? '待办' : '已完成'}</Tag>
           {v === 'TODO' && (
             <>
-              <Button type="link" size="small" onClick={async () => { await completeTask(r.id); message.success('已完成'); load(); }}>完成</Button>
+              {r.type === 'APPROVAL' ? (
+                <>
+                  <Button type="link" size="small" onClick={async () => { await approveApproval(r.refId); message.success('已通过'); load(); }}>通过</Button>
+                  <Popconfirm title="确认驳回?" onConfirm={async () => { await rejectApproval(r.refId); message.success('已驳回'); load(); }}>
+                    <Button type="link" size="small" danger>驳回</Button>
+                  </Popconfirm>
+                </>
+              ) : (
+                <Button type="link" size="small" onClick={async () => { await completeTask(r.id); message.success('已完成'); load(); }}>完成</Button>
+              )}
               <Popconfirm title="删除?" onConfirm={async () => { await removeTask(r.id); message.success('已删除'); load(); }}>
                 <Button type="link" size="small" danger>删</Button>
               </Popconfirm>

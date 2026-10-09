@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Layout, Menu, Button, Space, Typography, Grid, Dropdown, Avatar, Tag } from 'antd';
+import { Layout, Menu, Button, Space, Typography, Grid, Dropdown, Avatar, Tag, Badge, Popover } from 'antd';
 import {
   TeamOutlined,
   PartitionOutlined,
@@ -23,7 +23,13 @@ import {
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken } from '../api/client';
-import { fetchProfile } from '../api/crm';
+import {
+  fetchProfile,
+  getNotifications,
+  getUnreadCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from '../api/crm';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -31,6 +37,9 @@ const { Text } = Typography;
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [unread, setUnread] = useState(0);
+  const [noticeList, setNoticeList] = useState<any[]>([]);
+  const [noticeVisible, setNoticeVisible] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const screens = Grid.useBreakpoint();
@@ -42,8 +51,30 @@ export default function MainLayout() {
       fetchProfile()
         .then(setProfile)
         .catch(() => undefined);
+      getUnreadCount()
+        .then((r) => setUnread(r.count))
+        .catch(() => undefined);
     }
   }, []);
+
+  const openNotice = async () => {
+    const r = await getNotifications({ page: 1, size: 10, unreadOnly: 1 }).catch(() => null);
+    if (r) setNoticeList(r.list);
+  };
+  const onNoticeOpenChange = (open: boolean) => {
+    if (open) openNotice();
+    setNoticeVisible(open);
+  };
+  const onRead = async (id: number) => {
+    await markNotificationRead(id).catch(() => undefined);
+    setNoticeList((l) => l.filter((x) => x.id !== id));
+    setUnread((u) => Math.max(0, u - 1));
+  };
+  const onReadAll = async () => {
+    await markAllNotificationsRead().catch(() => undefined);
+    setNoticeList([]);
+    setUnread(0);
+  };
 
   const menuItems = [
     { key: '/', icon: <HomeOutlined />, label: '首页' },
@@ -124,6 +155,33 @@ export default function MainLayout() {
             </Button>
           )}
           <Space>
+            <Popover
+              open={noticeVisible}
+              onOpenChange={onNoticeOpenChange}
+              trigger="click"
+              content={
+                <div style={{ width: 300, maxHeight: 360, overflow: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <b>通知</b>
+                    <Button type="link" size="small" onClick={onReadAll}>全部已读</Button>
+                  </div>
+                  {noticeList.length === 0 && (
+                    <div style={{ color: 'rgba(0,0,0,.45)' }}>暂无未读通知</div>
+                  )}
+                  {noticeList.map((n) => (
+                    <div key={n.id} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                      <div style={{ fontWeight: 600 }}>{n.title}</div>
+                      <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>{n.content}</div>
+                      <Button type="link" size="small" onClick={() => onRead(n.id)}>标记已读</Button>
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <Badge count={unread} size="small">
+                <BellOutlined style={{ fontSize: 18, cursor: 'pointer' }} />
+              </Badge>
+            </Popover>
             {/* 机构/校区（多校区切换在 M8 引入 organization 后开放） */}
             <Tag color="blue">{profile?.orgName || '机构'}</Tag>
             <Dropdown

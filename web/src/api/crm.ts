@@ -168,6 +168,24 @@ export const TASK_TYPE_LABELS: Record<string, { label: string; color: string }> 
   APPROVAL: { label: '审批', color: 'magenta' },
 };
 
+// ---------- 通知中心 (§4.26 提醒推送) ----------
+export const getNotifications = (params: any) =>
+  apiGet<PageResult<any>>('/notifications', params);
+export const getUnreadCount = () => apiGet<{ count: number }>('/notifications/unread-count');
+export const markNotificationRead = (id: number) =>
+  apiPut<any>(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () =>
+  apiPut<any>('/notifications/read-all');
+
+// ---------- 审批中心 (§4.16 / §4.26 审批接入) ----------
+export const createApproval = (d: any) => apiPost<any>('/approvals', d);
+export const approveApproval = (id: number, comment?: string) =>
+  apiPost<any>(`/approvals/${id}/approve`, { comment });
+export const rejectApproval = (id: number, comment?: string) =>
+  apiPost<any>(`/approvals/${id}/reject`, { comment });
+export const listApprovals = (params: any) => apiGet<PageResult<any>>('/approvals', params);
+export const myApprovals = () => apiGet<any>('/approvals/todos');
+
 // ---------- 补课排课 (§4.6) ----------
 export const scheduleMakeup = (d: any) => apiPost<any>('/lessons/makeup', d);
 
