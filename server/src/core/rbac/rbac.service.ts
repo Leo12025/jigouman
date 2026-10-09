@@ -30,6 +30,7 @@ const MODULES = [
   'task',
   'homework',
   'review',
+  'dashboard',
   'growth',
   'growth',
   'approval',
