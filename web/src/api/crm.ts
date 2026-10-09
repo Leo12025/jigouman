@@ -221,3 +221,17 @@ export const createCourseReview = (d: any) => apiPost<any>('/course-reviews', d)
 export const listStudentReviews = (studentId: number, params?: any) =>
   apiGet<PageResult<any>>(`/students/${studentId}/reviews`, params);
 
+// ---------- 客诉管理 (§4.26 客诉分派→COMPLAINT 待办) ----------
+export const listComplaints = (params: any) => apiGet<any>('/complaints', params);
+export const createComplaint = (d: any) => apiPost<any>('/complaints', d);
+export const assignComplaint = (id: number, assigneeId: number) =>
+  apiPut<any>(`/complaints/${id}/assign`, { assigneeId });
+export const resolveComplaint = (id: number, resolution: string) =>
+  apiPost<any>(`/complaints/${id}/resolve`, { resolution });
+
+// ---------- 学员成长 / 成绩 (§6.5 测评→成绩录入) ----------
+export const listExams = () => apiGet<any[]>('/exams');
+export const createExam = (d: any) => apiPost<any>('/exams', d);
+export const listScores = (params: any) => apiGet<any[]>('/scores', params);
+export const createScore = (d: any) => apiPost<any>('/scores', d);
+

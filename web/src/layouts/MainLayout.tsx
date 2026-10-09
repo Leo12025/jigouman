@@ -22,6 +22,8 @@ import {
   BellOutlined,
   FileTextOutlined,
   BarChartOutlined,
+  CustomerServiceOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken } from '../api/client';
@@ -95,6 +97,7 @@ export default function MainLayout() {
         { key: '/finance', icon: <DollarOutlined />, label: '财务对账' },
         { key: '/tasks', icon: <BellOutlined />, label: '待办中心' },
         { key: '/homework', icon: <FileTextOutlined />, label: '作业管理' },
+        { key: '/scores', icon: <LineChartOutlined />, label: '成绩管理' },
       ],
     },
     {
@@ -106,6 +109,7 @@ export default function MainLayout() {
         { key: '/funnel', icon: <FundProjectionScreenOutlined />, label: '转化漏斗' },
         { key: '/channels', icon: <PartitionOutlined />, label: '渠道管理' },
         { key: '/campaigns', icon: <ThunderboltOutlined />, label: '市场活动' },
+        { key: '/complaints', icon: <CustomerServiceOutlined />, label: '客诉管理' },
       ],
     },
     {
@@ -116,7 +120,7 @@ export default function MainLayout() {
         { key: '/users', icon: <UserOutlined />, label: '用户管理' },
         { key: '/roles', icon: <SafetyCertificateOutlined />, label: '角色权限' },
         { key: '/approval-flows', icon: <AuditOutlined />, label: '审批流配置' },
-        { key: '/channels', icon: <ApiOutlined />, label: '消息渠道配置' },
+        { key: '/notify-channels', icon: <ApiOutlined />, label: '消息渠道配置' },
       ],
     },
   ];
