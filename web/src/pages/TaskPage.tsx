@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-  Table, Button, Tag, Select, Space, message, Popconfirm, Card, Row, Col, Radio,
+  Table, Button, Tag, Select, Space, message, Popconfirm, Card, Row, Col, Radio, Modal, Input,
 } from 'antd';
+import { AuditOutlined } from '@ant-design/icons';
 import {
   listTasks, getMyTodos, getTaskStats, completeTask, removeTask,
-  approveApproval, rejectApproval, TASK_TYPE_LABELS,
+  approveApproval, rejectApproval, createApproval,
+  listApprovalFlows, listAllUsers, TASK_TYPE_LABELS,
 } from '../api/crm';
 
 const STATUS_OPTS = [
@@ -21,6 +23,40 @@ export default function TaskPage() {
   const [type, setType] = useState<string | undefined>();
   const [overdueOnly, setOverdueOnly] = useState<boolean>(false);
   const [stats, setStats] = useState<any>(null);
+
+  // 发起审批
+  const [createOpen, setCreateOpen] = useState(false);
+  const [flows, setFlows] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [bizType, setBizType] = useState('REFUND');
+  const [title, setTitle] = useState('');
+  const [flowId, setFlowId] = useState<number | undefined>();
+  const [approverIds, setApproverIds] = useState<number[]>([]);
+
+  const openCreate = async () => {
+    setFlowId(undefined); setApproverIds([]); setTitle(''); setBizType('REFUND');
+    try {
+      const f = await listApprovalFlows({ page: 1, size: 100 });
+      setFlows(f.list || []);
+      const u = await listAllUsers();
+      setAllUsers(u.list || []);
+    } catch { /* ignore */ }
+    setCreateOpen(true);
+  };
+
+  const submitApproval = async () => {
+    if (!title.trim()) return message.warning('请填写审批标题');
+    if (!flowId && !approverIds.length) return message.warning('请选择审批流或手动指定审批人');
+    try {
+      await createApproval({
+        bizType, title: title.trim(),
+        ...(flowId ? { flowId } : { approverIds }),
+      });
+      message.success('审批已发起');
+      setCreateOpen(false);
+      load(1);
+    } catch { /* ignore */ }
+  };
 
   const load = async (p = page) => {
     const params: any = { page: p, size: 20, status, type };
@@ -144,9 +180,37 @@ export default function TaskPage() {
           options={[{ value: true, label: '仅逾期' }]}
           value={overdueOnly || undefined} onChange={(v) => setOverdueOnly(!!v)} />
         <Button type="primary" onClick={() => load(1)}>查询</Button>
+        <Button type="primary" icon={<AuditOutlined />} onClick={openCreate}>发起审批</Button>
       </Space>
       <Table rowKey="id" size="small" dataSource={rows} columns={cols}
         pagination={{ current: page, pageSize: 20, total, onChange: load }} />
+
+      <Modal title="发起审批" open={createOpen} onOk={submitApproval} onCancel={() => setCreateOpen(false)}>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <div>
+            <div style={{ marginBottom: 4 }}>业务类型</div>
+            <Input value={bizType} onChange={(e) => setBizType(e.target.value)} placeholder="如 REFUND / TRANSFER / DISCOUNT" />
+          </div>
+          <div>
+            <div style={{ marginBottom: 4 }}>审批标题</div>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="如 退费审批-张三" />
+          </div>
+          <div>
+            <div style={{ marginBottom: 4 }}>选择审批流模板（留空则手动指定审批人）</div>
+            <Select style={{ width: '100%' }} allowClear placeholder="可选：套用已配置审批流"
+              value={flowId} onChange={(v) => setFlowId(v)} showSearch optionFilterProp="label"
+              options={flows.map((f) => ({ value: f.id, label: `${f.name}（${f.bizType}）` }))} />
+          </div>
+          {!flowId && (
+            <div>
+              <div style={{ marginBottom: 4 }}>手动指定审批人（按顺序逐级）</div>
+              <Select style={{ width: '100%' }} mode="multiple" placeholder="选择审批人"
+                value={approverIds} onChange={(v) => setApproverIds(v)} showSearch optionFilterProp="label"
+                options={allUsers.map((u) => ({ value: u.id, label: u.name || u.username }))} />
+            </div>
+          )}
+        </Space>
+      </Modal>
     </div>
   );
 }

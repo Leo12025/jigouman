@@ -19,6 +19,7 @@ import HomeworkPage from './pages/HomeworkPage';
 import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 import DashboardPage from './pages/DashboardPage';
+import ApprovalFlowPage from './pages/ApprovalFlowPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="funnel" element={<FunnelPage />} />
         <Route path="users" element={<UserPage />} />
         <Route path="roles" element={<RolePage />} />
+        <Route path="approval-flows" element={<ApprovalFlowPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

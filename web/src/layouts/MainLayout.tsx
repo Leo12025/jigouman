@@ -12,6 +12,7 @@ import {
   UserOutlined,
   SolutionOutlined,
   SafetyCertificateOutlined,
+  AuditOutlined,
   TeamOutlined as Team2Outlined,
   HomeOutlined,
   LogoutOutlined,
@@ -113,6 +114,7 @@ export default function MainLayout() {
       children: [
         { key: '/users', icon: <UserOutlined />, label: '用户管理' },
         { key: '/roles', icon: <SafetyCertificateOutlined />, label: '角色权限' },
+        { key: '/approval-flows', icon: <AuditOutlined />, label: '审批流配置' },
       ],
     },
   ];
