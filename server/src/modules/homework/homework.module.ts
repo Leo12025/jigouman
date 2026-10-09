@@ -9,6 +9,7 @@ import { Student } from '../student/entities/student.entity';
 import { Lesson } from '../course/entities/lesson.entity';
 import { HomeworkService } from './homework.service';
 import { HomeworkController } from './homework.controller';
+import { TaskModule } from '../task/task.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { HomeworkController } from './homework.controller';
       Homework, HomeworkSubmit, HomeworkReview,
       StudentParent, StudentCourse, Student, Lesson,
     ]),
+    TaskModule,
   ],
   providers: [HomeworkService],
   controllers: [HomeworkController],

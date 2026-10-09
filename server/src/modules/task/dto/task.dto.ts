@@ -19,4 +19,6 @@ export class TaskPageQueryDto extends PageQueryDto {
   @IsOptional() @IsString() status?: string;
   @IsOptional() @IsString() refType?: string;
   @IsOptional() @Type(() => Number) @IsInt() refId?: number;
+  /** 仅取逾期待办（=1 时过滤已逾期且未完成） */
+  @IsOptional() @Type(() => Number) @IsInt() overdue?: number;
 }

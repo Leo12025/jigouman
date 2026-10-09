@@ -12,6 +12,8 @@ import {
 import { StudentCourse, StudentCourseStatus } from '../student/entities/student-course.entity';
 import { Student } from '../student/entities/student.entity';
 import { Lesson } from '../course/entities/lesson.entity';
+import { TaskService } from '../task/task.service';
+import { TASK_TYPES } from '../task/task-types';
 
 @Injectable()
 export class HomeworkService {
@@ -22,6 +24,7 @@ export class HomeworkService {
     @InjectRepository(StudentCourse) private readonly scRepo: Repository<StudentCourse>,
     @InjectRepository(Student) private readonly stuRepo: Repository<Student>,
     @InjectRepository(Lesson) private readonly lessonRepo: Repository<Lesson>,
+    private readonly taskSvc: TaskService,
   ) {}
 
   /** 布置作业（§4.7）。按班级布置时，若未传 courseId 则尝试从课次/班级补全 */
@@ -99,7 +102,23 @@ export class HomeworkService {
     rec.submitAt = now;
     rec.isLate = isLate ? 1 : 0;
     rec.status = rec.status === SubmitStatus.REVIEWED ? SubmitStatus.REVIEWED : SubmitStatus.SUBMITTED;
-    return this.submitRepo.save(rec as any);
+    const saved = await this.submitRepo.save(rec as any);
+    // 事件化：学员提交作业 → 生成「待批改」任务（§4.26 待办中心来源）
+    if (saved.status === SubmitStatus.SUBMITTED && hw.teacherId) {
+      try {
+        await this.taskSvc.ensurePending(tenantId, {
+          type: TASK_TYPES.HOMEWORK_REVIEW,
+          title: `作业批改：${hw.title}`,
+          assigneeId: hw.teacherId,
+          refType: 'HOMEWORK_SUBMIT',
+          refId: saved.id,
+          dueAt: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+        });
+      } catch {
+        /* 待办生成失败不阻断作业提交 */
+      }
+    }
+    return saved;
   }
 
   /** 批改（§4.7：打分、写评语、标注错误、标记优秀） */
@@ -124,6 +143,10 @@ export class HomeworkService {
     const saved = await this.reviewRepo.save(rv as any);
     sub.status = SubmitStatus.REVIEWED;
     await this.submitRepo.save(sub as any);
+    // 业务完成回流：关闭对应「待批改」任务（§4.26 任务完成即关闭）
+    await this.taskSvc
+      .closeByRef(tenantId, TASK_TYPES.HOMEWORK_REVIEW, 'HOMEWORK_SUBMIT', submitId, teacherId)
+      .catch(() => undefined);
     return saved;
   }
 

@@ -28,6 +28,20 @@ export class TaskController {
     return this.svc.list(t, q);
   }
 
+  @Get('todos')
+  @RequirePermissions('task:view')
+  @ApiOperation({ summary: '我的待办(按当前登录人，支持类型/状态/逾期过滤)' })
+  myTasks(@TenantId() t: number, @CurrentUser() u: AuthUser, @Query() q: TaskPageQueryDto) {
+    return this.svc.myTasks(t, u.id, q);
+  }
+
+  @Get('stats')
+  @RequirePermissions('task:view')
+  @ApiOperation({ summary: '待办聚合统计(总/逾期/严重逾期/按类型)' })
+  stats(@TenantId() t: number, @CurrentUser() u: AuthUser, @Query('scope') scope?: string) {
+    return this.svc.stats(t, scope === 'mine' ? u.id : undefined);
+  }
+
   @Put(':id/complete')
   @RequirePermissions('task:update')
   @OperationLog({ action: 'task:complete', target: 'task' })
