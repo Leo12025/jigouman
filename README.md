@@ -219,7 +219,7 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 
 ### 页面清单（web/src/pages）
 `Login` 登录 · `HomePage` 首页看板 · `CoursePage` 课程/分类 · `ClassGroupPage` 班级 ·
-`LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课 + 补课排课）· `StudentPage` 学员/家长/报名 ·
+`LessonPage` 课次排课（单条 + 按周批量生成 + 点名消课 + 补课排课）· `StudentPage` 学员/家长/报名 · `StudentLifecyclePage` 学员全生命周期视图(线索→到店体验→购课→上课→续课→服务→结课/退费) ·
 `OrderPage` 订单与财务（下单/支付/退费预览按消课比例）· `HourPage` 课时管理（账户/流水/预警）·
 `FinancePage` 财务对账（分账/工资 · 发票 · 财务报表）· `TaskPage` 待办中心（我的待办/逾期标红/按类型统计）·
 `HomeworkPage` 作业管理（布置/提交批改/统计提交率·优秀率·按时率/未提交名单）·

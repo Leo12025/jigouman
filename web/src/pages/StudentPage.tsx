@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, message, Popconfirm, Drawer, Descriptions, Tabs,
 } from 'antd';
@@ -10,6 +11,7 @@ const STATUS: Record<string, string> = {
 };
 
 export default function StudentPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -61,9 +63,10 @@ export default function StudentPage() {
     { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={v === 'STUDYING' ? 'green' : 'default'}>{STATUS[v] || v}</Tag> },
     { title: '标签', dataIndex: 'tags', render: (v: string) => v || '-' },
     {
-      title: '操作', width: 180, render: (_: any, r: any) => (
+      title: '操作', width: 220, render: (_: any, r: any) => (
         <Space size={4} wrap>
           <Button type="link" size="small" onClick={() => openDetail(r)}>详情</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/students/${r.id}/lifecycle`)}>全生命周期</Button>
           <Button type="link" size="small" onClick={() => { setEditing(r); form.setFieldsValue(r); setOpen(true); }}>编辑</Button>
           <Popconfirm title="确认删除该学员？" okText="删除" cancelText="取消" onConfirm={async () => { await deleteStudent(r.id); message.success('已删除'); load(); }}>
             <Button type="link" size="small" danger>删除</Button>
@@ -99,7 +102,8 @@ export default function StudentPage() {
         </Form>
       </Modal>
 
-      <Drawer title="学员详情" open={!!detail} onClose={() => setDetail(null)} width={720}>
+      <Drawer title="学员详情" open={!!detail} onClose={() => setDetail(null)} width={720}
+        extra={detail && <Button type="primary" size="small" onClick={() => navigate(`/students/${detail.id}/lifecycle`)}>全生命周期视图</Button>}>
         {detail && (
           <>
             <Descriptions column={2} bordered size="small" style={{ marginBottom: 16 }}>

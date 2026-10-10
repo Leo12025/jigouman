@@ -95,6 +95,7 @@ export const deleteStudent = (id: number) => apiDelete(`/students/${id}`);
 export const bindParent = (d: any) => apiPost<any>('/students/parents/bind', d);
 export const unbindParent = (d: any) => apiPost<any>('/students/parents/unbind', d);
 export const enrollCourse = (d: any) => apiPost<any>('/students/courses/enroll', d);
+export const getStudentLifecycle = (id: number) => apiGet<any>(`/students/${id}/lifecycle`);
 
 // ---------- 系统管理 ----------
 export const listUsers = (params: any) => apiGet<PageResult<any>>('/users', params);

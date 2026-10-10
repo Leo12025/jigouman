@@ -13,6 +13,7 @@ import { TenantId } from '../../common/decorators/auth.decorator';
 import { RequirePermissions } from '../../common/decorators/roles.decorator';
 import { OperationLog } from '../../common/decorators/operation-log.decorator';
 import { StudentService } from './student.service';
+import { StudentLifecycleService } from './student-lifecycle.service';
 import {
   CreateStudentDto,
   UpdateStudentDto,
@@ -25,7 +26,10 @@ import {
 @ApiTags('学员 Student')
 @Controller('students')
 export class StudentController {
-  constructor(private readonly svc: StudentService) {}
+  constructor(
+    private readonly svc: StudentService,
+    private readonly lifecycleSvc: StudentLifecycleService,
+  ) {}
 
   @Get()
   @RequirePermissions('student:view')
@@ -110,5 +114,13 @@ export class StudentController {
   @ApiOperation({ summary: '班级在读学员(供课次点名)' })
   byClassGroup(@TenantId() t: number, @Param('id') id: number) {
     return this.svc.listByClassGroup(t, id);
+  }
+
+  // 学员全生命周期聚合（线索→到店体验→购课→上课→续课→服务→结课/退费）
+  @Get(':id/lifecycle')
+  @RequirePermissions('student:view')
+  @ApiOperation({ summary: '学员全生命周期视图(一站式聚合)' })
+  lifecycle(@TenantId() t: number, @Param('id') id: number) {
+    return this.lifecycleSvc.lifecycle(t, Number(id));
   }
 }
