@@ -1,4 +1,4 @@
-import { apiPost, apiGet, apiPut, apiDelete, setTokens } from './client';
+import { apiPost, apiGet, apiPut, apiDelete, setTokens, downloadFile } from './client';
 import type {
   Channel,
   Campaign,
@@ -418,4 +418,13 @@ export const removeMetricDef = (id: number) => apiDelete(`/dashboards/metrics/${
 export const getBenchmark = () => apiGet<any>('/dashboards/benchmark');
 export const customReport = (d: any) => apiPost<any>('/dashboards/report', d);
 export const evaluateAlerts = () => apiPost<any>('/alert-rules/evaluate');
+
+// 报表导出（后端生成文件流：Excel=CSV / PDF）
+export const exportReportFile = (d: any) =>
+  downloadFile('/dashboards/report/export', { method: 'POST', data: d, fallbackName: 'report.csv' });
+export const exportBenchmarkFile = (format: string) =>
+  downloadFile(`/dashboards/benchmark/export?format=${format}`, {
+    method: 'GET',
+    fallbackName: 'benchmark.csv',
+  });
 

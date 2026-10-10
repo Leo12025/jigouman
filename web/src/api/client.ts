@@ -106,3 +106,31 @@ export const apiPut = <T = any>(url: string, data?: any): Promise<T> =>
   unwrap<T>(http.put(url, data) as any);
 export const apiDelete = <T = any>(url: string): Promise<T> =>
   unwrap<T>(http.delete(url) as any);
+
+/** 文件下载（后端生成文件流）：拿 Blob 触发浏览器下载，文件名取自 Content-Disposition */
+export async function downloadFile(
+  url: string,
+  opts?: { method?: 'GET' | 'POST'; data?: any; fallbackName?: string },
+): Promise<void> {
+  const res = await http.request({
+    url,
+    method: opts?.method || 'GET',
+    data: opts?.data,
+    responseType: 'blob',
+  });
+  const blob = res.data as Blob;
+  const cd = res.headers['content-disposition'] as string | undefined;
+  let filename = opts?.fallbackName || 'download';
+  if (cd) {
+    const m = cd.match(/filename="?([^";]+)"?/);
+    if (m) filename = decodeURIComponent(m[1]);
+  }
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objUrl);
+}

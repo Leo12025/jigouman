@@ -22,6 +22,8 @@ import {
   getBenchmark,
   customReport,
   evaluateAlerts,
+  exportReportFile,
+  exportBenchmarkFile,
 } from '../api/crm';
 
 const REPORT_DIM: Record<string, string[]> = {
@@ -126,7 +128,19 @@ function MetricTab() {
 
 function BenchmarkTab() {
   const [data, setData] = useState<any>(null);
+  const [exporting, setExporting] = useState(false);
   useEffect(() => { getBenchmark().then(setData).catch(() => setData(null)); }, []);
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      await exportBenchmarkFile('excel');
+      message.success('已导出 Excel');
+    } catch {
+      /* 拦截器统一提示 */
+    } finally {
+      setExporting(false);
+    }
+  };
   if (!data) return <div>加载中…</div>;
   const cols = [
     { title: '校区', dataIndex: 'name' },
@@ -138,6 +152,7 @@ function BenchmarkTab() {
   return (
     <div>
       <Space style={{ marginBottom: 12 }}>
+        <Button icon="download" loading={exporting} onClick={doExport}>导出Excel(对标)</Button>
         <Card size="small" title="校区数"><b>{data.campusCount}</b></Card>
         <Card size="small" title="总成本"><b>{data.totalCost}</b></Card>
         <Card size="small" title="平均成本"><b>{data.compare.avgCost}</b></Card>
@@ -154,11 +169,25 @@ function ReportTab() {
   const [dimensions, setDimensions] = useState<string[]>(['status']);
   const [metrics, setMetrics] = useState<string[]>(['orderCount']);
   const [rows, setRows] = useState<any[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   const gen = async () => {
     if (!dimensions.length || !metrics.length) { message.warning('请选择维度与指标'); return; }
     const r = await customReport({ source, dimensions, metrics });
     setRows(r.rows || []);
+  };
+
+  const doExport = async (format: 'excel' | 'pdf') => {
+    if (!dimensions.length || !metrics.length) { message.warning('请选择维度与指标'); return; }
+    setExporting(true);
+    try {
+      await exportReportFile({ source, dimensions, metrics, format, title: `自定义报表_${source}` });
+      message.success(`已导出 ${format.toUpperCase()}`);
+    } catch {
+      /* 错误提示已由拦截器统一处理 */
+    } finally {
+      setExporting(false);
+    }
   };
 
   const cols = [
@@ -177,6 +206,8 @@ function ReportTab() {
         <Select mode="multiple" placeholder="指标" style={{ minWidth: 280 }} value={metrics}
           onChange={setMetrics} options={REPORT_MET[source].map((m) => ({ value: m, label: m }))} />
         <Button type="primary" onClick={gen}>生成报表</Button>
+        <Button icon="download" loading={exporting} onClick={() => doExport('excel')}>导出Excel</Button>
+        <Button icon="file-pdf" loading={exporting} onClick={() => doExport('pdf')}>导出PDF</Button>
       </Space>
       <Table rowKey="key" size="small" dataSource={rows} columns={cols} scroll={{ x: 'max-content' }} />
     </div>

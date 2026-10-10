@@ -7,14 +7,16 @@ import {
   Put,
   Delete,
   Body,
+  Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { TenantId, CurrentUser, AuthUser } from '../../common/decorators/auth.decorator';
 import { RequirePermissions } from '../../common/decorators/roles.decorator';
 import { DashboardService } from './dashboard.service';
 import { DashboardQueryDto } from './dto/dashboard.dto';
 import { CreateMetricDefDto, UpdateMetricDefDto } from './dto/metric-def.dto';
-import { CustomReportDto } from './dto/report.dto';
+import { CustomReportDto, ExportReportDto } from './dto/report.dto';
 
 /**
  * 数据看板（M6，文档 §4.10 / §6.7）。
@@ -96,5 +98,40 @@ export class DashboardController {
   @ApiOperation({ summary: '自定义报表：按数据源/维度/指标聚合' })
   report(@TenantId() t: number, @Body() d: CustomReportDto) {
     return this.svc.customReport(t, d);
+  }
+
+  @Post('report/export')
+  @RequirePermissions('report:view')
+  @ApiOperation({ summary: '自定义报表导出(Excel=CSV带BOM / PDF=极简文本表)' })
+  async exportReport(
+    @TenantId() t: number,
+    @Body() d: ExportReportDto,
+    @Res() res: Response,
+  ) {
+    const { buffer, mime, ext } = await this.svc.exportReport(t, d);
+    const fname = `${this.safeName(d.title || 'report')}.${ext}`;
+    res.status(200);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buffer);
+  }
+
+  @Get('benchmark/export')
+  @RequirePermissions('dashboard:view')
+  @ApiOperation({ summary: '多校区对标导出(Excel=CSV，含中文不支持PDF)' })
+  async exportBenchmark(
+    @TenantId() t: number,
+    @Query('format') format: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, mime, ext } = await this.svc.exportBenchmark(t, format || 'excel');
+    res.status(200);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="benchmark.${ext}"`);
+    res.send(buffer);
+  }
+
+  private safeName(s: string): string {
+    return s.replace(/[^\w.-]/g, '_').slice(0, 80) || 'report';
   }
 }

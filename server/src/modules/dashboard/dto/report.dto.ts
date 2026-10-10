@@ -35,3 +35,13 @@ export const REPORT_METRICS = {
   order: ['orderCount', 'receivable', 'received', 'refundAmount', 'studentCount'],
   lead: ['leadCount', 'trial', 'signed'],
 } as const;
+
+/** 自定义报表导出（Excel=CSV带BOM / PDF=极简文本表），复用自定义报表聚合结果 */
+export class ExportReportDto extends CustomReportDto {
+  @IsIn(['excel', 'pdf'])
+  format: 'excel' | 'pdf';
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+}

@@ -21,6 +21,7 @@ import { Material } from '../inventory/entities/material.entity';
 import { Channel } from '../lead/entities/channel.entity';
 import { Campaign } from '../lead/entities/campaign.entity';
 import { DashboardRole, DASHBOARD_ROLES } from './dto/dashboard.dto';
+import { buildCsv, buildPdf, ExportColumn, ExportFile } from './export.util';
 
 /**
  * 数据经营分析（M6，文档 §4.10 / §6.7）。
@@ -487,6 +488,62 @@ export class DashboardService {
         return row;
       });
     return { source: d.source, dimensions: d.dimensions, metrics: d.metrics, rows: out };
+  }
+
+  // ---------------- 报表导出（Excel/PDF，后端生成文件流） ----------------
+  private readonly REPORT_LABELS: Record<string, string> = {
+    status: '状态',
+    month: '月份',
+    channel: '渠道',
+    campaign: '活动',
+    stage: '阶段',
+    orderCount: '订单数',
+    receivable: '应收金额',
+    received: '已收金额',
+    refundAmount: '退款金额',
+    studentCount: '学员数',
+    leadCount: '线索数',
+    trial: '试听数',
+    signed: '签约数',
+  };
+
+  /** 自定义报表导出：复用聚合结果，套用中文表头，输出 CSV/PDF 文件流 */
+  async exportReport(
+    t: number,
+    d: { source: string; dimensions: string[]; metrics: string[]; format: 'excel' | 'pdf'; title?: string; start?: string; end?: string },
+  ): Promise<ExportFile> {
+    const result = await this.customReport(t, d); // 内部完成 source/维度/指标校验
+    const columns: ExportColumn[] = [
+      ...d.dimensions.map((dim) => ({ key: dim, label: this.REPORT_LABELS[dim] || dim })),
+      ...d.metrics.map((met) => ({ key: met, label: this.REPORT_LABELS[met] || met })),
+    ];
+    const title = d.title || `自定义报表_${d.source}_${new Date().toISOString().slice(0, 10)}`;
+    const input = { title, columns, rows: result.rows };
+    return d.format === 'pdf' ? buildPdf(input) : buildCsv(input);
+  }
+
+  /** 多校区对标导出（含中文，仅支持 Excel/CSV） */
+  async exportBenchmark(t: number, format: string): Promise<ExportFile> {
+    if (format === 'pdf') {
+      throw new BadRequestException('校区对标含中文，请使用 Excel(CSV) 导出');
+    }
+    const b = await this.campusBenchmark(t);
+    const columns: ExportColumn[] = [
+      { key: 'name', label: '校区' },
+      { key: 'type', label: '类型' },
+      { key: 'costTotal', label: '成本合计' },
+      { key: 'materialCount', label: '物料数' },
+      { key: 'stockValue', label: '库存金额' },
+    ];
+    const summary = {
+      name: '合计',
+      type: '',
+      costTotal: b.totalCost,
+      materialCount: '',
+      stockValue: '',
+    };
+    const title = `多校区对标_${new Date().toISOString().slice(0, 10)}`;
+    return buildCsv({ title, columns, rows: [...b.campuses, summary] });
   }
 
   private dimValue(source: string, dim: string, r: any): string {

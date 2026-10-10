@@ -18,13 +18,18 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, any> {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const traceId = randomUUID();
     return next.handle().pipe(
-      map((data) => ({
-        code: ResCode.SUCCESS,
-        message: 'success',
-        data: data ?? null,
-        traceId,
-        timestamp: Date.now(),
-      })),
+      map((data) => {
+        // 控制器已通过 @Res() 直接发送响应（如文件下载），避免二次包装导致报错
+        const res = context.switchToHttp().getResponse();
+        if (res && res.headersSent) return data;
+        return {
+          code: ResCode.SUCCESS,
+          message: 'success',
+          data: data ?? null,
+          traceId,
+          timestamp: Date.now(),
+        };
+      }),
     );
   }
 }
