@@ -118,10 +118,18 @@ export const getOrder = (id: number) => apiGet<any>(`/orders/${id}`);
 export const createOrder = (d: any) => apiPost<any>('/orders', d);
 export const payOrder = (id: number, d: any) => apiPost<any>(`/orders/${id}/pay`, d);
 export const refundOrder = (id: number, d: any) => apiPost<any>(`/orders/${id}/refund`, d);
-export const approveRefund = (id: number, refundId: number) =>
-  apiPost<any>(`/orders/${id}/refund/${refundId}/approve`);
 export const previewRefund = (id: number) =>
   apiGet<any>(`/orders/${id}/refund-preview`);
+
+// ---------------- 审批中心（§4.16，资金联动退款/转班/调课均在此终审） ----------------
+export const myApprovalTodos = () => apiGet<any[]>('/approvals/todos');
+export const getApproval = (id: number) => apiGet<any>(`/approvals/${id}`);
+
+// ---------------- 调课/转班（资金联动，走审批中心） ----------------
+export const createTransfer = (d: any) => apiPost<any>('/class-change/transfers', d);
+export const listTransfers = (params: any) => apiGet<any>('/class-change/transfers', params);
+export const createReschedule = (d: any) => apiPost<any>('/class-change/reschedules', d);
+export const listReschedules = (params: any) => apiGet<any>('/class-change/reschedules', params);
 
 // ---------- 课时管理 (M4) ----------
 export const getStudentHours = (studentId: number) =>

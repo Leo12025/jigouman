@@ -4,8 +4,8 @@ import {
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import {
-  listOrders, getOrder, createOrder, payOrder, refundOrder, approveRefund,
-  listStudents, listCourses, previewRefund,
+  listOrders, getOrder, createOrder, payOrder, refundOrder,
+  listStudents, listCourses, listUsers, previewRefund,
 } from '../api/crm';
 
 const STATUS: Record<string, { label: string; color: string }> = {
@@ -25,6 +25,7 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [keyword, setKeyword] = useState<string | undefined>();
   const [status, setStatus] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
@@ -51,6 +52,7 @@ export default function OrderPage() {
     load(1, size);
     listStudents({ page: 1, size: 200 }).then((r) => setStudents(r.list)).catch(() => undefined);
     listCourses({ page: 1, size: 200 }).then((r) => setCourses(r.list)).catch(() => undefined);
+    listUsers({ page: 1, size: 200 }).then((r) => setUsers(r.list)).catch(() => undefined);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
 
@@ -207,6 +209,10 @@ export default function OrderPage() {
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="reason" label="退费原因"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item name="approverId" label="审批人" rules={[{ required: true, message: '请选择审批人' }]}>
+            <Select showSearch optionFilterProp="label" placeholder="提交后进入审批中心"
+              options={users.map((u) => ({ value: u.id, label: u.name || u.username }))} />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -256,16 +262,12 @@ export default function OrderPage() {
                         { title: '金额', dataIndex: 'amount', render: (v: number) => `¥${v}` },
                         { title: '状态', dataIndex: 'status' },
                         { title: '原因', dataIndex: 'reason', render: (v: string) => v || '-' },
+                        { title: '审批实例', dataIndex: 'approvalInstanceId', render: (v: number) => v ? `#${v}` : '-' },
                       ]} />
                     {detail.refunds?.some((r: any) => r.status === 'PENDING') && (
-                      <Button type="primary" danger style={{ marginTop: 12 }}
-                        onClick={async () => {
-                          const pend = detail.refunds.find((r: any) => r.status === 'PENDING');
-                          await approveRefund(detail.id, pend.id);
-                          message.success('退费已审批，课时已回滚');
-                          openDetail(detail.id);
-                          load();
-                        }}>审批通过并退款</Button>
+                      <div style={{ marginTop: 12, color: 'rgba(0,0,0,.45)', fontSize: 13 }}>
+                        该退费单待审批，请到「审批中心」处理。
+                      </div>
                     )}
                   </>
                 ),

@@ -21,6 +21,8 @@ import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 import DashboardPage from './pages/DashboardPage';
 import ApprovalFlowPage from './pages/ApprovalFlowPage';
+import ApprovalPage from './pages/ApprovalPage';
+import ClassChangePage from './pages/ClassChangePage';
 import ChannelConfigPage from './pages/ChannelConfigPage';
 import ComplaintPage from './pages/ComplaintPage';
 import ScorePage from './pages/ScorePage';
@@ -76,6 +78,8 @@ export default function App() {
         <Route path="users" element={<UserPage />} />
         <Route path="roles" element={<RolePage />} />
         <Route path="approval-flows" element={<ApprovalFlowPage />} />
+        <Route path="approvals" element={<ApprovalPage />} />
+        <Route path="class-change" element={<ClassChangePage />} />
         <Route path="notify-channels" element={<ChannelConfigPage />} />
         <Route path="complaints" element={<ComplaintPage />} />
         <Route path="scores" element={<ScorePage />} />
