@@ -23,6 +23,7 @@ export class CreateOrderDto {
   @IsInt() @IsNotEmpty() studentId: number;
   @IsOptional() @IsInt() ownerId?: number;
   @IsOptional() @IsNumber() @Min(0) discountAmount?: number;
+  @IsOptional() @IsString() couponCode?: string;
   @IsOptional() @IsString() remark?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => CreateOrderItemDto) items: CreateOrderItemDto[];
 }

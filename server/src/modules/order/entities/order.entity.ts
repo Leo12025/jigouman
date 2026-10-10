@@ -35,6 +35,12 @@ export class Order extends BaseEntity {
   @Column({ name: 'discount_amount', type: 'decimal', precision: 12, scale: 2, default: 0, transformer: MONEY, comment: '优惠抵扣' })
   discountAmount: number;
 
+  @Column({ name: 'coupon_code', length: 32, nullable: true, comment: '使用的优惠券码' })
+  couponCode?: string;
+
+  @Column({ name: 'coupon_discount', type: 'decimal', precision: 12, scale: 2, default: 0, transformer: MONEY, nullable: true, comment: '优惠券抵扣金额' })
+  couponDiscount?: number;
+
   @Column({ name: 'payable_amount', type: 'decimal', precision: 12, scale: 2, transformer: MONEY, comment: '实付应付' })
   payableAmount: number;
 

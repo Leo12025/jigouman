@@ -13,6 +13,7 @@ import { Payment, PayChannel } from './entities/payment.entity';
 import { Refund, RefundStatus } from './entities/refund.entity';
 import { OrderPageQueryDto, CreateOrderDto, PayOrderDto, RefundDto } from './dto/order.dto';
 import { HourService } from '../../modules/hour/hour.service';
+import { CouponService } from '../../modules/coupon/coupon.service';
 
 function genOrderNo(): string {
   return `NO${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -26,6 +27,7 @@ export class OrderService {
     @InjectRepository(Payment) private readonly payRepo: Repository<Payment>,
     @InjectRepository(Refund) private readonly refundRepo: Repository<Refund>,
     private readonly hourSvc: HourService,
+    private readonly couponSvc: CouponService,
   ) {}
 
   async createOrder(tenantId: number, d: CreateOrderDto) {
@@ -47,7 +49,14 @@ export class OrderService {
       } as OrderItem;
       return this.itemRepo.create(plain);
     });
-    const discount = d.discountAmount || 0;
+    // 优惠券抵扣（§4.17）：按券码预览金额并并入优惠
+    let couponDiscount = 0;
+    if (d.couponCode) {
+      const courseId = d.items?.[0]?.courseId;
+      const pv = await this.couponSvc.preview(tenantId, d.couponCode, total, courseId);
+      couponDiscount = pv.discount;
+    }
+    const discount = Math.round(((d.discountAmount || 0) + couponDiscount) * 100) / 100;
     const payable = Math.max(0, Math.round((total - discount) * 100) / 100);
 
     const order = this.orderRepo.create({
@@ -56,6 +65,8 @@ export class OrderService {
       studentId: d.studentId,
       totalAmount: total,
       discountAmount: discount,
+      couponCode: d.couponCode,
+      couponDiscount,
       payableAmount: payable,
       paidAmount: 0,
       status: OrderStatus.PENDING,
@@ -96,6 +107,15 @@ export class OrderService {
 
     // 支付成功 → 按订单项发放课时到学员账户
     const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
+
+    // 优惠券核销：支付成功后标记已用，抵扣本单金额（§4.17）
+    if (order.couponCode) {
+      const courseId = items[0]?.courseId;
+      await this.couponSvc
+        .redeem(tenantId, order.couponCode, order.id, Number(order.payableAmount), courseId)
+        .catch(() => undefined);
+    }
+
     for (const it of items) {
       if (it.hours > 0) {
         const perHour = Math.round((Number(it.amount) / it.hours) * 100) / 100;
