@@ -279,3 +279,123 @@ export const createCourseware = (stageId: number, d: any) =>
 export const updateCourseware = (id: number, d: any) => apiPut<any>(`/coursewares/${id}`, d);
 export const deleteCourseware = (id: number) => apiDelete(`/coursewares/${id}`);
 
+// ---------- 师资员工 (§4.14) ----------
+export const listEmployees = (params: any) => apiGet<PageResult<any>>('/employees', params);
+export const createEmployee = (d: any) => apiPost<any>('/employees', d);
+export const updateEmployee = (id: number, d: any) => apiPut<any>(`/employees/${id}`, d);
+export const deleteEmployee = (id: number) => apiDelete(`/employees/${id}`);
+export const upsertTeacherProfile = (id: number, d: any) =>
+  apiPut<any>(`/employees/${id}/teacher-profile`, d);
+export const listCertificates = (id: number) =>
+  apiGet<any[]>(`/employees/${id}/certificates`);
+export const addCertificate = (id: number, d: any) =>
+  apiPost<any>(`/employees/${id}/certificates`, d);
+export const updateCertificate = (cid: number, d: any) =>
+  apiPut<any>(`/employees/certificates/${cid}`, d);
+export const deleteCertificate = (cid: number) =>
+  apiDelete(`/employees/certificates/${cid}`);
+
+// ---------- 教室场地 (§4.15) ----------
+export const listClassrooms = (params: any) => apiGet<PageResult<any>>('/classrooms', params);
+export const createClassroom = (d: any) => apiPost<any>('/classrooms', d);
+export const updateClassroom = (id: number, d: any) => apiPut<any>(`/classrooms/${id}`, d);
+export const deleteClassroom = (id: number) => apiDelete(`/classrooms/${id}`);
+
+// ---------- 优惠券 (§4.17) ----------
+export const listCouponTemplates = (params: any) => apiGet<PageResult<any>>('/coupons/templates', params);
+export const createCouponTemplate = (d: any) => apiPost<any>('/coupons/templates', d);
+export const updateCouponTemplate = (id: number, d: any) => apiPut<any>(`/coupons/templates/${id}`, d);
+export const deleteCouponTemplate = (id: number) => apiDelete(`/coupons/templates/${id}`);
+export const grantCoupon = (d: any) => apiPost<any>('/coupons/grant', d);
+export const listCoupons = (params: any) => apiGet<PageResult<any>>('/coupons', params);
+export const previewCoupon = (d: any) => apiPost<any>('/coupons/preview', d);
+export const redeemCoupon = (d: any) => apiPost<any>('/coupons/redeem', d);
+
+// ---------- 合同电子签 (§4.23) ----------
+export const listContractTemplates = (params: any) => apiGet<PageResult<any>>('/contracts/templates', params);
+export const createContractTemplate = (d: any) => apiPost<any>('/contracts/templates', d);
+export const updateContractTemplate = (id: number, d: any) => apiPut<any>(`/contracts/templates/${id}`, d);
+export const deleteContractTemplate = (id: number) => apiDelete(`/contracts/templates/${id}`);
+export const listContracts = (params: any) => apiGet<PageResult<any>>('/contracts', params);
+export const createContract = (d: any) => apiPost<any>('/contracts', d);
+export const signContract = (id: number, d: any) => apiPost<any>(`/contracts/${id}/sign`, d);
+export const invalidateContract = (id: number, reason?: string) => apiPost(`/contracts/${id}/invalidate`, { reason });
+
+// ---------- 积分会员 (§4.19) ----------
+export const listMemberLevels = (params: any) => apiGet<any[]>('/membership/levels', params);
+export const createMemberLevel = (d: any) => apiPost<any>('/membership/levels', d);
+export const updateMemberLevel = (id: number, d: any) => apiPut<any>(`/membership/levels/${id}`, d);
+export const deleteMemberLevel = (id: number) => apiDelete(`/membership/levels/${id}`);
+export const listMembers = (params: any) => apiGet<PageResult<any>>('/membership/members', params);
+export const adjustPoints = (studentId: number, d: any) => apiPost<any>(`/membership/members/${studentId}/points`, d);
+export const listPointLedger = (studentId: number) => apiGet<any[]>(`/membership/members/${studentId}/ledger`);
+
+// ---------- 问卷满意度 (§4.22) ----------
+export const listSurveyTemplates = (params: any) => apiGet<PageResult<any>>('/surveys/templates', params);
+export const createSurveyTemplate = (d: any) => apiPost<any>('/surveys/templates', d);
+export const deleteSurveyTemplate = (id: number) => apiDelete(`/surveys/templates/${id}`);
+export const submitSurvey = (d: any) => apiPost<any>('/surveys/submit', d);
+export const listSurveyResponses = (params: any) => apiGet<PageResult<any>>('/surveys/responses', params);
+export const surveyStats = (templateId: number) => apiGet<any>(`/surveys/stats/${templateId}`);
+
+// ---------- 看板预警 (§4.10) ----------
+export const listAlertRules = (params: any) => apiGet<PageResult<any>>('/alert-rules', params);
+export const createAlertRule = (d: any) => apiPost<any>('/alert-rules', d);
+export const updateAlertRule = (id: number, d: any) => apiPut<any>(`/alert-rules/${id}`, d);
+export const deleteAlertRule = (id: number) => apiDelete(`/alert-rules/${id}`);
+export const checkAlert = (metrics: any) => apiPost<any>('/alert-rules/check', { metrics });
+
+// ---------- 多校区组织 (§4.11) ----------
+export const listOrgs = (params: any) => apiGet<any[]>('/orgs', params);
+export const orgTree = () => apiGet<any[]>('/orgs/tree');
+export const createOrg = (d: any) => apiPost<any>('/orgs', d);
+export const updateOrg = (id: number, d: any) => apiPut<any>(`/orgs/${id}`, d);
+export const deleteOrg = (id: number) => apiDelete(`/orgs/${id}`);
+
+// ---------- 教材库存 (§4.20) ----------
+export const listMaterials = (params: any) => apiGet<PageResult<any>>('/materials', params);
+export const createMaterial = (d: any) => apiPost<any>('/materials', d);
+export const updateMaterial = (id: number, d: any) => apiPut<any>(`/materials/${id}`, d);
+export const deleteMaterial = (id: number) => apiDelete(`/materials/${id}`);
+export const adjustStock = (id: number, d: any) => apiPost<any>(`/materials/${id}/stock`, d);
+export const listMovements = (id: number) => apiGet<any[]>(`/materials/${id}/movements`);
+
+// ---------- 机构成本 (§4.21) ----------
+export const listCosts = (params: any) => apiGet<PageResult<any>>('/costs', params);
+export const createCost = (d: any) => apiPost<any>('/costs', d);
+export const updateCost = (id: number, d: any) => apiPut<any>(`/costs/${id}`, d);
+export const deleteCost = (id: number) => apiDelete(`/costs/${id}`);
+export const costStats = (orgId?: number) => apiGet<any>('/costs/stats/by-category' + (orgId ? `?orgId=${orgId}` : ''));
+
+// ---------- 团购拼团 (§4.24) ----------
+export const listGroupBuyActivities = (params: any) => apiGet<PageResult<any>>('/group-buy/activities', params);
+export const createGroupBuyActivity = (d: any) => apiPost<any>('/group-buy/activities', d);
+export const updateGroupBuyActivity = (id: number, d: any) => apiPut<any>(`/group-buy/activities/${id}`, d);
+export const deleteGroupBuyActivity = (id: number) => apiDelete(`/group-buy/activities/${id}`);
+export const createTeam = (d: any) => apiPost<any>('/group-buy/teams', d);
+export const joinTeam = (d: any) => apiPost<any>('/group-buy/teams/join', d);
+export const listTeams = (activityId: number) => apiGet<any[]>('/group-buy/teams', { activityId });
+export const redeemGroupBuy = (code: string) => apiPost<any>('/group-buy/redeem', { code });
+
+// ---------- 分销裂变 (§4.28) ----------
+export const listDistributors = (params: any) => apiGet<PageResult<any>>('/distribution/distributors', params);
+export const createDistributor = (d: any) => apiPost<any>('/distribution/distributors', d);
+export const updateDistributor = (id: number, d: any) => apiPut<any>(`/distribution/distributors/${id}`, d);
+export const deleteDistributor = (id: number) => apiDelete(`/distribution/distributors/${id}`);
+export const distributorTree = () => apiGet<any[]>('/distribution/distributors/tree');
+export const recordCommission = (d: any) => apiPost<any>('/distribution/commissions', d);
+export const listCommissions = (distributorId: number) => apiGet<any[]>('/distribution/commissions', { distributorId });
+export const settleCommission = (id: number, status: string) => apiPut<any>(`/distribution/commissions/${id}/settle`, { status });
+export const distributionStats = () => apiGet<any>('/distribution/stats');
+
+// ---------- 在线课堂/督学 (§4.13) ----------
+export const listClasses = (params: any) => apiGet<PageResult<any>>('/teaching/classes', params);
+export const createClass = (d: any) => apiPost<any>('/teaching/classes', d);
+export const updateClass = (id: number, d: any) => apiPut<any>(`/teaching/classes/${id}`, d);
+export const deleteClass = (id: number) => apiDelete(`/teaching/classes/${id}`);
+export const startClass = (id: number) => apiPost<any>(`/teaching/classes/${id}/start`);
+export const endClass = (id: number) => apiPost<any>(`/teaching/classes/${id}/end`);
+export const recordStudy = (d: any) => apiPost<any>('/teaching/study', d);
+export const listStudy = (classId: number) => apiGet<any[]>('/teaching/study', { classId });
+export const studyStats = (classId: number) => apiGet<any>(`/teaching/study/stats/${classId}`);
+

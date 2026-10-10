@@ -27,6 +27,9 @@ import {
   AppstoreOutlined,
   ContainerOutlined,
   FolderOpenOutlined,
+  TagsOutlined,
+  ShareAltOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken } from '../api/client';
@@ -104,6 +107,7 @@ export default function MainLayout() {
         { key: '/tasks', icon: <BellOutlined />, label: '待办中心' },
         { key: '/homework', icon: <FileTextOutlined />, label: '作业管理' },
         { key: '/scores', icon: <LineChartOutlined />, label: '成绩管理' },
+        { key: '/teaching', icon: <VideoCameraOutlined />, label: '在线课堂/督学' },
       ],
     },
     {
@@ -116,6 +120,8 @@ export default function MainLayout() {
         { key: '/channels', icon: <PartitionOutlined />, label: '渠道管理' },
         { key: '/campaigns', icon: <ThunderboltOutlined />, label: '市场活动' },
         { key: '/complaints', icon: <CustomerServiceOutlined />, label: '客诉管理' },
+        { key: '/group-buy', icon: <TagsOutlined />, label: '团购拼团' },
+        { key: '/distribution', icon: <ShareAltOutlined />, label: '分销裂变' },
       ],
     },
     {

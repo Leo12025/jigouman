@@ -26,6 +26,18 @@ import ScorePage from './pages/ScorePage';
 import CoursePackagePage from './pages/CoursePackagePage';
 import CoursewarePage from './pages/CoursewarePage';
 import ResourcePage from './pages/ResourcePage';
+import EmployeePage from './pages/EmployeePage';
+import VenuePage from './pages/VenuePage';
+import CouponPage from './pages/CouponPage';
+import ContractPage from './pages/ContractPage';
+import MemberPage from './pages/MemberPage';
+import SurveyPage from './pages/SurveyPage';
+import AlertPage from './pages/AlertPage';
+import OrgPage from './pages/OrgPage';
+import InventoryCostPage from './pages/InventoryCostPage';
+import GroupBuyPage from './pages/GroupBuyPage';
+import DistributionPage from './pages/DistributionPage';
+import TeachingPage from './pages/TeachingPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -67,6 +79,18 @@ export default function App() {
         <Route path="course-packages" element={<CoursePackagePage />} />
         <Route path="coursewares" element={<CoursewarePage />} />
         <Route path="resources" element={<ResourcePage />} />
+        <Route path="employees" element={<EmployeePage />} />
+        <Route path="classrooms" element={<VenuePage />} />
+        <Route path="coupons" element={<CouponPage />} />
+        <Route path="contracts" element={<ContractPage />} />
+        <Route path="members" element={<MemberPage />} />
+        <Route path="surveys" element={<SurveyPage />} />
+        <Route path="alerts" element={<AlertPage />} />
+        <Route path="orgs" element={<OrgPage />} />
+        <Route path="inventory" element={<InventoryCostPage />} />
+        <Route path="group-buy" element={<GroupBuyPage />} />
+        <Route path="distribution" element={<DistributionPage />} />
+        <Route path="teaching" element={<TeachingPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

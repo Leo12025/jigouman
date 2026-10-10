@@ -31,6 +31,19 @@ import { ComplaintModule } from './modules/complaint/complaint.module';
 import { ResourceModule } from './modules/resource/resource.module';
 import { CoursePackageModule } from './modules/course-package/course-package.module';
 import { CoursewareModule } from './modules/courseware/courseware.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { VenueModule } from './modules/venue/venue.module';
+import { CouponModule } from './modules/coupon/coupon.module';
+import { ContractModule } from './modules/contract/contract.module';
+import { MembershipModule } from './modules/membership/membership.module';
+import { SurveyModule } from './modules/survey/survey.module';
+import { AlertModule } from './modules/alert/alert.module';
+import { OrgModule } from './modules/org/org.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { CostModule } from './modules/cost/cost.module';
+import { GroupBuyModule } from './modules/groupbuy/groupbuy.module';
+import { DistributionModule } from './modules/distribution/distribution.module';
+import { TeachingModule } from './modules/teaching/teaching.module';
 
 @Module({
   imports: [
@@ -59,6 +72,19 @@ import { CoursewareModule } from './modules/courseware/courseware.module';
     ResourceModule,
     CoursePackageModule,
     CoursewareModule,
+    StaffModule,
+    VenueModule,
+    CouponModule,
+    ContractModule,
+    MembershipModule,
+    SurveyModule,
+    AlertModule,
+    OrgModule,
+    InventoryModule,
+    CostModule,
+    GroupBuyModule,
+    DistributionModule,
+    TeachingModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

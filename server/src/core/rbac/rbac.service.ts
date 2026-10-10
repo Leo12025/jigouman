@@ -46,6 +46,16 @@ const MODULES = [
   'user',
   'role',
   'permission',
+  'staff',
+  'venue',
+  'contract',
+  'survey',
+  'alert',
+  'inventory',
+  'cost',
+  'groupbuy',
+  'distribution',
+  'teaching',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
 
