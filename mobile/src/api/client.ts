@@ -12,6 +12,20 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
 export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
 export const getRole = (): Role => (localStorage.getItem(ROLE_KEY) as Role) || 'parent';
 export const setRole = (r: Role) => localStorage.setItem(ROLE_KEY, r);
+
+/** 解码当前 JWT payload（无需后端），用于"我的"页展示账号信息 */
+export function decodeJwt(): Record<string, any> | null {
+  const t = getToken();
+  const seg = t.split('.');
+  if (seg.length !== 3) return null;
+  try {
+    const b64 = seg[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(escape(window.atob(b64)));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 export const setTokens = (accessToken: string, refreshToken?: string) => {
   localStorage.setItem(TOKEN_KEY, accessToken);
   if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
