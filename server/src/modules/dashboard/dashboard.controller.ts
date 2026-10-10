@@ -43,6 +43,13 @@ export class DashboardController {
     return this.svc.listMetricDefs(t, category);
   }
 
+  @Get('screen')
+  @RequirePermissions('dashboard:view')
+  @ApiOperation({ summary: '数据大屏总览(核心KPI+趋势+漏斗+预警)' })
+  screen(@TenantId() t: number) {
+    return this.svc.screenOverview(t);
+  }
+
   @Get(':role')
   @RequirePermissions('dashboard:view')
   @ApiOperation({ summary: '经营/招生/教学看板(role=principal|admission|teaching)' })

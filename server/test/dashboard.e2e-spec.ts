@@ -91,4 +91,19 @@ describe('数据看板 Dashboard (e2e, SQLite)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(400);
   });
+
+  it('GET /api/v1/dashboards/screen 数据大屏总览返回KPI与趋势', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/dashboards/screen')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body.code).toBe(0);
+    const d = res.body.data;
+    expect(d).toHaveProperty('kpis');
+    expect(typeof d.kpis.received).toBe('number');
+    expect(typeof d.kpis.conversionRate).toBe('number');
+    expect(Array.isArray(d.trend)).toBe(true);
+    expect(Array.isArray(d.byChannel)).toBe(true);
+    expect(Array.isArray(d.alerts)).toBe(true);
+  });
 });

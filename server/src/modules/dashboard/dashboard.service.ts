@@ -74,6 +74,40 @@ export class DashboardService {
     return base;
   }
 
+  /** 数据大屏总览：聚合经营/招生/教学核心指标 + 趋势 + 漏斗 + 预警（供独立全屏大屏调用） */
+  async screenOverview(t: number) {
+    const p = await this.byRole(t, 'principal', {});
+    const a = await this.byRole(t, 'admission', {});
+    const te = await this.byRole(t, 'teaching', {});
+    return {
+      kpis: {
+        receivable: this.num(p.revenue?.receivable),
+        received: this.num(p.revenue?.received),
+        refund: this.num(p.revenue?.refundAmount),
+        netCashflow: this.num(p.revenue?.netCashflow),
+        studying: this.num(p.students?.studying),
+        refunded: this.num(p.students?.refunded),
+        consumeRate: this.num(p.hours?.consumeRate),
+        fullRate: this.num(p.classGroups?.fullRate),
+        conversionRate: this.num(a.funnel?.conversionRate),
+        leads: this.num(a.funnel?.total),
+        signed: this.num(a.funnel?.signed),
+        attendanceRate: this.num(te.attendance?.attendanceRate),
+        reviewedRate: this.num(te.homework?.reviewedRate),
+      },
+      trend: p.trend || [],
+      funnel: a.funnel || {},
+      byChannel: a.byChannel || [],
+      classGroups: p.classGroups || {},
+      alerts: te.alerts || [],
+      dynamicMetrics: p.dynamicMetrics || [],
+    };
+  }
+
+  private num(v: any): number {
+    return typeof v === 'number' ? v : Number(v || 0);
+  }
+
   // ---------------- 动态指标配置（§4.10 看板增强） ----------------
   async createMetricDef(t: number, d: any) {
     const m = this.metricRepo.create({ tenantId: t, ...d } as MetricDef);

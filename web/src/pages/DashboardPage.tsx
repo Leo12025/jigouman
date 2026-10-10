@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Tabs, Card, Row, Col, Statistic, Table, Progress, Tag, Alert, Spin } from 'antd';
 import { getDashboard } from '../api/dashboard';
+import { LineChart, BarChart, PieChart } from '../components/Charts';
 
 type Role = 'principal' | 'admission' | 'teaching';
 
@@ -60,7 +61,9 @@ function Principal({ data }: { data: any }) {
         <Col span={6}><Card size="small"><Statistic title="班级满班率" value={pct(c.fullRate)} /></Card></Col>
       </Row>
 
-      <Card title="近 6 月趋势（应收 / 已收 / 消课）" size="small" style={{ marginBottom: 16 }}>
+      <Card title="近 6 月趋势（已收 / 应收）" size="small" style={{ marginBottom: 16 }}>
+        <LineChart data={(data.trend || []).map((t: any) => ({ label: t.month, value: t.received }))} color="#52c41a" />
+        <LineChart data={(data.trend || []).map((t: any) => ({ label: t.month, value: t.receivable }))} color="#1890ff" />
         <Table
           size="small"
           pagination={false}
@@ -76,17 +79,30 @@ function Principal({ data }: { data: any }) {
 
       <Card title="招生漏斗摘要" size="small">
         <Row gutter={16}>
-          <Col span={6}><Statistic title="线索总数" value={f.total ?? 0} /></Col>
-          <Col span={6}><Statistic title="已试听" value={f.trialed ?? 0} /></Col>
-          <Col span={6}><Statistic title="已报名" value={f.signed ?? 0} /></Col>
-          <Col span={6}><Statistic title="转化率" value={pct(f.conversionRate)} /></Col>
+          <Col span={12}>
+            <BarChart data={[
+              { label: '线索', value: f.total ?? 0 },
+              { label: '试听', value: f.trialed ?? 0 },
+              { label: '报名', value: f.signed ?? 0 },
+            ]} color="#1890ff" />
+          </Col>
+          <Col span={12}>
+            <div style={{ paddingTop: 8 }}>
+              <Row gutter={16}>
+                <Col span={6}><Statistic title="线索总数" value={f.total ?? 0} /></Col>
+                <Col span={6}><Statistic title="已试听" value={f.trialed ?? 0} /></Col>
+                <Col span={6}><Statistic title="已报名" value={f.signed ?? 0} /></Col>
+                <Col span={6}><Statistic title="转化率" value={pct(f.conversionRate)} /></Col>
+              </Row>
+              <div style={{ marginTop: 12 }}>
+                <Tag>班级数 {c.count}</Tag>
+                <Tag>总容量 {c.totalCapacity}</Tag>
+                <Tag>在班人数 {c.enrolled}</Tag>
+                <Tag>课时结余 {h.balance}</Tag>
+              </div>
+            </div>
+          </Col>
         </Row>
-        <div style={{ marginTop: 12 }}>
-          <Tag>班级数 {c.count}</Tag>
-          <Tag>总容量 {c.totalCapacity}</Tag>
-          <Tag>在班人数 {c.enrolled}</Tag>
-          <Tag>课时结余 {h.balance}</Tag>
-        </div>
       </Card>
     </>
   );
@@ -110,6 +126,19 @@ function Admission({ data }: { data: any }) {
         message={`超 7 天未跟进线索：${data.pendingFollow} 条`}
         style={{ marginBottom: 16 }}
       />
+
+      <Row gutter={16}>
+        <Col span={12}>
+          <Card title="按渠道(线索数 Top)" size="small" style={{ marginBottom: 16 }}>
+            <BarChart data={(data.byChannel || []).slice(0, 8).map((x: any) => ({ label: x.name, value: x.count }))} color="#722ed1" />
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card title="按活动(线索数 Top)" size="small" style={{ marginBottom: 16 }}>
+            <BarChart data={(data.byCampaign || []).slice(0, 8).map((x: any) => ({ label: x.name, value: x.count }))} color="#fa8c16" />
+          </Card>
+        </Col>
+      </Row>
 
       <Row gutter={16}>
         <Col span={8}>
@@ -160,19 +189,21 @@ function Teaching({ data }: { data: any }) {
   const a = data.attendance || {};
   const hw = data.homework || {};
   const tasks = data.tasks || {};
+  const present = a.present ?? 0;
+  const absent = Math.max(0, (a.total ?? 0) - present);
+  const reviewed = hw.reviewed ?? 0;
+  const unreviewed = Math.max(0, (hw.submitted ?? 0) - reviewed);
   return (
     <>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
-          <Card size="small" title="出勤率">
-            <Progress type="dashboard" percent={Number(((a.attendanceRate || 0) * 100).toFixed(1))} />
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>出勤 {a.present ?? 0} / 记录 {a.total ?? 0}</div>
+          <Card size="small" title="出勤构成">
+            <PieChart data={[{ label: '出勤', value: present }, { label: '缺勤', value: absent }]} />
           </Card>
         </Col>
         <Col span={8}>
-          <Card size="small" title="作业批改率">
-            <Progress type="dashboard" percent={Number(((hw.reviewedRate || 0) * 100).toFixed(1))} />
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>已批改 {hw.reviewed ?? 0} / 提交 {hw.submitted ?? 0}</div>
+          <Card size="small" title="作业批改构成">
+            <PieChart data={[{ label: '已批改', value: reviewed }, { label: '待批改', value: unreviewed }]} />
           </Card>
         </Col>
         <Col span={8}>
