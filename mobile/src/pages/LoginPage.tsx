@@ -27,9 +27,8 @@ export default function LoginPage() {
     if (!/^1\d{10}$/.test(phone)) { Toast.show({ content: '请输入正确的手机号' }); return; }
     setSending(true);
     try {
-      const r = await sendOtp(phone);
-      Toast.show({ content: r.code ? `验证码已发送：${r.code}` : '验证码已发送' });
-      if (r.code) setCode(r.code);
+      await sendOtp(phone);
+      Toast.show({ content: '验证码已发送，请查收短信' });
     } finally { setSending(false); }
   };
 

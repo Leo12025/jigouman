@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Button, Input, Toast, Selector, Form } from 'antd-mobile';
 import { listExams, createScore } from '../../api/staff';
+import { getList } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
 
 const TYPES = [
@@ -20,7 +21,7 @@ export default function ScoresPage() {
   const [comment, setComment] = useState('');
 
   useEffect(() => {
-    listExams().then(setExams).catch(() => setExams([]));
+    getList(listExams()).then(setExams);
   }, []);
 
   const submit = async () => {

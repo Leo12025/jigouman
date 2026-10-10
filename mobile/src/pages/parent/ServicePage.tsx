@@ -9,6 +9,7 @@ import {
   redeemGroupBuy,
   myStudents,
 } from '../../api/parent';
+import { getList } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
 
 /** 家长端：转介绍 / 客诉售后 / 合同查看 / 团购核销（§4.28/§4.26/§4.23/§4.24） */
@@ -37,7 +38,7 @@ function ReferralTab() {
   const [invite, setInvite] = useState('');
 
   const loadComm = (id: number) =>
-    listCommissions(id).then(setComm).catch(() => setComm([]));
+    getList(listCommissions(id)).then(setComm);
 
   useEffect(() => { if (distId) loadComm(distId); }, [distId]);
 
@@ -111,7 +112,7 @@ function ContractTab() {
   const [students, setStudents] = useState<any[]>([]);
   const [stuId, setStuId] = useState<number>();
   const [rows, setRows] = useState<any[]>([]);
-  useEffect(() => { myStudents().then(setStudents).catch(() => setStudents([])); }, []);
+  useEffect(() => { getList(myStudents()).then(setStudents); }, []);
   const onView = () => {
     if (!stuId) return Toast.show({ content: '请选择学员' });
     listContracts({ studentId: stuId }).then((r) => setRows(r.list || [])).catch(() => setRows([]));

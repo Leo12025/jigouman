@@ -1,29 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, Button, Toast, Dialog, Input, Form, List } from 'antd-mobile';
 import { myStudents, bindStudent, unbindStudent } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
+import { useApi } from '../../hooks/useApi';
+import StateView from '../../components/StateView';
 
 /** 我的学员（多对多绑定，§6.23） */
 export default function StudentsPage() {
-  const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [studentId, setStudentId] = useState('');
   const [parentName, setParentName] = useState('');
   const [relation, setRelation] = useState('');
-
-  const load = async () => {
-    try {
-      setRows(await myStudents());
-    } catch { setRows([]); }
-  };
-  useEffect(() => { load(); }, []);
+  const { data, loading, error, reload } = useApi(() => myStudents());
+  const rows: any[] = data || [];
 
   const onBind = async () => {
     if (!studentId) { Toast.show({ content: '请输入学员ID' }); return; }
     await bindStudent({ studentId: Number(studentId), parentName: parentName || undefined, relation: relation || undefined });
     Toast.show({ content: '绑定成功' });
     setOpen(false); setStudentId(''); setParentName(''); setRelation('');
-    load();
+    reload();
   };
 
   const onUnbind = async (id: number) => {
@@ -31,24 +27,26 @@ export default function StudentsPage() {
     if (!ok) return;
     await unbindStudent(id);
     Toast.show({ content: '已解绑' });
-    load();
+    reload();
   };
 
   return (
     <div className="page">
       <div className="page-title">我的学员</div>
       <div style={{ padding: 12 }}>
-        {rows.length ? rows.map((s) => (
-          <Card key={s.bindId} style={{ marginBottom: 10 }}>
-            <List>
-              <List.Item extra={s.relation || '-'}>{s.studentName}（ID:{s.studentId}）</List.Item>
-              <List.Item extra={s.isMain ? '主联系人' : '非主'}>关系</List.Item>
-            </List>
-            <Button size="mini" fill="none" color="danger" onClick={() => onUnbind(s.bindId)}>解绑</Button>
-          </Card>
-        )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无绑定学员，请先绑定</div></Card>}
+        <StateView loading={loading} error={error} onRetry={reload}>
+          {rows.length ? rows.map((s) => (
+            <Card key={s.bindId} style={{ marginBottom: 10 }}>
+              <List>
+                <List.Item extra={s.relation || '-'}>{s.studentName}（ID:{s.studentId}）</List.Item>
+                <List.Item extra={s.isMain ? '主联系人' : '非主'}>关系</List.Item>
+              </List>
+              <Button size="mini" fill="none" color="danger" onClick={() => onUnbind(s.bindId)}>解绑</Button>
+            </Card>
+          )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无绑定学员，请先绑定</div></Card>}
 
-        <Button block color="primary" onClick={() => setOpen(true)} style={{ marginTop: 8 }}>绑定学员</Button>
+          <Button block color="primary" onClick={() => setOpen(true)} style={{ marginTop: 8 }}>绑定学员</Button>
+        </StateView>
       </div>
 
       {open && (

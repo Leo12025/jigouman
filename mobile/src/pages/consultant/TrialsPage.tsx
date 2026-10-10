@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, List, Button, Input, Toast, Form } from 'antd-mobile';
 import { listTrials, createTrial } from '../../api/staff';
+import { getList } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
 
 /** 顾问端试听排期（§11.6） */
@@ -10,7 +11,7 @@ export default function TrialsPage() {
   const [rows, setRows] = useState<any[]>([]);
 
   const loadTrials = async (id: number) => {
-    const t = await listTrials(id).catch(() => []);
+    const t = await getList(listTrials(id));
     setRows(t);
   };
 

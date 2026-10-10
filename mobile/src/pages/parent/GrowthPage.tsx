@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, List, Tag, Selector } from 'antd-mobile';
 import { myStudents, myGrowth } from '../../api/parent';
+import { getList } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
 
 const TYPE_LABEL: Record<string, { text: string; color: string }> = {
@@ -17,15 +18,15 @@ export default function GrowthPage() {
   const [rows, setRows] = useState<any[]>([]);
 
   useEffect(() => {
-    myStudents().then((s) => {
+    getList(myStudents()).then((s) => {
       setStudents(s);
       if (s.length) setStudentId(Number(s[0].studentId));
-    }).catch(() => setStudents([]));
+    });
   }, []);
 
   useEffect(() => {
     if (!studentId) return;
-    myGrowth(studentId).then(setRows).catch(() => setRows([]));
+    getList(myGrowth(studentId)).then(setRows);
   }, [studentId]);
 
   return (

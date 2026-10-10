@@ -1,28 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, List, Button, Tag, Toast, Dialog, Selector } from 'antd-mobile';
 import { listLessons, classGroupStudents, attendLesson } from '../../api/staff';
+import { getList } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
+import { useApi } from '../../hooks/useApi';
+import StateView from '../../components/StateView';
 
 /** 老师端班级课表 + 点名消课（§11.6） */
 export default function LessonsPage() {
-  const [rows, setRows] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [statusMap, setStatusMap] = useState<Record<number, string>>({});
   const [current, setCurrent] = useState<any>(null);
-
-  const load = () => listLessons({ page: 1, size: 50 })
-    .then((r) => setRows(r.list || r)).catch(() => Toast.show({ content: '加载课表失败' }));
-  useEffect(() => { load(); }, []);
+  const { data, loading, error, reload } = useApi(
+    () => listLessons({ page: 1, size: 50 }),
+  );
+  const rows: any[] = data || [];
 
   const openAttend = async (l: any) => {
     setCurrent(l);
     setStatusMap({});
     if (l.classGroupId) {
-      try {
-        const s = await classGroupStudents(l.classGroupId);
-        setStudents(s);
-        setStatusMap(Object.fromEntries(s.map((x: any) => [Number(x.id), 'PRESENT'])));
-      } catch { setStudents([]); }
+      const s = await getList(classGroupStudents(l.classGroupId));
+      setStudents(s);
+      setStatusMap(Object.fromEntries(s.map((x: any) => [Number(x.id), 'PRESENT'])));
     } else setStudents([]);
   };
 
@@ -33,7 +33,7 @@ export default function LessonsPage() {
     await attendLesson(current.id, students.map((s) => ({ studentId: Number(s.id), status: statusMap[Number(s.id)] || 'PRESENT' })));
     Toast.show({ content: '点名完成' });
     setCurrent(null);
-    load();
+    reload();
   };
 
   const OPTIONS = [
@@ -47,17 +47,19 @@ export default function LessonsPage() {
     <div className="page">
       <div className="page-title">班级课表</div>
       <div style={{ padding: 12 }}>
-        {rows.length ? rows.map((l) => (
-          <Card key={l.id} style={{ marginBottom: 10 }}>
-            <List>
-              <List.Item extra={l.type === 'MAKEUP' ? <Tag color="warning">补课</Tag> : <Tag color="primary">{l.status}</Tag>}>
-                {l.startTime ? new Date(l.startTime).toLocaleString() : '-'}
-              </List.Item>
-              <List.Item extra={`班级 ${l.classGroupId ?? '-'}`}>课程 {l.courseId ?? '-'}</List.Item>
-            </List>
-            <Button size="mini" color="primary" onClick={() => openAttend(l)}>点名消课</Button>
-          </Card>
-        )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无课次</div></Card>}
+        <StateView loading={loading} error={error} onRetry={reload}>
+          {rows.length ? rows.map((l) => (
+            <Card key={l.id} style={{ marginBottom: 10 }}>
+              <List>
+                <List.Item extra={l.type === 'MAKEUP' ? <Tag color="warning">补课</Tag> : <Tag color="primary">{l.status}</Tag>}>
+                  {l.startTime ? new Date(l.startTime).toLocaleString() : '-'}
+                </List.Item>
+                <List.Item extra={`班级 ${l.classGroupId ?? '-'}`}>课程 {l.courseId ?? '-'}</List.Item>
+              </List>
+              <Button size="mini" color="primary" onClick={() => openAttend(l)}>点名消课</Button>
+            </Card>
+          )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无课次</div></Card>}
+        </StateView>
 
         {current && (
           <Card style={{ marginTop: 12 }}>

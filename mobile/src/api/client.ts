@@ -48,15 +48,69 @@ function redirectToLogin() {
 
 http.interceptors.response.use(
   (res) => res,
-  (error: AxiosError<ApiBody<unknown>>) => {
+  async (error: AxiosError<ApiBody<unknown>>) => {
+    const original = error.config as (typeof error.config & { _retried?: boolean }) | undefined;
     const status = error.response?.status;
-    // 家长端刷新令牌走 /parents/login 重新 OTP 登录，401 直接回登录页
-    if (status === 401) redirectToLogin();
+    // 401：先用 refreshToken 续期并重放一次原请求；失败才回登录页
+    if (status === 401 && original && !original._retried) {
+      original._retried = true;
+      try {
+        const newToken = await doRefresh();
+        if (newToken) {
+          original.headers = original.headers || ({} as any);
+          (original.headers as any).Authorization = `Bearer ${newToken}`;
+          return http.request(original);
+        }
+      } catch {
+        /* 续期失败，走下方登出 */
+      }
+      clearToken();
+      redirectToLogin();
+    }
     const body = error.response?.data;
     Toast.show({ content: body?.message || error.message || '网络异常' });
     return Promise.reject(error);
   },
 );
+
+/** 刷新访问令牌（家长/员工令牌均 type=refresh，统一走 /auth/refresh；并发只触发一次） */
+let refreshing: Promise<string | null> | null = null;
+async function doRefresh(): Promise<string | null> {
+  const rt = getRefreshToken();
+  if (!rt) return null;
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const res = await axios.post<ApiBody<{ accessToken: string; refreshToken?: string }>>(
+        `${BASE}/auth/refresh`,
+        { refreshToken: rt },
+      );
+      const data = res.data?.data;
+      if (data?.accessToken) {
+        setTokens(data.accessToken, data.refreshToken);
+        return data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
+/**
+ * 列表接口安全解包：无论后端返回数组 / {list:[...]} / {rows:[...]} / null，
+ * 统一返回数组，避免 setX(null) 后在渲染期 .map 崩溃白屏。
+ */
+export async function getList<T = any>(p: Promise<any>): Promise<T[]> {
+  const r = await p.catch(() => null);
+  if (Array.isArray(r)) return r as T[];
+  if (r && Array.isArray((r as any).list)) return (r as any).list as T[];
+  if (r && Array.isArray((r as any).rows)) return (r as any).rows as T[];
+  return [] as T[];
+}
 
 async function unwrap<T>(p: Promise<{ data: ApiBody<T> }>): Promise<T> {
   const res = await p;

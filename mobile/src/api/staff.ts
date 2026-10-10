@@ -14,7 +14,6 @@ export const completeTask = (id: number) => apiPut(`/tasks/${id}/complete`);
 
 /** 班级课表 */
 export const listLessons = (params?: any) => apiGet<any>('/courses/lessons/list', params);
-export const listClassGroups = (params?: any) => apiGet<any>('/courses/class-groups/list', params);
 /** 班级在读学员（点名用） */
 export const classGroupStudents = (id: number) => apiGet<any[]>(`/students/by-class-group/${id}`);
 /** 点名消课 */
@@ -39,7 +38,6 @@ export const listLeads = (params?: any) => apiGet<any>('/leads', params);
 export const followLead = (id: number, d: any) => apiPost<any>(`/leads/${id}/follow`, d);
 export const listTrials = (id: number) => apiGet<any[]>(`/leads/${id}/trials`);
 export const createTrial = (id: number, d: any) => apiPost<any>(`/leads/${id}/trials`, d);
-export const convertLead = (id: number, d?: any) => apiPost<any>(`/leads/${id}/convert`, d);
 export const getFunnel = () => apiGet<any>('/leads/funnel');
 
 // ---------- 老师考勤打卡（§11.6） ----------

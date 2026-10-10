@@ -1,19 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, List, Button, Tag, Toast, Modal, Input, TextArea } from 'antd-mobile';
 import { listHomeworks, getHomework, reviewHomework } from '../../api/staff';
 import BottomTab from '../../components/BottomTab';
+import { useApi } from '../../hooks/useApi';
+import StateView from '../../components/StateView';
 
 /** 老师端作业批改（§11.6） */
 export default function HomeworkPage() {
-  const [rows, setRows] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
   const [target, setTarget] = useState<any>(null);
   const [score, setScore] = useState('');
   const [comment, setComment] = useState('');
-
-  const load = () => listHomeworks({ page: 1, size: 50 })
-    .then((r) => setRows(r.list || r)).catch(() => Toast.show({ content: '加载作业失败' }));
-  useEffect(() => { load(); }, []);
+  const { data, loading, error, reload } = useApi(
+    () => listHomeworks({ page: 1, size: 50 }),
+  );
+  const rows: any[] = data || [];
 
   const openDetail = async (id: number) => {
     const d = await getHomework(id);
@@ -29,24 +30,26 @@ export default function HomeworkPage() {
     Toast.show({ content: '批改完成' });
     setTarget(null); setScore(''); setComment('');
     if (detail) setDetail(await getHomework(detail.id));
-    load();
+    reload();
   };
 
   return (
     <div className="page">
       <div className="page-title">作业批改</div>
       <div style={{ padding: 12 }}>
-        {rows.length ? rows.map((h) => (
-          <Card key={h.id} style={{ marginBottom: 10 }}>
-            <List>
-              <List.Item>{h.title}</List.Item>
-              <List.Item extra={`班级 ${h.classGroupId ?? '-'}`}>
-                {h.deadline ? new Date(h.deadline).toLocaleDateString() : '不限截止'}
-              </List.Item>
-            </List>
-            <Button size="mini" color="primary" onClick={() => openDetail(h.id)}>查看提交</Button>
-          </Card>
-        )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无作业</div></Card>}
+        <StateView loading={loading} error={error} onRetry={reload}>
+          {rows.length ? rows.map((h) => (
+            <Card key={h.id} style={{ marginBottom: 10 }}>
+              <List>
+                <List.Item>{h.title}</List.Item>
+                <List.Item extra={`班级 ${h.classGroupId ?? '-'}`}>
+                  {h.deadline ? new Date(h.deadline).toLocaleDateString() : '不限截止'}
+                </List.Item>
+              </List>
+              <Button size="mini" color="primary" onClick={() => openDetail(h.id)}>查看提交</Button>
+            </Card>
+          )) : <Card><div style={{ padding: 12, color: '#999' }}>暂无作业</div></Card>}
+        </StateView>
 
         {detail && (
           <Card style={{ marginTop: 12 }}>
