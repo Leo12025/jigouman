@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { MetricDef } from './entities/metric-def.entity';
 import { Lead, LeadStage } from '../lead/entities/lead.entity';
 import { Student, StudentStatus } from '../student/entities/student.entity';
 import { StudentCourse } from '../student/entities/student-course.entity';
@@ -14,6 +15,9 @@ import { HomeworkSubmit } from '../homework/entities/homework-submit.entity';
 import { HomeworkReview } from '../homework/entities/homework-review.entity';
 import { Task, TaskStatus } from '../task/entities/task.entity';
 import { CourseReview } from '../family/entities/course-review.entity';
+import { Organization } from '../org/entities/organization.entity';
+import { CostRecord } from '../cost/entities/cost-record.entity';
+import { Material } from '../inventory/entities/material.entity';
 import { Channel } from '../lead/entities/channel.entity';
 import { Campaign } from '../lead/entities/campaign.entity';
 import { DashboardRole, DASHBOARD_ROLES } from './dto/dashboard.dto';
@@ -41,6 +45,10 @@ export class DashboardService {
     @InjectRepository(CourseReview) private reviewRepo: Repository<CourseReview>,
     @InjectRepository(Channel) private channelRepo: Repository<Channel>,
     @InjectRepository(Campaign) private campaignRepo: Repository<Campaign>,
+    @InjectRepository(MetricDef) private metricRepo: Repository<MetricDef>,
+    @InjectRepository(Organization) private orgRepo: Repository<Organization>,
+    @InjectRepository(CostRecord) private costRepo: Repository<CostRecord>,
+    @InjectRepository(Material) private materialRepo: Repository<Material>,
   ) {}
 
   async byRole(t: number, role: string, q: any) {
@@ -48,16 +56,159 @@ export class DashboardService {
       throw new BadRequestException(`role 必须为 ${DASHBOARD_ROLES.join(' | ')}`);
     }
     const months = Number(q?.months) || 6;
+    let base: any;
     switch (role) {
       case 'principal':
-        return this.principal(t, q, months);
+        base = await this.principal(t, q, months);
+        break;
       case 'admission':
-        return this.admission(t, q);
+        base = await this.admission(t, q);
+        break;
       case 'teaching':
-        return this.teaching(t);
+        base = await this.teaching(t);
+        break;
       default:
         throw new BadRequestException('unknown role');
     }
+    base.dynamicMetrics = await this.dynamicMetricsFor(t, role);
+    return base;
+  }
+
+  // ---------------- 动态指标配置（§4.10 看板增强） ----------------
+  async createMetricDef(t: number, d: any) {
+    const m = this.metricRepo.create({ tenantId: t, ...d } as MetricDef);
+    return this.metricRepo.save(m as any);
+  }
+
+  async listMetricDefs(t: number, category?: string) {
+    const where: any = { tenantId: t };
+    if (category) where.category = category;
+    const list = await this.metricRepo.find({ where, order: { sort: 'ASC', id: 'ASC' } as any });
+    return { list };
+  }
+
+  async updateMetricDef(t: number, id: number, d: any) {
+    const m = await this.metricRepo.findOne({ where: { tenantId: t, id } as any });
+    if (!m) throw new NotFoundException('指标定义不存在');
+    Object.assign(m, d);
+    return this.metricRepo.save(m as any);
+  }
+
+  async removeMetricDef(t: number, id: number) {
+    const m = await this.metricRepo.findOne({ where: { tenantId: t, id } as any });
+    if (!m) throw new NotFoundException('指标定义不存在');
+    await this.metricRepo.delete({ tenantId: t, id } as any);
+    return { id };
+  }
+
+  /** 按角色分类（含 common）取已启用指标，并计算当前值 */
+  private async dynamicMetricsFor(t: number, role: DashboardRole) {
+    const defs = await this.metricRepo.find({
+      where: { tenantId: t, enabled: true, category: (role as any) } as any,
+    });
+    const out: any[] = [];
+    for (const def of defs) {
+      const value = await this.computeMetric(def.code, t);
+      out.push({ code: def.code, name: def.name, unit: def.unit || '', value });
+    }
+    return out;
+  }
+
+  /** 内置指标注册表：code -> 计算函数（复用已注入仓储，规避 SQL 方言差异） */
+  private async computeMetric(code: string, t: number): Promise<number | null> {
+    switch (code) {
+      case 'REVENUE_RECEIVED':
+        return this.sum(
+          (await this.orderRepo.find({ where: { tenantId: t } })).filter(
+            (o) => o.status === OrderStatus.PAID || o.status === OrderStatus.COMPLETED,
+          ),
+          'paidAmount',
+        );
+      case 'REVENUE_RECEIVABLE':
+        return this.sum(await this.orderRepo.find({ where: { tenantId: t } }), 'payableAmount');
+      case 'REFUND_AMOUNT':
+        return this.sum(
+          (await this.orderRepo.find({ where: { tenantId: t } })).filter(
+            (o) => o.status === OrderStatus.REFUNDED,
+          ),
+          'payableAmount',
+        );
+      case 'TOTAL_STUDENTS':
+        return (await this.studentRepo.find({ where: { tenantId: t } })).length;
+      case 'STUDYING_STUDENTS':
+        return (await this.studentRepo.find({ where: { tenantId: t } })).filter(
+          (s) => s.status === StudentStatus.STUDYING,
+        ).length;
+      case 'REFUNDED_STUDENTS':
+        return (await this.studentRepo.find({ where: { tenantId: t } })).filter(
+          (s) => s.status === StudentStatus.REFUNDED,
+        ).length;
+      case 'CONSUME_RATE': {
+        const hc = await this.hcRepo.find({ where: { tenantId: t } });
+        const granted = this.sum(hc.filter((h) => h.type === 'GRANT'), 'hours');
+        const consumed = -this.sum(hc.filter((h) => h.type === 'CONSUME'), 'hours');
+        return granted ? Number((consumed / granted).toFixed(4)) : 0;
+      }
+      case 'FULL_RATE': {
+        const cgs = await this.cgRepo.find({ where: { tenantId: t } });
+        const enrolled = (await this.scRepo.find({ where: { tenantId: t } })).filter(
+          (s) => s.status === 'ACTIVE',
+        ).length;
+        const cap = this.sum(cgs, 'capacity');
+        return cap ? Number((enrolled / cap).toFixed(4)) : 0;
+      }
+      case 'ATTENDANCE_RATE': {
+        const att = await this.attRepo.find({ where: { tenantId: t } });
+        if (!att.length) return 0;
+        const present = att.filter((a) => a.status === 'PRESENT').length;
+        return Number((present / att.length).toFixed(4));
+      }
+      case 'TRIAL_CONVERSION': {
+        const leads = await this.leadRepo.find({ where: { tenantId: t } });
+        if (!leads.length) return 0;
+        const signed = leads.filter((l) => l.stage === LeadStage.SIGNED).length;
+        return Number((signed / leads.length).toFixed(4));
+      }
+      case 'TOTAL_LEADS':
+        return (await this.leadRepo.find({ where: { tenantId: t } })).length;
+      case 'PENDING_HOMEWORK':
+        return (await this.hsRepo.find({ where: { tenantId: t } })).filter(
+          (s) => s.status === 'SUBMITTED',
+        ).length;
+      case 'PENDING_REVIEW':
+        return (await this.taskRepo.find({ where: { tenantId: t } })).filter(
+          (x) => x.status === TaskStatus.TODO,
+        ).length;
+      case 'PENDING_COURSE_REVIEW':
+        return (await this.taskRepo.find({ where: { tenantId: t } })).filter(
+          (x) => x.status === TaskStatus.TODO && x.type === 'AFTER_CLASS_REVIEW',
+        ).length;
+      default:
+        return null;
+    }
+  }
+
+  /** 导出全部内置指标当前值快照（供预警规则评估联动，§4.10/§6.7） */
+  async snapshotMetrics(t: number): Promise<Record<string, number>> {
+    const codes = [
+      'REVENUE_RECEIVED',
+      'REVENUE_RECEIVABLE',
+      'REFUND_AMOUNT',
+      'TOTAL_STUDENTS',
+      'STUDYING_STUDENTS',
+      'REFUNDED_STUDENTS',
+      'CONSUME_RATE',
+      'FULL_RATE',
+      'ATTENDANCE_RATE',
+      'TRIAL_CONVERSION',
+      'TOTAL_LEADS',
+      'PENDING_HOMEWORK',
+      'PENDING_REVIEW',
+      'PENDING_COURSE_REVIEW',
+    ];
+    const out: Record<string, number> = {};
+    for (const c of codes) out[c] = (await this.computeMetric(c, t)) ?? 0;
+    return out;
   }
 
   // ---------------- 经营看板（校长视角） ----------------
@@ -209,6 +360,110 @@ export class DashboardService {
         { code: 'PENDING_TASK', label: '待办任务总数', value: pendingReview },
       ],
     };
+  }
+
+  // ---------------- 多校区汇总对标（§4.11 / §10 M8 多校区） ----------------
+  async campusBenchmark(t: number) {
+    const orgs = await this.orgRepo.find({ where: { tenantId: t } as any });
+    const costs = await this.costRepo.find({ where: { tenantId: t } as any });
+    const materials = await this.materialRepo.find({ where: { tenantId: t } as any });
+
+    const campuses = orgs
+      .filter((o) => o.type === 'CAMPUS' || o.type === 'BRANCH')
+      .map((o) => {
+        const orgCosts = costs.filter((c) => c.orgId === o.id);
+        const orgMat = materials.filter((m) => m.orgId === o.id);
+        const costTotal = this.sum(orgCosts, 'amount');
+        const stockValue = orgMat.reduce(
+          (a, m) => a + (Number(m.stockQty) || 0) * (Number(m.price) || 0),
+          0,
+        );
+        return {
+          id: o.id,
+          name: o.name,
+          type: o.type,
+          costTotal: Number(costTotal.toFixed(2)),
+          materialCount: orgMat.length,
+          stockValue: Number(stockValue.toFixed(2)),
+        };
+      });
+
+    const allCost = this.sum(costs, 'amount');
+    const ranked = [...campuses].sort((a, b) => b.costTotal - a.costTotal);
+    return {
+      campuses,
+      totalCost: Number(allCost.toFixed(2)),
+      campusCount: campuses.length,
+      compare: {
+        highestCost: ranked[0] || null,
+        lowestCost: ranked[ranked.length - 1] || null,
+        avgCost: campuses.length
+          ? Number((allCost / campuses.length).toFixed(2))
+          : 0,
+      },
+    };
+  }
+
+  // ---------------- 自定义报表（§4.10 报表增强） ----------------
+  async customReport(t: number, d: any) {
+    const allowedDim: any = { order: ['status', 'month'], lead: ['channel', 'campaign', 'stage'] };
+    const allowedMet: any = {
+      order: ['orderCount', 'receivable', 'received', 'refundAmount', 'studentCount'],
+      lead: ['leadCount', 'trial', 'signed'],
+    };
+    if (!allowedDim[d.source]) throw new BadRequestException('source 必须为 order | lead');
+    for (const dim of d.dimensions || [])
+      if (!allowedDim[d.source].includes(dim)) throw new BadRequestException(`不支持维度 ${dim}`);
+    for (const met of d.metrics || [])
+      if (!allowedMet[d.source].includes(met)) throw new BadRequestException(`不支持指标 ${met}`);
+
+    const rows = d.source === 'order'
+      ? await this.orderRepo.find({ where: { tenantId: t } })
+      : await this.leadRepo.find({ where: { tenantId: t } });
+    const filtered = this.filterByDate(rows as any, d.start, d.end);
+
+    const map = new Map<string, any>();
+    for (const r of filtered) {
+      const dimVals: any = {};
+      for (const dim of d.dimensions) dimVals[dim] = this.dimValue(d.source, dim, r);
+      const key = d.dimensions.map((dm: string) => String(dimVals[dm])).join('|');
+      if (!map.has(key)) {
+        map.set(key, { key, dims: dimVals, _students: new Set<number>() });
+      }
+      const agg = map.get(key)!;
+      agg._students.add((r as any).studentId);
+      agg.orderCount = (agg.orderCount || 0) + 1;
+      agg.leadCount = (agg.leadCount || 0) + 1;
+      agg.receivable = (agg.receivable || 0) + Number((r as any).payableAmount || 0);
+      agg.received = (agg.received || 0) + (d.source === 'order' && ((r as any).status === OrderStatus.PAID || (r as any).status === OrderStatus.COMPLETED) ? Number((r as any).paidAmount || 0) : 0);
+      agg.refundAmount = (agg.refundAmount || 0) + (d.source === 'order' && (r as any).status === OrderStatus.REFUNDED ? Number((r as any).payableAmount || 0) : 0);
+      agg.trial = (agg.trial || 0) + (d.source === 'lead' && (r as any).stage === LeadStage.TRIALED ? 1 : 0);
+      agg.signed = (agg.signed || 0) + (d.source === 'lead' && (r as any).stage === LeadStage.SIGNED ? 1 : 0);
+    }
+
+    const out = [...map.values()]
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map((a) => {
+        const row: any = { key: a.key };
+        for (const dm of d.dimensions) row[dm] = a.dims[dm];
+        for (const met of d.metrics) {
+          if (met === 'studentCount') row[met] = a._students.size;
+          else row[met] = Number((a[met] || 0).toFixed ? (a[met] || 0) : 0);
+        }
+        return row;
+      });
+    return { source: d.source, dimensions: d.dimensions, metrics: d.metrics, rows: out };
+  }
+
+  private dimValue(source: string, dim: string, r: any): string {
+    if (dim === 'month') {
+      if (!r.createdAt) return 'unknown';
+      const d = new Date(r.createdAt);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    if (source === 'lead' && dim === 'channel') return `channel:${r.channelId ?? 'null'}`;
+    if (source === 'lead' && dim === 'campaign') return `campaign:${r.campaignId ?? 'null'}`;
+    return String(r[dim] ?? 'null');
   }
 
   // ---------------- 聚合辅助 ----------------

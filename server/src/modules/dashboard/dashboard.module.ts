@@ -17,6 +17,10 @@ import { HomeworkSubmit } from '../homework/entities/homework-submit.entity';
 import { HomeworkReview } from '../homework/entities/homework-review.entity';
 import { Task } from '../task/entities/task.entity';
 import { CourseReview } from '../family/entities/course-review.entity';
+import { MetricDef } from './entities/metric-def.entity';
+import { Organization } from '../org/entities/organization.entity';
+import { CostRecord } from '../cost/entities/cost-record.entity';
+import { Material } from '../inventory/entities/material.entity';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { CourseReview } from '../family/entities/course-review.entity';
       HomeworkReview,
       Task,
       CourseReview,
+      MetricDef,
+      Organization,
+      CostRecord,
+      Material,
     ]),
   ],
   controllers: [DashboardController],

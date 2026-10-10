@@ -35,4 +35,9 @@ export class AlertController {
   @RequirePermissions('alert:view')
   @ApiOperation({ summary: '传入指标值，返回触发的规则' })
   check(@TenantId() t: number, @Body() d: CheckAlertDto) { return this.svc.check(t, d.metrics); }
+
+  @Post('evaluate')
+  @RequirePermissions('alert:update')
+  @ApiOperation({ summary: '取看板当前指标快照评估全部规则，命中即推送通知给接收人' })
+  evaluate(@TenantId() t: number) { return this.svc.evaluate(t); }
 }

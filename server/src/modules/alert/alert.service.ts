@@ -3,10 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AlertRule } from './entities/alert-rule.entity';
 import { CreateAlertRuleDto, UpdateAlertRuleDto, CheckAlertDto, AlertPageQueryDto } from './dto/alert.dto';
+import { DashboardService } from '../dashboard/dashboard.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class AlertService {
-  constructor(@InjectRepository(AlertRule) private readonly repo: Repository<AlertRule>) {}
+  constructor(
+    @InjectRepository(AlertRule) private readonly repo: Repository<AlertRule>,
+    private readonly dashboard: DashboardService,
+    private readonly notification: NotificationService,
+  ) {}
 
   async createRule(tenantId: number, d: CreateAlertRuleDto) {
     const r = this.repo.create({ tenantId, ...(d as any) } as AlertRule);
@@ -52,5 +58,44 @@ export class AlertService {
       }
     }).map((r) => ({ rule: r, value: metrics[r.metric] }));
     return { triggered };
+  }
+
+  /**
+   * 评估全部启用规则：取看板当前指标快照 → 命中规则 → 向接收人推送站内通知(并触发外部渠道)。
+   * 供定时任务/手动触发调用（§4.10 预警联动 §6.7）。
+   */
+  async evaluate(tenantId: number) {
+    const metrics = await this.dashboard.snapshotMetrics(tenantId);
+    const { triggered } = await this.check(tenantId, metrics);
+    const notified: any[] = [];
+    for (const { rule, value } of triggered) {
+      const receivers: number[] = (rule.receivers || []).filter(
+        (x: any) => x != null,
+      );
+      if (!receivers.length) continue;
+      for (const uid of receivers) {
+        const n = await this.notification.create(tenantId, {
+          userId: uid,
+          type: 'ALERT',
+          title: `预警触发：${rule.name}`,
+          content: `指标 ${rule.metric} 当前值 ${value} 触发阈值 ${rule.operator} ${rule.threshold}`,
+          refType: 'alert_rule',
+          refId: rule.id,
+        });
+        notified.push({ userId: uid, ruleId: rule.id, notificationId: (n as any).id });
+      }
+    }
+    return {
+      metrics,
+      triggeredCount: triggered.length,
+      triggered: triggered.map((x) => ({
+        id: x.rule.id,
+        name: x.rule.name,
+        metric: x.rule.metric,
+        value: x.value,
+        channel: x.rule.channel,
+      })),
+      notified,
+    };
   }
 }
