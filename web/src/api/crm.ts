@@ -400,3 +400,13 @@ export const recordStudy = (d: any) => apiPost<any>('/teaching/study', d);
 export const listStudy = (classId: number) => apiGet<any[]>('/teaching/study', { classId });
 export const studyStats = (classId: number) => apiGet<any>(`/teaching/study/stats/${classId}`);
 
+// ---------- 看板增强 (§4.10) ----------
+export const listMetricDefs = (category?: string) =>
+  apiGet<{ list: any[] }>('/dashboards/metrics' + (category ? `?category=${category}` : ''));
+export const createMetricDef = (d: any) => apiPost<any>('/dashboards/metrics', d);
+export const updateMetricDef = (id: number, d: any) => apiPut<any>(`/dashboards/metrics/${id}`, d);
+export const removeMetricDef = (id: number) => apiDelete(`/dashboards/metrics/${id}`);
+export const getBenchmark = () => apiGet<any>('/dashboards/benchmark');
+export const customReport = (d: any) => apiPost<any>('/dashboards/report', d);
+export const evaluateAlerts = () => apiPost<any>('/alert-rules/evaluate');
+

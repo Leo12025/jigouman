@@ -44,7 +44,7 @@ export default function TeachingPage() {
       <Space>
         <Button type="link" size="small" disabled={r.status !== 'SCHEDULED'} onClick={async () => { await startClass(r.id); message.success('已开始'); loadClasses(); }}>开始</Button>
         <Button type="link" size="small" disabled={r.status !== 'LIVE'} onClick={async () => { await endClass(r.id); message.success('已结束'); loadClasses(); }}>结束</Button>
-        <Button type="link" size="small" onClick={() => { setStudyClassId(r.id); setStudyForm.resetFields(); studyForm.setFieldsValue({ classId: r.id, status: 'PRESENT', durationSec: 0 }); setStudyOpen(true); if (studyClassId !== r.id) loadStudy(r.id); }}>督学打卡</Button>
+        <Button type="link" size="small" onClick={() => { setStudyClassId(r.id); studyForm.resetFields(); studyForm.setFieldsValue({ classId: r.id, status: 'PRESENT', durationSec: 0 }); setStudyOpen(true); if (studyClassId !== r.id) loadStudy(r.id); }}>督学打卡</Button>
         <Popconfirm title="删除?" okText="删除" cancelText="取消" onConfirm={async () => { await deleteClass(r.id); message.success('已删除'); loadClasses(); }}><Button type="link" danger size="small">删除</Button></Popconfirm>
       </Space>
     ) },

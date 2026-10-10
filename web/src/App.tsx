@@ -39,6 +39,7 @@ import InventoryCostPage from './pages/InventoryCostPage';
 import GroupBuyPage from './pages/GroupBuyPage';
 import DistributionPage from './pages/DistributionPage';
 import TeachingPage from './pages/TeachingPage';
+import ReportPage from './pages/ReportPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   return getToken() ? children : <Navigate to="/login" replace />;
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="group-buy" element={<GroupBuyPage />} />
         <Route path="distribution" element={<DistributionPage />} />
         <Route path="teaching" element={<TeachingPage />} />
+        <Route path="reports" element={<ReportPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

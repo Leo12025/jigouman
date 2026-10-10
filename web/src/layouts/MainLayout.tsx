@@ -133,6 +133,7 @@ export default function MainLayout() {
         { key: '/roles', icon: <SafetyCertificateOutlined />, label: '角色权限' },
         { key: '/approval-flows', icon: <AuditOutlined />, label: '审批流配置' },
         { key: '/notify-channels', icon: <ApiOutlined />, label: '消息渠道配置' },
+        { key: '/reports', icon: <BarChartOutlined />, label: '看板配置/报表' },
       ],
     },
   ];

@@ -50,7 +50,7 @@ export default function GroupBuyPage() {
     { title: '备注', dataIndex: 'remark', render: (v: string) => v || '-' },
     { title: '操作', width: 220, render: (_: any, r: any) => (
       <Space>
-        <Button type="link" size="small" onClick={() => { setOpenTeamAct(true); setTeamActId(r.id); setTeamForm.resetFields(); loadTeams(r.id); }}>开团</Button>
+        <Button type="link" size="small" onClick={() => { setOpenTeamAct(true); setTeamActId(r.id); teamForm.resetFields(); loadTeams(r.id); }}>开团</Button>
         <Button type="link" size="small" onClick={() => { setJoinOpen(true); setJoinActId(r.id); joinForm.resetFields(); }}>参团</Button>
         <Button type="link" size="small" onClick={() => { setEditing(r); actForm.resetFields(); actForm.setFieldsValue(r); setActOpen(true); }}>编辑</Button>
         <Popconfirm title="删除?" okText="删除" cancelText="取消" onConfirm={async () => { await deleteGroupBuyActivity(r.id); message.success('已删除'); loadActs(); }}><Button type="link" danger size="small">删除</Button></Popconfirm>
