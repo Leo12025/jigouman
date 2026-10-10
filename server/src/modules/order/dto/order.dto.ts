@@ -38,6 +38,8 @@ export class PayOrderDto {
 export class RefundDto {
   @IsNumber() @Min(0) amount: number;
   @IsOptional() @IsString() reason?: string;
+  /** 审批人(单节点审批)；不传则审批中心要求显式指定 */
+  @IsOptional() @IsInt() approverId?: number;
 }
 
 export class OrderPageQueryDto extends PageQueryDto {

@@ -8,12 +8,14 @@ import { OrderService } from './order.service';
 import { OrderController } from './order.controller';
 import { HourModule } from '../../modules/hour/hour.module';
 import { CouponModule } from '../../modules/coupon/coupon.module';
+import { ApprovalModule } from '../../modules/approval/approval.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, Payment, Refund]),
     HourModule,
     CouponModule,
+    ApprovalModule,
   ],
   providers: [OrderService],
   controllers: [OrderController],

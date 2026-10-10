@@ -33,4 +33,7 @@ export class Refund extends BaseEntity {
 
   @Column({ name: 'approved_at', type: 'datetime', nullable: true, comment: '审批时间' })
   approvedAt?: Date;
+
+  @Column({ name: 'approval_instance_id', type: 'bigint', nullable: true, comment: '关联审批实例(资金联动走审批中心)' })
+  approvalInstanceId?: number;
 }

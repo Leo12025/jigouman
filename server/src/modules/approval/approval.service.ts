@@ -11,6 +11,7 @@ import { TaskService } from '../task/task.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { NotificationService } from '../notification/notification.service';
 import { ApprovalFlowService } from './approval-flow.service';
+import { approvalEvents } from '../../common/approval-events';
 
 @Injectable()
 export class ApprovalService {
@@ -174,6 +175,7 @@ export class ApprovalService {
     if (action === ApprovalAction.REJECT) {
       inst.status = ApprovalStatus.REJECTED;
       await this.instanceRepo.save(inst as any);
+      this.emit('rejected', inst);
       // 关闭本实例全部待办（含 ROLE 节点多成员任务）
       await this.taskSvc.closeByRefAll(tenantId, 'APPROVAL_INSTANCE', id, 'APPROVAL', operator.id);
       await this.notifySvc
@@ -202,6 +204,7 @@ export class ApprovalService {
     } else {
       inst.status = ApprovalStatus.APPROVED;
       await this.instanceRepo.save(inst as any);
+      this.emit('approved', inst);
       await this.taskSvc.closeByRefAll(tenantId, 'APPROVAL_INSTANCE', id, 'APPROVAL', operator.id);
       await this.notifySvc
         .create(tenantId, {
@@ -220,5 +223,16 @@ export class ApprovalService {
       after: { node: inst.currentNode, comment },
     });
     return inst;
+  }
+
+  /** 审批终审后向业务模块广播（避免审批模块反向依赖业务模块造成循环依赖） */
+  private emit(action: 'approved' | 'rejected', inst: ApprovalInstance) {
+    approvalEvents.emit(`approval.${action}`, {
+      tenantId: inst.tenantId,
+      bizType: inst.bizType,
+      bizId: inst.bizId,
+      instanceId: inst.id,
+      applicantId: inst.applicantId,
+    });
   }
 }

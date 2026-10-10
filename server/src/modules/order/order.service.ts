@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
@@ -14,13 +14,16 @@ import { Refund, RefundStatus } from './entities/refund.entity';
 import { OrderPageQueryDto, CreateOrderDto, PayOrderDto, RefundDto } from './dto/order.dto';
 import { HourService } from '../../modules/hour/hour.service';
 import { CouponService } from '../../modules/coupon/coupon.service';
+import { AuthUser } from '../../common/decorators/auth.decorator';
+import { approvalEvents, ApprovalEventPayload } from '../../common/approval-events';
+import { ApprovalService } from '../approval/approval.service';
 
 function genOrderNo(): string {
   return `NO${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
 @Injectable()
-export class OrderService {
+export class OrderService implements OnModuleInit {
   constructor(
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderItem) private readonly itemRepo: Repository<OrderItem>,
@@ -28,6 +31,7 @@ export class OrderService {
     @InjectRepository(Refund) private readonly refundRepo: Repository<Refund>,
     private readonly hourSvc: HourService,
     private readonly couponSvc: CouponService,
+    private readonly approvalSvc: ApprovalService,
   ) {}
 
   async createOrder(tenantId: number, d: CreateOrderDto) {
@@ -204,7 +208,7 @@ export class OrderService {
     };
   }
 
-  async applyRefund(tenantId: number, id: number, d: RefundDto) {
+  async applyRefund(tenantId: number, id: number, d: RefundDto, applicant: AuthUser) {
     const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
     if (!order) throw new NotFoundException('订单不存在');
     if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.COMPLETED) {
@@ -230,28 +234,57 @@ export class OrderService {
     const saved = await this.refundRepo.save(refund as any);
     order.status = OrderStatus.REFUNDING;
     await this.orderRepo.save(order as any);
+    // 资金联动：进入审批中心，审批通过/驳回后由事件回写(仅系统内流转，不关联外部账户)
+    const inst = await this.approvalSvc.create(tenantId, {
+      bizType: 'REFUND',
+      bizId: saved.id,
+      title: `退款申请-订单${id}-金额${saved.amount}元`,
+      approverIds: d.approverId ? [d.approverId] : undefined,
+    }, applicant);
+    saved.approvalInstanceId = inst.id;
+    await this.refundRepo.save(saved as any);
     return saved;
   }
 
-  async approveRefund(tenantId: number, refundId: number, operatorId?: number) {
+  // ---------------- 审批中心联动回写（事件驱动，避免循环依赖） ----------------
+  onModuleInit() {
+    approvalEvents.on('approval.approved', (p: ApprovalEventPayload) => {
+      if (p.bizType === 'REFUND') this.applyRefundEffect(p.tenantId, p.bizId).catch(() => undefined);
+    });
+    approvalEvents.on('approval.rejected', (p: ApprovalEventPayload) => {
+      if (p.bizType === 'REFUND') this.revertRefund(p.tenantId, p.bizId).catch(() => undefined);
+    });
+  }
+
+  /** 审批通过后回写：退款生效 + 课时回滚 + 订单置已退费 */
+  async applyRefundEffect(tenantId: number, refundId?: number) {
+    if (!refundId) return;
     const refund = await this.refundRepo.findOne({ where: { tenantId, id: refundId } as any });
-    if (!refund) throw new NotFoundException('退费单不存在');
-    if (refund.status !== RefundStatus.PENDING) {
-      throw new BusinessException(ResCode.BAD_REQUEST, '仅待审批退费单可处理');
-    }
+    if (!refund || refund.status !== RefundStatus.PENDING) return;
     refund.status = RefundStatus.REFUNDED;
-    refund.approverId = operatorId;
     refund.approvedAt = new Date();
     await this.refundRepo.save(refund as any);
-
     const order = await this.orderRepo.findOne({ where: { tenantId, id: refund.orderId } as any });
     if (order) {
       order.status = OrderStatus.REFUNDED;
       await this.orderRepo.save(order as any);
     }
     // 退费必须触发课时回滚，防止资损
-    await this.hourSvc.rollbackByOrder(tenantId, refund.orderId, operatorId);
-    return { refund, order: order ? (order as any) : null };
+    await this.hourSvc.rollbackByOrder(tenantId, refund.orderId, undefined);
+  }
+
+  /** 审批驳回后回写：退款单置驳回，订单退回已支付 */
+  async revertRefund(tenantId: number, refundId?: number) {
+    if (!refundId) return;
+    const refund = await this.refundRepo.findOne({ where: { tenantId, id: refundId } as any });
+    if (!refund || refund.status !== RefundStatus.PENDING) return;
+    refund.status = RefundStatus.REJECTED;
+    await this.refundRepo.save(refund as any);
+    const order = await this.orderRepo.findOne({ where: { tenantId, id: refund.orderId } as any });
+    if (order && order.status === OrderStatus.REFUNDING) {
+      order.status = OrderStatus.PAID;
+      await this.orderRepo.save(order as any);
+    }
   }
 
   async listOrders(tenantId: number, q: OrderPageQueryDto) {

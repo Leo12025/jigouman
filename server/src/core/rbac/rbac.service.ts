@@ -57,6 +57,8 @@ const MODULES = [
   'distribution',
   'teaching',
   'attendance',
+  'class-transfer',
+  'lesson-reschedule',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
 

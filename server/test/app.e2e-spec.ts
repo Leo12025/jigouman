@@ -194,12 +194,14 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     const refund = await request(app.getHttpServer())
       .post(`/api/v1/orders/${m4OrderId}/refund`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ amount: 950, reason: 'e2e' })
+      .send({ amount: 950, reason: 'e2e', approverId: 1 })
       .expect(201);
     expect(refund.body.data.status).toBe('PENDING');
+    // 经审批中心终审(§4 资金联动，仅系统内流转)，通过后回滚课时
     await request(app.getHttpServer())
-      .post(`/api/v1/orders/${m4OrderId}/refund/${refund.body.data.id}/approve`)
+      .post(`/api/v1/approvals/${refund.body.data.approvalInstanceId}/approve`)
       .set('Authorization', `Bearer ${token}`)
+      .send({ comment: 'e2e' })
       .expect(201);
     hours = await request(app.getHttpServer())
       .get(`/api/v1/students/${m4StudentId}/hours`)
