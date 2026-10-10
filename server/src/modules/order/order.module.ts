@@ -9,6 +9,7 @@ import { OrderController } from './order.controller';
 import { HourModule } from '../../modules/hour/hour.module';
 import { CouponModule } from '../../modules/coupon/coupon.module';
 import { ApprovalModule } from '../../modules/approval/approval.module';
+import { StudentModule } from '../../modules/student/student.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ApprovalModule } from '../../modules/approval/approval.module';
     HourModule,
     CouponModule,
     ApprovalModule,
+    StudentModule,
   ],
   providers: [OrderService],
   controllers: [OrderController],

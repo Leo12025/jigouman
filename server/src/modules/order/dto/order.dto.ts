@@ -24,6 +24,8 @@ export class CreateOrderDto {
   @IsOptional() @IsInt() ownerId?: number;
   @IsOptional() @IsNumber() @Min(0) discountAmount?: number;
   @IsOptional() @IsString() couponCode?: string;
+  /** 学员提交的优惠券码数组（与 couponCode 二选一，多券可叠加） */
+  @IsOptional() @IsArray() @IsString({ each: true }) couponCodes?: string[];
   @IsOptional() @IsString() remark?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => CreateOrderItemDto) items: CreateOrderItemDto[];
 }

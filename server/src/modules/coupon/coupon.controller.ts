@@ -10,6 +10,7 @@ import {
   CouponPageQueryDto,
   PreviewRedeemDto,
   RedeemCouponDto,
+  CalcPromotionDto,
 } from './dto/coupon.dto';
 
 @ApiTags('优惠券 Coupon')
@@ -73,6 +74,13 @@ export class CouponController {
   @ApiOperation({ summary: '预览抵扣金额(不核销)' })
   preview(@TenantId() t: number, @Body() d: PreviewRedeemDto) {
     return this.svc.preview(t, d.code, Number(d.amount), d.courseId);
+  }
+
+  @Post('calc')
+  @RequirePermissions('coupon:view')
+  @ApiOperation({ summary: '促销试算引擎(全场活动+券码叠加/互斥/满减/买赠/限时特价)' })
+  calc(@TenantId() t: number, @Body() d: CalcPromotionDto) {
+    return this.svc.calcPromotion(t, d);
   }
 
   @Post('redeem')

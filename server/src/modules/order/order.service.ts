@@ -14,12 +14,25 @@ import { Refund, RefundStatus } from './entities/refund.entity';
 import { OrderPageQueryDto, CreateOrderDto, PayOrderDto, RefundDto } from './dto/order.dto';
 import { HourService } from '../../modules/hour/hour.service';
 import { CouponService } from '../../modules/coupon/coupon.service';
+import { StudentService } from '../../modules/student/student.service';
 import { AuthUser } from '../../common/decorators/auth.decorator';
 import { approvalEvents, ApprovalEventPayload } from '../../common/approval-events';
 import { ApprovalService } from '../approval/approval.service';
 
 function genOrderNo(): string {
   return `NO${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+/** 解析学员人群标签（DB 存为 JSON 字符串） */
+function parseTags(tags: any): string[] {
+  if (!tags) return [];
+  if (Array.isArray(tags)) return tags;
+  try {
+    const v = JSON.parse(tags);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
 }
 
 @Injectable()
@@ -31,6 +44,7 @@ export class OrderService implements OnModuleInit {
     @InjectRepository(Refund) private readonly refundRepo: Repository<Refund>,
     private readonly hourSvc: HourService,
     private readonly couponSvc: CouponService,
+    private readonly studentSvc: StudentService,
     private readonly approvalSvc: ApprovalService,
   ) {}
 
@@ -53,13 +67,23 @@ export class OrderService implements OnModuleInit {
       } as OrderItem;
       return this.itemRepo.create(plain);
     });
-    // 优惠券抵扣（§4.17）：按券码预览金额并并入优惠
-    let couponDiscount = 0;
-    if (d.couponCode) {
-      const courseId = d.items?.[0]?.courseId;
-      const pv = await this.couponSvc.preview(tenantId, d.couponCode, total, courseId);
-      couponDiscount = pv.discount;
-    }
+    // 促销引擎（§4.17 高级玩法）：合并全场活动 + 学员券码，按叠加/互斥规则计算
+    const student = await this.studentSvc.getStudent(tenantId, d.studentId).catch(() => null);
+    const studentTags = parseTags(student?.tags);
+    const codes = d.couponCodes || (d.couponCode ? [d.couponCode] : []);
+    const promo = await this.couponSvc.calcPromotion(tenantId, {
+      amount: total,
+      items: d.items.map((it) => ({
+        courseId: it.courseId,
+        classGroupId: (it as any).classGroupId,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+      })),
+      studentTags,
+      codes,
+      includeAuto: true,
+    });
+    const couponDiscount = promo.totalDiscount;
     const discount = Math.round(((d.discountAmount || 0) + couponDiscount) * 100) / 100;
     const payable = Math.max(0, Math.round((total - discount) * 100) / 100);
 
@@ -69,8 +93,9 @@ export class OrderService implements OnModuleInit {
       studentId: d.studentId,
       totalAmount: total,
       discountAmount: discount,
-      couponCode: d.couponCode,
+      couponCode: codes.length ? codes.join(',') : undefined,
       couponDiscount,
+      appliedPromotions: promo.applied as any,
       payableAmount: payable,
       paidAmount: 0,
       status: OrderStatus.PENDING,
@@ -80,7 +105,21 @@ export class OrderService implements OnModuleInit {
     const saved = await this.orderRepo.save(order as any);
 
     for (const it of items) it.orderId = saved.id;
-    await this.itemRepo.save(items as any[]);
+    // 买赠：将赠品写入订单项(单价0)
+    const giftItems = (promo.giftItems || []).map((g: any) =>
+      this.itemRepo.create({
+        tenantId,
+        orderId: saved.id,
+        courseId: g.courseId,
+        itemType: 'GIFT',
+        name: g.name,
+        qty: g.qty,
+        unitPrice: 0,
+        amount: 0,
+        hours: 0,
+      } as any),
+    );
+    await this.itemRepo.save([...items, ...giftItems] as any[]);
 
     return this.getOrder(tenantId, saved.id);
   }
@@ -112,11 +151,11 @@ export class OrderService implements OnModuleInit {
     // 支付成功 → 按订单项发放课时到学员账户
     const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
 
-    // 优惠券核销：支付成功后标记已用，抵扣本单金额（§4.17）
+    // 优惠券核销：支付成功后批量标记已用（§4.17 多券/券+活动）
     if (order.couponCode) {
       const courseId = items[0]?.courseId;
-      await this.couponSvc
-        .redeem(tenantId, order.couponCode, order.id, Number(order.payableAmount), courseId)
+      const codes = order.couponCode.split(',').filter(Boolean);
+      await this.couponSvc.redeemMany(tenantId, codes, order.id, Number(order.payableAmount))
         .catch(() => undefined);
     }
 

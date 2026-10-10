@@ -41,6 +41,9 @@ export class Order extends BaseEntity {
   @Column({ name: 'coupon_discount', type: 'decimal', precision: 12, scale: 2, default: 0, transformer: MONEY, nullable: true, comment: '优惠券抵扣金额' })
   couponDiscount?: number;
 
+  @Column({ name: 'applied_promotions', type: 'simple-json', nullable: true, comment: '促销试算命中明细(券/活动/买赠)' })
+  appliedPromotions?: any;
+
   @Column({ name: 'payable_amount', type: 'decimal', precision: 12, scale: 2, transformer: MONEY, comment: '实付应付' })
   payableAmount: number;
 

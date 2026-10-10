@@ -319,6 +319,7 @@ export const grantCoupon = (d: any) => apiPost<any>('/coupons/grant', d);
 export const listCoupons = (params: any) => apiGet<PageResult<any>>('/coupons', params);
 export const previewCoupon = (d: any) => apiPost<any>('/coupons/preview', d);
 export const redeemCoupon = (d: any) => apiPost<any>('/coupons/redeem', d);
+export const calcPromotion = (d: any) => apiPost<any>('/coupons/calc', d);
 
 // ---------- 合同电子签 (§4.23) ----------
 export const listContractTemplates = (params: any) => apiGet<PageResult<any>>('/contracts/templates', params);

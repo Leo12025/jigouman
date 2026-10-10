@@ -13,7 +13,7 @@ export class OrderItem extends BaseEntity {
   courseId: number;
 
   @Column({ name: 'item_type', length: 16, default: 'COURSE', comment: 'COURSE 课程 / HOUR_PACK 课时包' })
-  itemType: 'COURSE' | 'HOUR_PACK';
+  itemType: 'COURSE' | 'HOUR_PACK' | 'GIFT';
 
   /** HOUR_PACK 时关联课包（支付发放到学员课包账户） */
   @Column({ name: 'package_id', type: 'bigint', nullable: true, comment: '关联课包' })
