@@ -209,7 +209,8 @@ export default function OrderPage() {
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="reason" label="退费原因"><Input.TextArea rows={2} /></Form.Item>
-          <Form.Item name="approverId" label="审批人" rules={[{ required: true, message: '请选择审批人' }]}>
+          <Form.Item name="approverId" label="审批人(兜底)" tooltip="已配置审批流模板时优先走模板，此处仅在未配置模板时作为单节点审批人兜底"
+            rules={[{ required: true, message: '请选择兜底审批人' }]}>
             <Select showSearch optionFilterProp="label" placeholder="提交后进入审批中心"
               options={users.map((u) => ({ value: u.id, label: u.name || u.username }))} />
           </Form.Item>

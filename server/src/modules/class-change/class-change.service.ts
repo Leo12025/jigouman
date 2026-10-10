@@ -51,12 +51,13 @@ export class ClassChangeService implements OnModuleInit {
       status: ClassTransferStatus.PENDING,
     } as ClassTransfer);
     const saved = await this.transferRepo.save(e as any);
-    const inst = await this.approval.create(tenantId, {
+    const inst = await this.approval.createByBizType(tenantId, {
       bizType: 'CLASS_TRANSFER',
       bizId: saved.id,
       title: `转班申请-学员${d.studentId}-${d.fromClassGroupId}→${d.toClassGroupId}`,
-      approverIds: d.approverId ? [d.approverId] : undefined,
-    }, applicant);
+      applicant,
+      fallbackApproverId: d.approverId,
+    });
     saved.approvalInstanceId = inst.id;
     await this.transferRepo.save(saved as any);
     return saved;
@@ -69,12 +70,13 @@ export class ClassChangeService implements OnModuleInit {
       status: 'PENDING',
     } as LessonReschedule);
     const saved = await this.reschedRepo.save(e as any);
-    const inst = await this.approval.create(tenantId, {
+    const inst = await this.approval.createByBizType(tenantId, {
       bizType: 'LESSON_RESCHEDULE',
       bizId: saved.id,
       title: `调课申请-课次${d.lessonId}`,
-      approverIds: d.approverId ? [d.approverId] : undefined,
-    }, applicant);
+      applicant,
+      fallbackApproverId: d.approverId,
+    });
     saved.approvalInstanceId = inst.id;
     await this.reschedRepo.save(saved as any);
     return saved;

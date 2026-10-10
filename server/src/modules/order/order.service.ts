@@ -234,13 +234,14 @@ export class OrderService implements OnModuleInit {
     const saved = await this.refundRepo.save(refund as any);
     order.status = OrderStatus.REFUNDING;
     await this.orderRepo.save(order as any);
-    // 资金联动：进入审批中心，审批通过/驳回后由事件回写(仅系统内流转，不关联外部账户)
-    const inst = await this.approvalSvc.create(tenantId, {
+    // 资金联动：默认走已配置的审批流模板；未配置时退化为单节点审批人(兜底)
+    const inst = await this.approvalSvc.createByBizType(tenantId, {
       bizType: 'REFUND',
       bizId: saved.id,
       title: `退款申请-订单${id}-金额${saved.amount}元`,
-      approverIds: d.approverId ? [d.approverId] : undefined,
-    }, applicant);
+      applicant,
+      fallbackApproverId: d.approverId,
+    });
     saved.approvalInstanceId = inst.id;
     await this.refundRepo.save(saved as any);
     return saved;

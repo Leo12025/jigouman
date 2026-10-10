@@ -84,6 +84,35 @@ export class ApprovalService {
     return saved;
   }
 
+  /**
+   * 业务发起审批：默认套用已配置的审批流模板（按 bizType 查找 enabled 模板）。
+   * 若未配置模板，退化到单节点 approverIds（fallbackApproverId 兜底）；两者皆无则报错，
+   * 提示先到「审批流配置」设置模板（符合"默认走审批流模板"的要求）。
+   */
+  async createByBizType(
+    tenantId: number,
+    p: { bizType: string; bizId?: number; title: string; applicant: AuthUser; fallbackApproverId?: number },
+  ) {
+    const flow = await this.flowSvc.getByBizType(tenantId, p.bizType);
+    if (flow) {
+      return this.create(
+        tenantId,
+        { bizType: p.bizType, bizId: p.bizId, title: p.title, flowId: flow.id },
+        p.applicant,
+      );
+    }
+    if (p.fallbackApproverId) {
+      return this.create(
+        tenantId,
+        { bizType: p.bizType, bizId: p.bizId, title: p.title, approverIds: [p.fallbackApproverId] },
+        p.applicant,
+      );
+    }
+    throw new BadRequestException(
+      `业务类型 ${p.bizType} 未配置审批流模板，请在「审批流配置」中设置后再发起`,
+    );
+  }
+
   /** 为某节点集合内的每个可审批人生成待办任务（ROLE 节点会生成多个） */
   private async createNodeTasks(tenantId: number, inst: ApprovalInstance, nodeIndex: number) {
     const set = this.normalizeNodes(inst.nodesJson)[nodeIndex] || [];

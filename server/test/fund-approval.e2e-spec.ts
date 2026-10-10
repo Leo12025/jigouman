@@ -129,4 +129,35 @@ describe('资金审批联动 (e2e, SQLite)', () => {
     const l = list.body.data.list.find((x: any) => x.id === lid);
     expect(new Date(l.startTime).getTime()).toBe(new Date('2026-10-25T14:00:00').getTime());
   });
+
+  it('已配置审批流模板 → 退款默认走模板(多节点，无需指定审批人)', async () => {
+    // 配置 REFUND 审批流模板(两节点：主管→财务)
+    await post('/api/v1/approvals/flows').send({
+      bizType: 'REFUND', name: '退款审批流',
+      nodes: [
+        { order: 1, name: '主管', approverType: 'USER', approverId: 1 },
+        { order: 2, name: '财务', approverType: 'USER', approverId: 1 },
+      ],
+    }).expect(201);
+
+    const sid = await createStudent('模板学员');
+    const oid = await createPaidOrder(sid);
+    // 不传 approverId，应自动套用模板
+    const rf = await post(`/api/v1/orders/${oid}/refund`).send({ amount: 100, reason: 't' }).expect(201);
+    const inst = await get(`/api/v1/approvals/${rf.body.data.approvalInstanceId}`).expect(200);
+    expect(inst.body.data.nodes.length).toBe(2); // 套用模板的两节点
+    expect(inst.body.data.currentNode).toBe(0);
+    // 审批中心多级通过后仍生效
+    await approve(inst.body.data.id);
+    await approve(inst.body.data.id); // 第二节点需同一审批人再批一次
+    // 事件回写为异步，轮询等待退款生效
+    let status = '';
+    for (let i = 0; i < 20; i++) {
+      const o = await get(`/api/v1/orders/${oid}`).expect(200);
+      status = o.body.data.status;
+      if (status === 'REFUNDED') break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(status).toBe('REFUNDED');
+  });
 });

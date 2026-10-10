@@ -9,7 +9,7 @@ export class CreateClassTransferDto {
   @IsInt() toClassGroupId: number;
   @IsOptional() @IsNumber() @Min(0) diffAmount?: number;
   @IsOptional() @IsString() reason?: string;
-  /** 审批人(单节点审批)；不传则审批中心要求显式指定 */
+  /** 审批人(兜底)：未配置审批流模板时作为单节点审批人，配置模板后优先走模板 */
   @IsOptional() @IsInt() approverId?: number;
 }
 

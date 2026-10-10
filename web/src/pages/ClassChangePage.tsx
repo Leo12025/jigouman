@@ -108,7 +108,8 @@ export default function ClassChangePage() {
             </Space>
             <Form.Item name="diffAmount" label="转班补差价(元)"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="reason" label="转班原因"><Input.TextArea rows={2} /></Form.Item>
-            <Form.Item name="approverId" label="审批人" rules={[{ required: true, message: '请选择审批人' }]}>
+            <Form.Item name="approverId" label="审批人(兜底)" tooltip="已配置审批流模板时优先走模板，此处仅在未配置模板时作为单节点审批人兜底"
+              rules={[{ required: true, message: '请选择兜底审批人' }]}>
               <Select showSearch optionFilterProp="label" style={{ width: 200 }} options={userOpt} />
             </Form.Item>
             <Button type="primary" onClick={submitTransfer}>提交转班申请</Button>
@@ -133,7 +134,8 @@ export default function ClassChangePage() {
             </Space>
             <Form.Item name="newTeacherId" label="新授课老师"><Select allowClear showSearch optionFilterProp="label" style={{ width: 200 }} options={userOpt} /></Form.Item>
             <Form.Item name="reason" label="调课原因"><Input.TextArea rows={2} /></Form.Item>
-            <Form.Item name="approverId" label="审批人" rules={[{ required: true, message: '请选择审批人' }]}>
+            <Form.Item name="approverId" label="审批人(兜底)" tooltip="已配置审批流模板时优先走模板，此处仅在未配置模板时作为单节点审批人兜底"
+              rules={[{ required: true, message: '请选择兜底审批人' }]}>
               <Select showSearch optionFilterProp="label" style={{ width: 200 }} options={userOpt} />
             </Form.Item>
             <Button type="primary" onClick={submitReschedule}>提交调课申请</Button>
