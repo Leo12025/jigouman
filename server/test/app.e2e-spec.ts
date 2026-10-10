@@ -269,7 +269,7 @@ describe('机构管理系统 (e2e, SQLite)', () => {
     // 超过可退余额应被拒绝
     await request(app.getHttpServer())
       .post(`/api/v1/orders/${oid}/refund`).set('Authorization', `Bearer ${token}`)
-      .send({ amount: 999 }).expect(400);
+      .send({ amount: 2000 }).expect(400);
 
     // 工资：按周期聚合分账生成工资单
     await request(app.getHttpServer()).post(`/api/v1/finance/salary/generate`).set('Authorization', `Bearer ${token}`).send({ period }).expect(201);
