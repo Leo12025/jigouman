@@ -38,7 +38,7 @@ export default function CoursePackagePage() {
 
   useEffect(() => { load(); }, [page, status]);
   useEffect(() => {
-    listCourses({ size: 999 })
+    listCourses({ size: 200 })
       .then((r: any) => setCourses(r.list || []))
       .catch(() => undefined);
   }, []);

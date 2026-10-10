@@ -202,7 +202,7 @@ export const updateApprovalFlow = (id: number, d: any) => apiPut<any>(`/approval
 export const deleteApprovalFlow = (id: number) => apiDelete(`/approvals/flows/${id}`);
 // 审批人选择器：拉取全部用户（角色/用户节点共用）
 export const listAllUsers = (params: any = {}) =>
-  apiGet<PageResult<any>>('/users', { size: 999, ...params });
+  apiGet<PageResult<any>>('/users', { size: 200, ...params });
 
 // ---------- 补课排课 (§4.6) ----------
 export const scheduleMakeup = (d: any) => apiPost<any>('/lessons/makeup', d);

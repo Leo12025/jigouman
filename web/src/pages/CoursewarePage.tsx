@@ -29,7 +29,7 @@ export default function CoursewarePage() {
   const [cwFiles, setCwFiles] = useState<ResourceItem[]>([]);
 
   useEffect(() => {
-    listCourses({ size: 999 })
+    listCourses({ size: 200 })
       .then((r: any) => {
         const list = r.list || [];
         setCourses(list);
