@@ -44,6 +44,7 @@ import { CostModule } from './modules/cost/cost.module';
 import { GroupBuyModule } from './modules/groupbuy/groupbuy.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { TeachingModule } from './modules/teaching/teaching.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { TeachingModule } from './modules/teaching/teaching.module';
     GroupBuyModule,
     DistributionModule,
     TeachingModule,
+    AttendanceModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限

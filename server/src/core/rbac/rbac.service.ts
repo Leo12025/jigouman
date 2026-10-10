@@ -56,6 +56,7 @@ const MODULES = [
   'groupbuy',
   'distribution',
   'teaching',
+  'attendance',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
 
