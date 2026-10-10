@@ -16,6 +16,7 @@ import PConsumptions from './pages/parent/ConsumptionsPage';
 import PGrowth from './pages/parent/GrowthPage';
 import POrders from './pages/parent/OrdersPage';
 import PNotices from './pages/parent/NoticesPage';
+import PService from './pages/parent/ServicePage';
 
 // 老师端
 import TTasks from './pages/teacher/TasksPage';
@@ -23,11 +24,13 @@ import TLessons from './pages/teacher/LessonsPage';
 import THomework from './pages/teacher/HomeworkPage';
 import TScores from './pages/teacher/ScoresPage';
 import TReviews from './pages/teacher/ReviewsPage';
+import TSchedule from './pages/teacher/SchedulePage';
 
 // 顾问端
 import CLeads from './pages/consultant/LeadsPage';
 import CTrials from './pages/consultant/TrialsPage';
 import CFunnel from './pages/consultant/FunnelPage';
+import CMarketing from './pages/consultant/MarketingPage';
 import './index.css';
 
 /** 登录守卫：未登录跳登录页；已登录但角色不匹配则跳回该角色首页 */
@@ -56,16 +59,19 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/p/growth" element={<Guard role="parent"><PGrowth /></Guard>} />
           <Route path="/p/orders" element={<Guard role="parent"><POrders /></Guard>} />
           <Route path="/p/notices" element={<Guard role="parent"><PNotices /></Guard>} />
+          <Route path="/p/service" element={<Guard role="parent"><PService /></Guard>} />
           {/* 老师端 */}
           <Route path="/t/tasks" element={<Guard role="teacher"><TTasks /></Guard>} />
           <Route path="/t/lessons" element={<Guard role="teacher"><TLessons /></Guard>} />
           <Route path="/t/homework" element={<Guard role="teacher"><THomework /></Guard>} />
           <Route path="/t/scores" element={<Guard role="teacher"><TScores /></Guard>} />
           <Route path="/t/reviews" element={<Guard role="teacher"><TReviews /></Guard>} />
+          <Route path="/t/schedule" element={<Guard role="teacher"><TSchedule /></Guard>} />
           {/* 顾问端 */}
           <Route path="/c/leads" element={<Guard role="consultant"><CLeads /></Guard>} />
           <Route path="/c/trials" element={<Guard role="consultant"><CTrials /></Guard>} />
           <Route path="/c/funnel" element={<Guard role="consultant"><CFunnel /></Guard>} />
+          <Route path="/c/marketing" element={<Guard role="consultant"><CMarketing /></Guard>} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </HashRouter>

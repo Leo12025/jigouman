@@ -41,3 +41,24 @@ export const listTrials = (id: number) => apiGet<any[]>(`/leads/${id}/trials`);
 export const createTrial = (id: number, d: any) => apiPost<any>(`/leads/${id}/trials`, d);
 export const convertLead = (id: number, d?: any) => apiPost<any>(`/leads/${id}/convert`, d);
 export const getFunnel = () => apiGet<any>('/leads/funnel');
+
+// ---------- 老师考勤打卡（§11.6） ----------
+export const attendanceClock = (d: any) => apiPost<any>('/attendance/clock', d);
+export const listAttendance = (teacherId: number, date?: string) =>
+  apiGet<any>('/attendance', { teacherId, date });
+
+// ---------- 顾问端：分销/转介绍（§4.28） ----------
+export const listDistributors = (params?: any) => apiGet<any>('/distribution/distributors', params);
+export const distributionStats = () => apiGet<any>('/distribution/stats');
+export const listCommissions = (distributorId: number) =>
+  apiGet<any[]>('/distribution/commissions', { distributorId });
+
+// ---------- 顾问端：优惠券发放（§4.17） ----------
+export const listCouponTemplates = (params?: any) => apiGet<any>('/coupons/templates', params);
+export const grantCoupon = (d: any) => apiPost<any>('/coupons/grant', d);
+
+// ---------- 顾问端/家长端：团购核销（§4.24） ----------
+export const redeemGroupBuy = (code: string) => apiPost<any>('/group-buy/redeem', { code });
+
+// ---------- 通用：学员列表（发放优惠券选择学员） ----------
+export const listStudents = (params?: any) => apiGet<any>('/students', params);

@@ -10,6 +10,7 @@ const TABS: Record<Role, { key: string; title: string }[]> = {
     { key: '/p/homework', title: '作业' },
     { key: '/p/reviews', title: '点评' },
     { key: '/p/me', title: '我的' },
+    { key: '/p/service', title: '服务' },
   ],
   teacher: [
     { key: '/t/tasks', title: '待办' },
@@ -17,11 +18,13 @@ const TABS: Record<Role, { key: string; title: string }[]> = {
     { key: '/t/homework', title: '批改' },
     { key: '/t/scores', title: '成绩' },
     { key: '/t/reviews', title: '点评' },
+    { key: '/t/schedule', title: '排班' },
   ],
   consultant: [
     { key: '/c/leads', title: '线索' },
     { key: '/c/trials', title: '试听' },
     { key: '/c/funnel', title: '漏斗' },
+    { key: '/c/marketing', title: '营销' },
   ],
 };
 
