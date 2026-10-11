@@ -102,6 +102,133 @@ export function PieChart({ data, height = 160 }: { data: { label: string; value:
   );
 }
 
+/** 仪表盘：半圆进度（value/max 计算百分比，max 默认 100；比率类传 max=1） */
+export function GaugeChart({
+  value,
+  max = 100,
+  label,
+  height = 140,
+  color = '#1890ff',
+  labelColor = 'rgba(0,0,0,.5)',
+}: {
+  value: number;
+  max?: number;
+  label?: string;
+  height?: number;
+  color?: string;
+  labelColor?: string;
+}) {
+  const w = 200;
+  const cx = w / 2;
+  const cy = height - 16;
+  const r = w / 2 - 22;
+  const ratio = Math.max(0, Math.min(1, (value || 0) / (max || 1)));
+  const polar = (a: number, rad: number) => [cx + rad * Math.cos(a), cy + rad * Math.sin(a)];
+  const [bgX0, bgY0] = polar(Math.PI, r);
+  const [bgX1, bgY1] = polar(Math.PI * 2, r);
+  const [fgX0, fgY0] = polar(Math.PI, r);
+  const [fgX1, fgY1] = polar(Math.PI + ratio * Math.PI, r);
+  const large = ratio > 0.5 ? 1 : 0;
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height}>
+      <path d={`M${bgX0},${bgY0} A${r},${r} 0 0 1 ${bgX1},${bgY1}`} fill="none" stroke="rgba(0,0,0,.08)" strokeWidth="12" strokeLinecap="round" />
+      <path d={`M${fgX0},${fgY0} A${r},${r} 0 ${large} 1 ${fgX1},${fgY1}`} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" />
+      <text x={cx} y={cy - 20} fontSize="20" fontWeight={600} fill={color} textAnchor="middle">
+        {(ratio * 100).toFixed(1)}%
+      </text>
+      {label && (
+        <text x={cx} y={cy + 2} fontSize="11" fill={labelColor} textAnchor="middle">
+          {label}
+        </text>
+      )}
+    </svg>
+  );
+}
+
+/** 漏斗：各阶段依次收窄（宽度相对首项） */
+export function FunnelChart({ data, height = 200 }: { data: { label: string; value: number }[]; height?: number }) {
+  if (!data.length) return <Empty h={height} />;
+  const top = data[0]?.value || 1;
+  const n = data.length;
+  const w = 320;
+  const rowH = (height - 20) / n;
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height}>
+      {data.map((d, i) => {
+        const topW = (d.value / top) * (w - 40);
+        const nextV = i < n - 1 ? data[i + 1].value : 0;
+        const botW = (nextV / top) * (w - 40);
+        const y0 = 10 + i * rowH;
+        const y1 = 10 + (i + 1) * rowH;
+        const x0 = (w - topW) / 2;
+        const x1 = (w - botW) / 2;
+        const path = `M${x0},${y0} L${x0 + topW},${y0} L${x1 + botW},${y1} L${x1},${y1} Z`;
+        return (
+          <g key={i}>
+            <path d={path} fill={COLORS[i % COLORS.length]} opacity={0.85}>
+              <title>{`${d.label}: ${d.value}`}</title>
+            </path>
+            <text x={w / 2} y={(y0 + y1) / 2 + 4} fontSize="11" fill="#fff" textAnchor="middle">
+              {d.label} {d.value}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** 多系列分组柱状图 */
+export function GroupedBar({
+  categories,
+  series,
+  height = 200,
+}: {
+  categories: string[];
+  series: { name: string; color?: string; data: number[] }[];
+  height?: number;
+}) {
+  if (!categories.length) return <Empty h={height} />;
+  const w = 320;
+  const pad = 24;
+  const h = height;
+  const all = series.flatMap((s) => s.data);
+  const max = Math.max(...all, 1);
+  const groupW = (w - pad * 2) / categories.length;
+  const barW = (groupW * 0.7) / Math.max(1, series.length);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h}>
+      {categories.map((c, gi) => {
+        const gx = pad + gi * groupW + groupW * 0.15;
+        return series.map((s, si) => {
+          const v = s.data[gi] ?? 0;
+          const bh = (v / max) * (h - pad * 2);
+          const x = gx + si * barW;
+          const y = h - pad - bh;
+          return (
+            <rect key={`${gi}-${si}`} x={x} y={y} width={Math.max(1, barW - 2)} height={bh} rx="2" fill={s.color || COLORS[si % COLORS.length]}>
+              <title>{`${c} ${s.name}: ${v}`}</title>
+            </rect>
+          );
+        });
+      })}
+      {categories.map((c, gi) => (
+        <text key={gi} x={pad + gi * groupW + groupW / 2} y={h - 6} fontSize="9" fill="rgba(0,0,0,.45)" textAnchor="middle">
+          {c}
+        </text>
+      ))}
+      {series.map((s, si) => (
+        <g key={`lg-${si}`} transform={`translate(${pad + si * 76}, 6)`}>
+          <rect width="8" height="8" rx="2" fill={s.color || COLORS[si % COLORS.length]} />
+          <text x="12" y="8" fontSize="9" fill="rgba(0,0,0,.6)">
+            {s.name}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function Empty({ h }: { h: number }) {
   return <div style={{ height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(0,0,0,.25)', fontSize: 12 }}>暂无数据</div>;
 }

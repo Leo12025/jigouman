@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { getDashboardScreen } from '../api/dashboard';
-import { LineChart, BarChart, PieChart } from '../components/Charts';
+import { LineChart, BarChart, PieChart, GaugeChart, FunnelChart } from '../components/Charts';
 
 const money = (v: number) => `¥${Math.round((v || 0) * 100) / 100}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 const pct = (v: number) => `${((v || 0) * 100).toFixed(1)}%`;
@@ -54,17 +54,25 @@ export default function BigScreenPage() {
       </div>
 
       {/* 图表区 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 14 }}>
         <Panel title="近 6 月营收趋势（已收 / 应收）">
           <LineChart data={trend.map((t: any) => ({ label: t.month, value: t.received }))} color="#52c41a" height={200} />
           <LineChart data={trend.map((t: any) => ({ label: t.month, value: t.receivable }))} color="#1890ff" height={200} />
         </Panel>
         <Panel title="招生漏斗（线索 / 试听 / 报名）">
-          <BarChart data={[
+          <FunnelChart data={[
             { label: '线索', value: k.leads ?? 0 },
             { label: '试听', value: data?.funnel?.trialed ?? 0 },
             { label: '报名', value: k.signed ?? 0 },
-          ]} color="#1890ff" height={200} />
+          ]} height={220} />
+        </Panel>
+        <Panel title="核心比率">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+            <GaugeChart value={k.conversionRate || 0} max={1} label="转化率" color="#faad14" labelColor="rgba(255,255,255,.7)" height={130} />
+            <GaugeChart value={k.consumeRate || 0} max={1} label="课消率" color="#1890ff" labelColor="rgba(255,255,255,.7)" height={130} />
+            <GaugeChart value={k.fullRate || 0} max={1} label="满班率" color="#722ed1" labelColor="rgba(255,255,255,.7)" height={130} />
+            <GaugeChart value={k.attendanceRate || 0} max={1} label="出勤率" color="#52c41a" labelColor="rgba(255,255,255,.7)" height={130} />
+          </div>
         </Panel>
       </div>
 
@@ -72,10 +80,10 @@ export default function BigScreenPage() {
         <Panel title="渠道线索 Top">
           <BarChart data={(data?.byChannel || []).slice(0, 6).map((x: any) => ({ label: x.name, value: x.count }))} color="#722ed1" height={200} />
         </Panel>
-        <Panel title="出勤 / 作业构成">
+        <Panel title="作业批改构成">
           <PieChart data={[
-            { label: '出勤', value: data?.kpis?.attendanceRate ? Math.round((k.attendanceRate ?? 0) * 100) : 0 },
-            { label: '缺勤', value: Math.round((1 - (k.attendanceRate ?? 0)) * 100) },
+            { label: '已批改', value: data?.kpis?.reviewedRate ? Math.round((k.reviewedRate ?? 0) * 100) : 0 },
+            { label: '待批改', value: Math.round((1 - (k.reviewedRate ?? 0)) * 100) },
           ]} height={200} />
         </Panel>
         <Panel title="风险预警">
