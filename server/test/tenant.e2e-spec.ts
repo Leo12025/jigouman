@@ -40,12 +40,13 @@ describe('多租户/租户中心 (e2e, SQLite)', () => {
     expect(r.body.data.id).not.toBe(100000);
   });
 
-  it('域名路由：在 acme.localhost 登录(该租户无账号)应 401，证明按域名解析到 acme 租户', async () => {
-    await request(app.getHttpServer())
+  it('域名路由：在 acme.localhost 登录(总域已为品牌域建管理员)应 201，证明按域名解析到 acme 租户', async () => {
+    const r = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('Host', 'acme.localhost')
       .send({ username: 'admin', password: 'admin123456' })
-      .expect(401);
+      .expect(201);
+    expect(r.body.data.user.tenantId).not.toBe(100000);
   });
 
   it('域名路由回退：未知域名回退默认租户，默认账号登录成功 201', async () => {

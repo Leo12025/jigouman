@@ -60,4 +60,11 @@ describe('租户认证增强 + 校区额度 + 家长端 (e2e, SQLite)', () => {
     await orgSvc.create(t.id, { name: '校区1', type: 'CAMPUS' } as any);
     await expect(orgSvc.create(t.id, { name: '校区2', type: 'CAMPUS' } as any)).rejects.toThrow();
   });
+
+  it('总域建品牌域并初始化管理员后，可用 用户名@品牌域 登录', async () => {
+    const slug = 'brandx';
+    await request(app.getHttpServer()).post('/api/v1/platform/tenants').set(auth()).send({ slug, name: '品牌X', domain: 'brandx.localhost' }).expect(201);
+    const r = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ username: `admin@${slug}`, password: 'admin123456' }).expect(201);
+    expect(r.body.data.user.tenantId).toBeGreaterThan(0);
+  });
 });
