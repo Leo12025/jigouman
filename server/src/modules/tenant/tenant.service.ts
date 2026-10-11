@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Tenant } from './entities/tenant.entity';
@@ -50,6 +50,25 @@ export class TenantService {
     return t;
   }
 
+  /** 按品牌域标识(slug 或 domain)解析租户（用于 用户名@品牌域 登录） */
+  async findBySlugOrDomain(s: string): Promise<Tenant | null> {
+    if (!s) return null;
+    const key = s.toLowerCase().trim();
+    let t = await this.repo.findOne({ where: { slug: key } });
+    if (!t) t = await this.repo.findOne({ where: { domain: key } });
+    return t;
+  }
+
+  /** 可用性校验：停用 / 过期则拒绝（总域据此管控品牌域授权） */
+  async assertUsable(tenantId: number) {
+    const t = await this.repo.findOne({ where: { id: tenantId } });
+    if (!t) return; // 表未初始化或未知租户时放行默认行为
+    if (t.status === 'DISABLED') throw new UnauthorizedException('该机构已停用');
+    if (t.expiresAt && new Date(t.expiresAt).getTime() < Date.now()) {
+      throw new UnauthorizedException('该机构已过期');
+    }
+  }
+
   async create(d: CreateTenantDto) {
     const exist = await this.repo.findOne({
       where: [{ slug: d.slug }, ...(d.domain ? [{ domain: d.domain }] : [])],
@@ -61,6 +80,8 @@ export class TenantService {
       name: d.name,
       config: d.config,
       status: 'ACTIVE',
+      expiresAt: d.expiresAt ? new Date(d.expiresAt) : null,
+      maxCampuses: d.maxCampuses ?? null,
     });
     const saved = await this.repo.save(t);
     this.invalidate();
@@ -73,6 +94,8 @@ export class TenantService {
     if (d.name !== undefined) t.name = d.name;
     if (d.status !== undefined) t.status = d.status;
     if (d.config !== undefined) t.config = d.config;
+    if (d.expiresAt !== undefined) t.expiresAt = d.expiresAt ? new Date(d.expiresAt) : null;
+    if (d.maxCampuses !== undefined) t.maxCampuses = d.maxCampuses ?? null;
     const saved = await this.repo.save(t);
     this.invalidate();
     return saved;
@@ -95,7 +118,15 @@ export class TenantService {
       }
       return exist;
     }
-    const t = this.repo.create({ id, slug, name, domain, status: 'ACTIVE' });
+    const t = this.repo.create({
+      id,
+      slug,
+      name,
+      domain,
+      status: 'ACTIVE',
+      expiresAt: null,
+      maxCampuses: null,
+    });
     return this.repo.save(t);
   }
 }

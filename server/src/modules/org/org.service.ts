@@ -1,18 +1,33 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { Like, Not, Repository } from 'typeorm';
 import { Organization } from './entities/organization.entity';
 import { CreateOrgDto, UpdateOrgDto, OrgPageQueryDto } from './dto/org.dto';
+import { TenantService } from '../tenant/tenant.service';
+import { BusinessException } from '../../common/exceptions/business.exception';
+import { ResCode } from '../../common/constants/response-code';
 
 @Injectable()
 export class OrgService {
-  constructor(@InjectRepository(Organization) private readonly repo: Repository<Organization>) {}
+  constructor(
+    @InjectRepository(Organization) private readonly repo: Repository<Organization>,
+    private readonly tenantService: TenantService,
+  ) {}
 
   async create(tenantId: number, d: CreateOrgDto) {
     // 每租户仅允许一个 HQ（总校区）：已有则拒绝新建
     if (d.type === 'HQ') {
       const existHq = await this.repo.findOne({ where: { tenantId, type: 'HQ' } as any });
       if (existHq) throw new NotFoundException('该租户已存在总校区(HQ)，请勿重复创建');
+    } else {
+      // 校区额度校验（HQ 不计额度）：超过品牌域 maxCampuses 则拒绝
+      const tenant = await this.tenantService.get(tenantId);
+      if (tenant.maxCampuses != null) {
+        const used = await this.repo.count({ where: { tenantId, type: Not('HQ') } as any });
+        if (used >= tenant.maxCampuses) {
+          throw new BusinessException(ResCode.BAD_REQUEST, `校区额度已满（上限 ${tenant.maxCampuses}）`);
+        }
+      }
     }
     const o = this.repo.create({ tenantId, ...(d as any) } as Organization);
     return this.repo.save(o as any);

@@ -232,7 +232,12 @@ export default function MainLayout() {
                 setOrgSel(next);
                 window.location.reload();
               }}
-              options={[{ value: 'ALL', label: '全部校区(总校区)' }, ...campusOpts]}
+              options={[
+                { value: 'ALL', label: '全部校区(总校区)' },
+                ...(profile?.orgIds?.length
+                  ? campusOpts.filter((o) => profile.orgIds!.includes(o.value))
+                  : campusOpts),
+              ]}
             />
             <Tag color="blue">{profile?.orgName || '机构'}</Tag>
             <Dropdown

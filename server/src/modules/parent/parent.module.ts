@@ -11,6 +11,8 @@ import { HomeworkSubmit } from '../homework/entities/homework-submit.entity';
 import { CourseReview } from '../family/entities/course-review.entity';
 import { FamilyModule } from '../family/family.module';
 import { GrowthModule } from '../growth/growth.module';
+import { OrgModule } from '../org/org.module';
+import { TenantModule } from '../tenant/tenant.module';
 import { HourConsumption } from '../hour/entities/hour-consumption.entity';
 import { Attendance } from '../hour/entities/attendance.entity';
 import { Order } from '../order/entities/order.entity';
@@ -22,6 +24,8 @@ import { ParentController } from './parent.controller';
     AuthModule,
     FamilyModule,
     GrowthModule,
+    OrgModule,
+    TenantModule,
     TypeOrmModule.forFeature([
       Parent, StudentParent, Student, StudentCourse,
       Lesson, Homework, HomeworkSubmit, CourseReview,

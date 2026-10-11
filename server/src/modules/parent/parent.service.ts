@@ -18,6 +18,8 @@ import { HourConsumption } from '../hour/entities/hour-consumption.entity';
 import { Attendance } from '../hour/entities/attendance.entity';
 import { Order } from '../order/entities/order.entity';
 import { SendOtpDto, ParentLoginDto, BindStudentDto } from './dto/parent.dto';
+import { OrgService } from '../org/org.service';
+import { TenantService } from '../tenant/tenant.service';
 
 interface OtpRecord {
   code: string;
@@ -49,6 +51,8 @@ export class ParentService {
     private readonly familySvc: FamilyService,
     private readonly growthSvc: GrowthService,
     private readonly jwt: JwtService,
+    private readonly orgSvc: OrgService,
+    private readonly tenantSvc: TenantService,
   ) {}
 
   // ---------- 家长端补齐：消课/考勤、成长档案、缴费、通知、续费提醒 ----------
@@ -131,17 +135,24 @@ export class ParentService {
     return { sent: true, phone: d.phone, code: isProd ? undefined : code };
   }
 
-  /** 手机号 + OTP 登录/注册（§6.23） */
+  /** 手机号 + OTP / 手机号后6位 登录/注册（§6.23） */
   async login(tenantId: number, d: ParentLoginDto) {
-    const rec = this.otpStore.get(d.phone);
-    if (!rec || rec.code !== d.code) {
-      throw new UnauthorizedException('验证码错误');
-    }
-    if (Date.now() > rec.expireAt) {
+    if (d.last6 && !d.code) {
+      // 后6位快捷登录：校验手机号末6位
+      if (d.last6 !== d.phone.slice(-6)) {
+        throw new UnauthorizedException('手机号后6位校验失败');
+      }
+    } else {
+      const rec = this.otpStore.get(d.phone);
+      if (!rec || rec.code !== d.code) {
+        throw new UnauthorizedException('验证码错误');
+      }
+      if (Date.now() > rec.expireAt) {
+        this.otpStore.delete(d.phone);
+        throw new UnauthorizedException('验证码已过期');
+      }
       this.otpStore.delete(d.phone);
-      throw new UnauthorizedException('验证码已过期');
     }
-    this.otpStore.delete(d.phone);
 
     let parent = await this.parentRepo.findOne({ where: { tenantId, phone: d.phone } as any });
     if (!parent) {
@@ -230,6 +241,31 @@ export class ParentService {
   async boundStudentIds(tenantId: number, phone: string): Promise<number[]> {
     const rows = await this.spRepo.find({ where: { tenantId, phone } as any });
     return rows.filter((r) => !r.unboundAt).map((r) => Number(r.studentId));
+  }
+
+  /** 我的校区列表（本品牌内：依据绑定学员所属校区聚合，供移动端校区切换） */
+  async campuses(tenantId: number, phone: string) {
+    const ids = await this.boundStudentIds(tenantId, phone);
+    if (!ids.length) return [];
+    const students = await this.stuRepo.find({ where: { tenantId, id: In(ids) } as any });
+    const orgIds = [...new Set(students.map((s: any) => s.orgId).filter(Boolean))] as number[];
+    if (!orgIds.length) return [];
+    const orgs = await Promise.all(orgIds.map((id) => this.orgSvc.get(tenantId, id).catch(() => null)));
+    return orgs
+      .filter(Boolean)
+      .map((o: any) => ({ orgId: o.id, name: o.name, type: o.type }));
+  }
+
+  /** 跨品牌发现：该手机号在哪些品牌域（租户）存在家长账号，供移动端跨平台切换 */
+  async brands(phone: string) {
+    const parents = await this.parentRepo.find({ where: { phone } as any });
+    const tenantIds = [...new Set(parents.map((p) => p.tenantId))];
+    const tenants = await Promise.all(
+      tenantIds.map((id) => this.tenantSvc.get(id).catch(() => null)),
+    );
+    return tenants
+      .filter(Boolean)
+      .map((t: any) => ({ tenantId: t.id, slug: t.slug, name: t.name, domain: t.domain }));
   }
 
   /** 我的课表：按绑定学员所在班级的课次 */

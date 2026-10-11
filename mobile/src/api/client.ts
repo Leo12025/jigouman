@@ -13,6 +13,19 @@ export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
 export const getRole = (): Role => (localStorage.getItem(ROLE_KEY) as Role) || 'parent';
 export const setRole = (r: Role) => localStorage.setItem(ROLE_KEY, r);
 
+/** 当前校区(org_id)；空=全部/总校区视角。家长/员工移动端按此下发 X-Org-Id 实现校区切换 */
+export const CURRENT_ORG_KEY = 'jm_mobile_org';
+export const getCurrentOrg = (): number | null => {
+  const v = localStorage.getItem(CURRENT_ORG_KEY);
+  if (v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+};
+export const setCurrentOrg = (orgId: number | null) => {
+  if (orgId == null) localStorage.removeItem(CURRENT_ORG_KEY);
+  else localStorage.setItem(CURRENT_ORG_KEY, String(orgId));
+};
+
 /** 解码当前 JWT payload（无需后端），用于"我的"页展示账号信息 */
 export function decodeJwt(): Record<string, any> | null {
   const t = getToken();
@@ -50,6 +63,8 @@ const http = axios.create({ baseURL: BASE, timeout: 15000 });
 http.interceptors.request.use((cfg) => {
   const t = getToken();
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  const org = getCurrentOrg();
+  if (org != null) cfg.headers['X-Org-Id'] = String(org);
   return cfg;
 });
 

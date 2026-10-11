@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Delete, Param, Body, ForbiddenException,
+  Controller, Post, Get, Delete, Param, Body, Query, ForbiddenException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, AuthUser, TenantId, Public } from '../../common/decorators/auth.decorator';
@@ -45,6 +45,20 @@ export class ParentController {
   students(@TenantId() t: number, @CurrentUser() u: AuthUser) {
     this.assertParent(u);
     return this.svc.myStudents(t, u.phone as string);
+  }
+
+  @Get('campuses')
+  @ApiOperation({ summary: '我的校区列表(本品牌内，供校区切换)' })
+  campuses(@TenantId() t: number, @CurrentUser() u: AuthUser) {
+    this.assertParent(u);
+    return this.svc.campuses(t, u.phone as string);
+  }
+
+  @Public()
+  @Get('brands')
+  @ApiOperation({ summary: '跨品牌发现(按手机号查所在品牌域，供跨平台切换)' })
+  brands(@Query('phone') phone: string) {
+    return this.svc.brands(phone);
   }
 
   @Get('lessons')

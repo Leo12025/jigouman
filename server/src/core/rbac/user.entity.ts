@@ -31,6 +31,14 @@ export class User extends BaseEntity {
   @Column({ type: 'tinyint', default: 1, comment: '状态 1启用 0禁用' })
   status: number;
 
+  /** 归属校区 id 列表（空=租户内所有校区可见）；用于多校区账号的校区切换与隔离 */
+  @Column({ name: 'org_ids', type: 'simple-json', nullable: true, comment: '归属校区id列表，空=全部' })
+  orgIds?: number[] | null;
+
+  /** 微信 openid（管理员微信登录/绑定） */
+  @Column({ name: 'wechat_openid', type: 'varchar', length: 64, nullable: true, comment: '微信openid' })
+  wechatOpenid?: string | null;
+
   @ManyToMany(() => Role, { eager: true })
   @JoinTable({
     name: 'user_role',

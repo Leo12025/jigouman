@@ -10,7 +10,10 @@ export class SendOtpDto {
 
 export class ParentLoginDto {
   @IsString() @Length(11, 11) @Matches(/^1\d{10}$/) phone: string;
-  @IsString() @Length(6, 6) code: string;
+  /** 短信验证码（与 last6 二选一） */
+  @IsOptional() @IsString() @Length(6, 6) code?: string;
+  /** 手机号后6位快捷登录（与 code 二选一） */
+  @IsOptional() @IsString() @Length(6, 6) last6?: string;
   @IsOptional() @Type(() => Number) @IsInt() tenantId?: number;
 }
 

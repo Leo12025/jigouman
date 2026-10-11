@@ -39,6 +39,14 @@ export class Tenant {
   @Column({ name: 'config', type: 'text', nullable: true })
   config?: string;
 
+  /** 有效期截止（空=永久可用），总域据此管控品牌域授权期限 */
+  @Column({ name: 'expires_at', type: 'datetime', nullable: true })
+  expiresAt?: Date | null;
+
+  /** 校区额度（最大校区/分校数，空=不限），总域据此管控品牌域规模 */
+  @Column({ name: 'max_campuses', type: 'int', nullable: true })
+  maxCampuses?: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

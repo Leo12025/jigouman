@@ -7,6 +7,7 @@ import { User } from '../rbac/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './jwt.strategy';
 import { AuthUser } from '../../common/decorators/auth.decorator';
+import { TenantService } from '../../modules/tenant/tenant.service';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly tenantService: TenantService,
   ) {}
 
   /** 账号密码校验 */
@@ -35,11 +37,29 @@ export class AuthService {
 
   /** 登录签发双令牌（access 短时效 / refresh 长时效，§9.2） */
   async login(dto: LoginDto, resolvedTenantId?: number) {
-    // 优先用调用方显式指定的租户（超级管理员跨租户登录），
-    // 否则用网关/域名解析出的租户（多租户按域名隔离登录），再回退默认租户。
-    const tenantId =
+    let username = dto.username.trim();
+    let tenantId =
       dto.tenantId ?? resolvedTenantId ?? (Number(process.env.DEFAULT_TENANT_ID) || 0);
-    const user = await this.validate(dto.username, dto.password, tenantId);
+
+    // 用户名@品牌域：从 @ 后缀解析品牌（slug/domain），快速定位对应租户
+    const at = username.indexOf('@');
+    if (at > 0) {
+      const suffix = username.slice(at + 1).trim();
+      const name = username.slice(0, at).trim();
+      if (suffix) {
+        const brand = await this.tenantService.findBySlugOrDomain(suffix);
+        if (brand) {
+          tenantId = brand.id;
+          username = name;
+        }
+        // 后缀不匹配任何品牌域时，回退到域名/默认租户 + 完整用户名（兼容邮箱式账号）
+      }
+    }
+
+    // 租户可用性校验（停用 / 过期拦截）
+    await this.tenantService.assertUsable(tenantId);
+
+    const user = await this.validate(username, dto.password, tenantId);
     const base: JwtPayload = {
       sub: user.id,
       tenantId: user.tenantId,
@@ -148,7 +168,69 @@ export class AuthService {
       name: user.name,
       phone: user.phone,
       tenantId: user.tenantId,
+      orgIds: user.orgIds || [],
       roles: user.roles?.map((r) => ({ id: r.id, code: r.code, name: r.name })) || [],
     };
+  }
+
+  // ---------- 管理员微信登录 / 绑定（配置驱动：WX_APPID / WX_SECRET） ----------
+
+  /** 微信 code -> openid（公众号网页授权 / 小程序 login 拿到的 code） */
+  private async exchangeWechatOpenid(code: string): Promise<string> {
+    const appid = process.env.WX_APPID;
+    const secret = process.env.WX_SECRET;
+    if (!appid || !secret) {
+      throw new UnauthorizedException('微信登录未配置（缺少 WX_APPID / WX_SECRET）');
+    }
+    const url =
+      `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appid}` +
+      `&secret=${secret}&code=${encodeURIComponent(code)}&grant_type=authorization_code`;
+    const res = await fetch(url);
+    const data: any = await res.json();
+    if (data.errcode) {
+      throw new UnauthorizedException(`微信授权失败: ${data.errcode} ${data.errmsg}`);
+    }
+    return data.openid as string;
+  }
+
+  /** 微信登录：code 换 openid，命中已绑定账号则签发令牌 */
+  async wechatLogin(code: string) {
+    const openid = await this.exchangeWechatOpenid(code);
+    const user = await this.userRepo.findOne({
+      where: { wechatOpenid: openid } as any,
+      relations: ['roles', 'roles.permissions'],
+    });
+    if (!user) throw new UnauthorizedException('该微信未绑定账号，请先绑定');
+    if (user.status !== 1) throw new UnauthorizedException('账号已被禁用');
+    await this.tenantService.assertUsable(user.tenantId);
+    const base: JwtPayload = {
+      sub: user.id,
+      tenantId: user.tenantId,
+      username: user.username,
+    };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync({ ...base, type: 'access' }, { expiresIn: process.env.JWT_EXPIRES_IN || '2h' }),
+      this.jwtService.signAsync({ ...base, type: 'refresh' }, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }),
+    ]);
+    return { accessToken, refreshToken, user: this.toUserInfo(user) };
+  }
+
+  /** 微信绑定并登录：code 换 openid，绑定到当前租户下指定手机号账号 */
+  async wechatBind(tenantId: number, code: string, phone: string) {
+    await this.tenantService.assertUsable(tenantId);
+    const openid = await this.exchangeWechatOpenid(code);
+    const user = await this.userRepo.findOne({
+      where: { tenantId, phone } as any,
+      relations: ['roles', 'roles.permissions'],
+    });
+    if (!user) throw new UnauthorizedException('该手机号账号不存在');
+    user.wechatOpenid = openid;
+    await this.userRepo.save(user as any);
+    const base: JwtPayload = { sub: user.id, tenantId: user.tenantId, username: user.username };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync({ ...base, type: 'access' }, { expiresIn: process.env.JWT_EXPIRES_IN || '2h' }),
+      this.jwtService.signAsync({ ...base, type: 'refresh' }, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }),
+    ]);
+    return { accessToken, refreshToken, user: this.toUserInfo(user) };
   }
 }

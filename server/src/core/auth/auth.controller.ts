@@ -31,4 +31,18 @@ export class AuthController {
   profile(@TenantId() t: number, @CurrentUser() u: AuthUser) {
     return this.authService.profile(t, u.id);
   }
+
+  @Public()
+  @Post('wechat/login')
+  @ApiOperation({ summary: '管理员微信登录(code换openid，需已绑定)' })
+  wechatLogin(@Body() d: { code: string }) {
+    return this.authService.wechatLogin(d.code);
+  }
+
+  @Public()
+  @Post('wechat/bind')
+  @ApiOperation({ summary: '管理员微信绑定并登录(绑定到当前租户手机号账号)' })
+  wechatBind(@TenantId() t: number, @Body() d: { code: string; phone: string }) {
+    return this.authService.wechatBind(t, d.code, d.phone);
+  }
 }

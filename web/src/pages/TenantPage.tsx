@@ -33,16 +33,19 @@ export default function TenantPage() {
   const openEdit = (r: any) => {
     setEditing(r);
     form.resetFields();
-    form.setFieldsValue({ slug: r.slug, domain: r.domain || '', name: r.name, status: r.status, config: r.config || '' });
+    form.setFieldsValue({ slug: r.slug, domain: r.domain || '', name: r.name, status: r.status, maxCampuses: r.maxCampuses ?? '', expiresAt: r.expiresAt || '', config: r.config || '' });
     setOpen(true);
   };
   const submit = async () => {
     const v = await form.validateFields();
+    const payload: any = { ...v };
+    if (payload.maxCampuses === '' || payload.maxCampuses == null) delete payload.maxCampuses;
+    if (payload.expiresAt === '') delete payload.expiresAt;
     if (editing) {
-      await updateTenant(editing.id, v);
+      await updateTenant(editing.id, payload);
       message.success('已保存');
     } else {
-      await createTenant(v);
+      await createTenant(payload);
       message.success('创建成功');
     }
     setOpen(false);
@@ -69,6 +72,8 @@ export default function TenantPage() {
             dataIndex: 'status',
             render: (s: string) => <Tag color={s === 'ACTIVE' ? 'green' : 'red'}>{s === 'ACTIVE' ? '启用' : '停用'}</Tag>,
           },
+          { title: '校区额度', dataIndex: 'maxCampuses', render: (v: number) => (v == null ? '不限' : v) },
+          { title: '有效期至', dataIndex: 'expiresAt', render: (v: string) => (v ? v : '永久') },
           {
             title: '操作',
             render: (_: any, r: any) => (
@@ -90,6 +95,8 @@ export default function TenantPage() {
             <Input placeholder="如 acme.example.com 或 acme.localhost" />
           </Form.Item>
           <Form.Item name="status" label="状态"><Select options={[{ value: 'ACTIVE', label: '启用' }, { value: 'DISABLED', label: '停用' }]} /></Form.Item>
+          <Form.Item name="maxCampuses" label="校区额度(最大校区数，留空=不限)"><Input type="number" placeholder="如 20" /></Form.Item>
+          <Form.Item name="expiresAt" label="有效期至(留空=永久，ISO格式)"><Input placeholder="2027-12-31T23:59:59" /></Form.Item>
           <Form.Item name="config" label="配置(JSON，可选)"><Input.TextArea rows={3} placeholder='{"theme":"blue"}' /></Form.Item>
         </Form>
       </Modal>
