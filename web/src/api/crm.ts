@@ -362,6 +362,12 @@ export const createOrg = (d: any) => apiPost<any>('/orgs', d);
 export const updateOrg = (id: number, d: any) => apiPut<any>(`/orgs/${id}`, d);
 export const deleteOrg = (id: number) => apiDelete(`/orgs/${id}`);
 
+// 平台级租户中心（仅平台管理员）
+export const listTenants = (params: any) => apiGet<any[]>('/platform/tenants', params);
+export const createTenant = (d: any) => apiPost<any>('/platform/tenants', d);
+export const updateTenant = (id: number, d: any) => apiPut<any>(`/platform/tenants/${id}`, d);
+export const deleteTenant = (id: number) => apiDelete(`/platform/tenants/${id}`);
+
 // ---------- 教材库存 (§4.20) ----------
 export const listMaterials = (params: any) => apiGet<PageResult<any>>('/materials', params);
 export const createMaterial = (d: any) => apiPost<any>('/materials', d);

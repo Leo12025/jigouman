@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Layout, Menu, Button, Space, Typography, Grid, Dropdown, Avatar, Tag, Badge, Popover } from 'antd';
+import { Layout, Menu, Button, Space, Typography, Grid, Dropdown, Avatar, Tag, Badge, Popover, Select } from 'antd';
 import {
   TeamOutlined,
   PartitionOutlined,
@@ -33,14 +33,24 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { clearToken, getToken } from '../api/client';
+import { clearToken, getToken, getCurrentOrg, setCurrentOrg } from '../api/client';
 import {
   fetchProfile,
   getNotifications,
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  orgTree,
 } from '../api/crm';
+
+/** 将组织树展平为校区下拉选项（HQ/分校/校区均可选） */
+const flattenOrgs = (nodes: any[], out: { value: number; label: string }[] = []): { value: number; label: string }[] => {
+  nodes?.forEach((n) => {
+    out.push({ value: n.id, label: `${n.name}（${n.type}）` });
+    if (n.children?.length) flattenOrgs(n.children, out);
+  });
+  return out;
+};
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -56,6 +66,8 @@ export default function MainLayout() {
   const screens = Grid.useBreakpoint();
   const isNarrow = !screens.lg;
   const selected = '/' + (location.pathname.split('/')[1] || 'leads');
+  const [campusOpts, setCampusOpts] = useState<{ value: number; label: string }[]>([]);
+  const [orgSel, setOrgSel] = useState<number | null>(getCurrentOrg());
 
   useEffect(() => {
     if (getToken()) {
@@ -65,6 +77,8 @@ export default function MainLayout() {
       getUnreadCount()
         .then((r) => setUnread(r.count))
         .catch(() => undefined);
+      // 校区切换器：加载组织树并展平
+      orgTree().then((t) => setCampusOpts(flattenOrgs(t))).catch(() => undefined);
     }
   }, []);
 
@@ -138,6 +152,7 @@ export default function MainLayout() {
         { key: '/approvals', icon: <AuditOutlined />, label: '审批中心' },
         { key: '/notify-channels', icon: <ApiOutlined />, label: '消息渠道配置' },
         { key: '/reports', icon: <BarChartOutlined />, label: '看板配置/报表' },
+        { key: '/tenants', icon: <ApiOutlined />, label: '租户中心' },
       ],
     },
   ];
@@ -207,7 +222,18 @@ export default function MainLayout() {
                 <BellOutlined style={{ fontSize: 18, cursor: 'pointer' }} />
               </Badge>
             </Popover>
-            {/* 机构/校区（多校区切换在 M8 引入 organization 后开放） */}
+            {/* 多校区切换器：切换后下发 X-Org-Id，全页以该校区视角隔离数据 */}
+            <Select
+              value={orgSel ?? 'ALL'}
+              style={{ width: 180 }}
+              onChange={(v) => {
+                const next = v === 'ALL' ? null : Number(v);
+                setCurrentOrg(next);
+                setOrgSel(next);
+                window.location.reload();
+              }}
+              options={[{ value: 'ALL', label: '全部校区(总校区)' }, ...campusOpts]}
+            />
             <Tag color="blue">{profile?.orgName || '机构'}</Tag>
             <Dropdown
               menu={{

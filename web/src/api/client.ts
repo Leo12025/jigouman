@@ -3,6 +3,8 @@ import { message } from 'antd';
 
 export const TOKEN_KEY = 'jm_token';
 export const REFRESH_KEY = 'jm_refresh';
+/** 当前选中的校区(org_id)；空字符串=全部/总校区视角 */
+export const CURRENT_ORG_KEY = 'jm_current_org';
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
 export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
@@ -13,6 +15,18 @@ export const setTokens = (accessToken: string, refreshToken?: string) => {
 export const clearToken = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
+};
+
+/** 当前校区：null=全部(总校区可见)；number=仅该校区 */
+export const getCurrentOrg = (): number | null => {
+  const v = localStorage.getItem(CURRENT_ORG_KEY);
+  if (v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+};
+export const setCurrentOrg = (orgId: number | null) => {
+  if (orgId == null) localStorage.removeItem(CURRENT_ORG_KEY);
+  else localStorage.setItem(CURRENT_ORG_KEY, String(orgId));
 };
 
 /** 统一响应体（文档 §6：{ code, message, data, traceId }） */
@@ -31,6 +45,9 @@ const http = axios.create({
 http.interceptors.request.use((cfg) => {
   const t = getToken();
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  // 校区上下文：校区切换器写入 localStorage，统一在此下发 X-Org-Id
+  const org = getCurrentOrg();
+  if (org != null) cfg.headers['X-Org-Id'] = String(org);
   return cfg;
 });
 
