@@ -7,6 +7,9 @@ import { BaseEntity } from '../../../common/base.entity';
 @Entity({ name: 'trial_lesson' })
 @Index(['tenantId', 'leadId'])
 export class TrialLesson extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，无则为租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
   @Column({ name: 'lead_id', type: 'bigint', comment: '线索' })
   leadId: number;
 

@@ -7,18 +7,32 @@ import { BaseEntity } from '../base.entity';
 import { PageQueryDto, PageResult } from '../dto/pagination.dto';
 import { BusinessException } from '../exceptions/business.exception';
 import { ResCode } from '../constants/response-code';
+import { getOrgId } from '../org-context';
 
 /**
- * 多租户 CRUD 基类：所有写操作自动注入 tenantId，
- * 所有读操作按 tenantId 隔离（文档 §2.2 单库多租户）。
- * 子类通过 `super(repo)` 注入 Repository 即可获得标准能力。
+ * 多租户 + 多校区 CRUD 基类：
+ * - 所有写操作自动注入 tenantId；有 org_id 列的实体额外按校区上下文落章 orgId。
+ * - 所有读操作按 tenantId 隔离；若请求携带校区上下文且有 org_id 列，则追加 orgId 过滤（校区独立）。
+ * 子类通过 `super(repo)` 注入 Repository 即可获得标准能力（文档 §2.2 / §4.11）。
  */
 @Injectable()
 export class BaseService<T extends BaseEntity> {
   constructor(public readonly repo: Repository<T>) {}
 
+  /** 当前实体是否带有 org_id 校区列 */
+  private hasOrgColumn(): boolean {
+    return this.repo.metadata.columns.some((c) => c.propertyName === 'orgId');
+  }
+
+  /** 合并校区上下文：仅在实体有 org_id 列且当前请求携带 orgId 时追加过滤/落章 */
+  private scopeOrg(extra: Record<string, any> = {}): Record<string, any> {
+    const orgId = getOrgId();
+    if (orgId == null || !this.hasOrgColumn()) return extra;
+    return { ...extra, orgId };
+  }
+
   protected withTenant(tenantId: number, extra: FindOptionsWhere<T> = {}) {
-    return { tenantId, ...extra } as FindOptionsWhere<T>;
+    return { tenantId, ...this.scopeOrg(extra as Record<string, any>) } as FindOptionsWhere<T>;
   }
 
   async paginate(
@@ -67,13 +81,17 @@ export class BaseService<T extends BaseEntity> {
   }
 
   async create(tenantId: number, dto: Partial<T>): Promise<T> {
-    const entity = this.repo.create({ ...(dto as any), tenantId });
+    const entity: any = this.repo.create({ ...(dto as any), tenantId });
+    const orgId = getOrgId();
+    if (orgId != null && this.hasOrgColumn()) entity.orgId = orgId;
     return (await this.repo.save(entity)) as unknown as T;
   }
 
   async update(tenantId: number, id: number, dto: Partial<T>): Promise<T> {
     const e = await this.findOne(tenantId, id);
     Object.assign(e, dto);
+    const orgId = getOrgId();
+    if (orgId != null && this.hasOrgColumn()) (e as any).orgId = orgId;
     return (await this.repo.save(e)) as unknown as T;
   }
 

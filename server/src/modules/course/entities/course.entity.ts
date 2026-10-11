@@ -14,6 +14,9 @@ export enum CourseType {
 @Entity({ name: 'course' })
 @Index(['tenantId', 'categoryId'])
 export class Course extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，无则为租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
   @Column({ type: 'varchar', length: 128, comment: '课程名称' })
   name: string;
 

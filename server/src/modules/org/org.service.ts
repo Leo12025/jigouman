@@ -9,6 +9,11 @@ export class OrgService {
   constructor(@InjectRepository(Organization) private readonly repo: Repository<Organization>) {}
 
   async create(tenantId: number, d: CreateOrgDto) {
+    // 每租户仅允许一个 HQ（总校区）：已有则拒绝新建
+    if (d.type === 'HQ') {
+      const existHq = await this.repo.findOne({ where: { tenantId, type: 'HQ' } as any });
+      if (existHq) throw new NotFoundException('该租户已存在总校区(HQ)，请勿重复创建');
+    }
     const o = this.repo.create({ tenantId, ...(d as any) } as Organization);
     return this.repo.save(o as any);
   }

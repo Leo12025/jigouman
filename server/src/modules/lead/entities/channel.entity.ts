@@ -16,6 +16,9 @@ export enum ChannelType {
 @Entity({ name: 'channel' })
 @Index(['tenantId', 'type'])
 export class Channel extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，无则为租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
   @Column({ type: 'varchar', length: 64, comment: '渠道名称' })
   name: string;
 

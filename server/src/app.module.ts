@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, NestModule, OnModuleInit, RequestMethod, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
@@ -10,6 +10,7 @@ import { AuthModule } from './core/auth/auth.module';
 import { JwtAuthGuard } from './core/auth/jwt-auth.guard';
 import { TenantGuard } from './core/tenant/tenant.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { OrgContextMiddleware } from './common/org-context.middleware';
 import { RbacModule } from './core/rbac/rbac.module';
 import { RbacService } from './core/rbac/rbac.service';
 
@@ -103,7 +104,17 @@ import { ClassChangeModule } from './modules/class-change/class-change.module';
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
-export class AppModule implements OnModuleInit {
+export class AppModule implements OnModuleInit, NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // 校区上下文：用 AsyncLocalStorage.run 包裹整条请求，使下游 Service 可按校区隔离
+    consumer
+      .apply(OrgContextMiddleware)
+      .exclude(
+        { path: 'health', method: RequestMethod.GET },
+        { path: 'api/v1/health', method: RequestMethod.GET },
+      )
+      .forRoutes('*');
+  }
   constructor(
     private readonly rbac: RbacService,
     private readonly tenantService: TenantService,

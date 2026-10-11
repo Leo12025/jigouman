@@ -15,6 +15,9 @@ export enum CampaignType {
  */
 @Entity({ name: 'campaign' })
 export class Campaign extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，无则为租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
   @Column({ type: 'varchar', length: 64, comment: '活动名称' })
   name: string;
 
