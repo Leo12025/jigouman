@@ -6,6 +6,8 @@ import { CreateTaskDto, TaskPageQueryDto } from './dto/task.dto';
 import { TASK_TYPE_LABELS, TASK_SEVERE_OVERDUE_HOURS } from './task-types';
 import { NotificationService } from '../notification/notification.service';
 
+import { orgRepo } from '../../common/org-scope';
+
 export interface TaskView extends Task {
   /** 是否已逾期（status=TODO 且已超过截止时间） */
   overdue: boolean;
@@ -17,10 +19,13 @@ export interface TaskView extends Task {
 
 @Injectable()
 export class TaskService {
+  private readonly repo: Repository<Task>;
   constructor(
-    @InjectRepository(Task) private readonly repo: Repository<Task>,
+    @InjectRepository(Task) repo: Repository<Task>,
     private readonly notifySvc: NotificationService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   /** 派生逾期信息（§4.26 逾期提醒/升级的数据基础） */
   private decorate(t: Task): TaskView {

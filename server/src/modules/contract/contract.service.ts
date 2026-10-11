@@ -14,12 +14,19 @@ import {
   ContractPageQueryDto,
 } from './dto/contract.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ContractService {
+  private readonly tpl: Repository<ContractTemplate>;
+  private readonly repo: Repository<Contract>;
   constructor(
-    @InjectRepository(ContractTemplate) private readonly tpl: Repository<ContractTemplate>,
-    @InjectRepository(Contract) private readonly repo: Repository<Contract>,
-  ) {}
+    @InjectRepository(ContractTemplate) tpl: Repository<ContractTemplate>,
+    @InjectRepository(Contract) repo: Repository<Contract>,
+  ) {
+    this.tpl = orgRepo(tpl);
+    this.repo = orgRepo(repo);
+  }
 
   // ---- 模板 ----
   async createTemplate(tenantId: number, d: CreateContractTemplateDto) {

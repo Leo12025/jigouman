@@ -7,12 +7,19 @@ import {
   CreateSurveyTemplateDto, UpdateSurveyTemplateDto, SubmitSurveyDto, SurveyPageQueryDto,
 } from './dto/survey.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class SurveyService {
+  private readonly tpl: Repository<SurveyTemplate>;
+  private readonly resp: Repository<SurveyResponse>;
   constructor(
-    @InjectRepository(SurveyTemplate) private readonly tpl: Repository<SurveyTemplate>,
-    @InjectRepository(SurveyResponse) private readonly resp: Repository<SurveyResponse>,
-  ) {}
+    @InjectRepository(SurveyTemplate) tpl: Repository<SurveyTemplate>,
+    @InjectRepository(SurveyResponse) resp: Repository<SurveyResponse>,
+  ) {
+    this.tpl = orgRepo(tpl);
+    this.resp = orgRepo(resp);
+  }
 
   // ---- 模板 ----
   async createTemplate(tenantId: number, d: CreateSurveyTemplateDto) {

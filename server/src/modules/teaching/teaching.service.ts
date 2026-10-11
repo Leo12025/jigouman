@@ -7,12 +7,19 @@ import { OnlineClass } from './entities/online-class.entity';
 import { StudyRecord } from './entities/study-record.entity';
 import { CreateOnlineClassDto, UpdateOnlineClassDto, CreateStudyRecordDto, TeachingPageQueryDto } from './dto/teaching.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class TeachingService {
+  private readonly cls: Repository<OnlineClass>;
+  private readonly rec: Repository<StudyRecord>;
   constructor(
-    @InjectRepository(OnlineClass) private readonly cls: Repository<OnlineClass>,
-    @InjectRepository(StudyRecord) private readonly rec: Repository<StudyRecord>,
-  ) {}
+    @InjectRepository(OnlineClass) cls: Repository<OnlineClass>,
+    @InjectRepository(StudyRecord) rec: Repository<StudyRecord>,
+  ) {
+    this.cls = orgRepo(cls);
+    this.rec = orgRepo(rec);
+  }
 
   async createClass(tenantId: number, d: CreateOnlineClassDto) {
     const e = this.cls.create({ tenantId, ...(d as any) } as OnlineClass);

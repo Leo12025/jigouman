@@ -5,12 +5,17 @@ import { Tenant } from './entities/tenant.entity';
 import { CreateTenantDto, UpdateTenantDto, TenantQueryDto } from './dto/tenant.dto';
 
 /** 租户服务：CRUD + 域名解析（租户中心 & 多租户网关） */
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class TenantService {
   /** 域名 -> 租户 解析缓存（60s），避免每请求查库 */
   private cache = new Map<string, { id: number; ts: number }>();
 
-  constructor(@InjectRepository(Tenant) private readonly repo: Repository<Tenant>) {}
+  private readonly repo: Repository<Tenant>;
+  constructor(@InjectRepository(Tenant) repo: Repository<Tenant>) {
+    this.repo = orgRepo(repo);
+  }
 
   /**
    * 按 Host 头解析租户：先精确匹配 domain，再取子域名(slug)匹配。

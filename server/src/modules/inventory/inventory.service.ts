@@ -7,12 +7,19 @@ import { Material } from './entities/material.entity';
 import { StockMovement } from './entities/stock-movement.entity';
 import { CreateMaterialDto, UpdateMaterialDto, StockAdjustDto, InventoryPageQueryDto } from './dto/inventory.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class InventoryService {
+  private readonly mat: Repository<Material>;
+  private readonly mv: Repository<StockMovement>;
   constructor(
-    @InjectRepository(Material) private readonly mat: Repository<Material>,
-    @InjectRepository(StockMovement) private readonly mv: Repository<StockMovement>,
-  ) {}
+    @InjectRepository(Material) mat: Repository<Material>,
+    @InjectRepository(StockMovement) mv: Repository<StockMovement>,
+  ) {
+    this.mat = orgRepo(mat);
+    this.mv = orgRepo(mv);
+  }
 
   async create(tenantId: number, d: CreateMaterialDto) {
     const m = this.mat.create({ tenantId, stockQty: d.stockQty || 0, warningQty: d.warningQty || 0, ...(d as any) } as Material);

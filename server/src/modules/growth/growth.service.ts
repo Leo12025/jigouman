@@ -16,17 +16,32 @@ import { TaskService } from '../task/task.service';
 const SCORE_ENTRY_TYPE = 'SCORE_ENTRY';
 const SCORE_ENTRY_REF = 'EXAM';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class GrowthService {
+  private readonly examRepo: Repository<Exam>;
+  private readonly scoreRepo: Repository<Score>;
+  private readonly metricRepo: Repository<GrowthMetric>;
+  private readonly contestRepo: Repository<Contest>;
+  private readonly joinRepo: Repository<ContestJoin>;
+  private readonly awardRepo: Repository<Award>;
   constructor(
-    @InjectRepository(Exam) private readonly examRepo: Repository<Exam>,
-    @InjectRepository(Score) private readonly scoreRepo: Repository<Score>,
-    @InjectRepository(GrowthMetric) private readonly metricRepo: Repository<GrowthMetric>,
-    @InjectRepository(Contest) private readonly contestRepo: Repository<Contest>,
-    @InjectRepository(ContestJoin) private readonly joinRepo: Repository<ContestJoin>,
-    @InjectRepository(Award) private readonly awardRepo: Repository<Award>,
+    @InjectRepository(Exam) examRepo: Repository<Exam>,
+    @InjectRepository(Score) scoreRepo: Repository<Score>,
+    @InjectRepository(GrowthMetric) metricRepo: Repository<GrowthMetric>,
+    @InjectRepository(Contest) contestRepo: Repository<Contest>,
+    @InjectRepository(ContestJoin) joinRepo: Repository<ContestJoin>,
+    @InjectRepository(Award) awardRepo: Repository<Award>,
     private readonly taskSvc: TaskService,
-  ) {}
+  ) {
+    this.examRepo = orgRepo(examRepo);
+    this.scoreRepo = orgRepo(scoreRepo);
+    this.metricRepo = orgRepo(metricRepo);
+    this.contestRepo = orgRepo(contestRepo);
+    this.joinRepo = orgRepo(joinRepo);
+    this.awardRepo = orgRepo(awardRepo);
+  }
 
   // ---------- 测评 / 成绩 ----------
   /** 创建测评（§6.5）。创建即生成 SCORE_ENTRY 待办并通知录入人（§4.26 事件化来源：测评→成绩录入） */

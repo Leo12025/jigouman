@@ -4,9 +4,14 @@ import { Like, Repository } from 'typeorm';
 import { Classroom } from './entities/classroom.entity';
 import { CreateClassroomDto, UpdateClassroomDto, ClassroomPageQueryDto } from './dto/venue.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class VenueService {
-  constructor(@InjectRepository(Classroom) private readonly repo: Repository<Classroom>) {}
+  private readonly repo: Repository<Classroom>;
+  constructor(@InjectRepository(Classroom) repo: Repository<Classroom>) {
+    this.repo = orgRepo(repo);
+  }
 
   async create(tenantId: number, d: CreateClassroomDto) {
     const c = this.repo.create({ tenantId, ...(d as any) } as Classroom);

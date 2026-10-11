@@ -6,13 +6,18 @@ import { CreateAlertRuleDto, UpdateAlertRuleDto, CheckAlertDto, AlertPageQueryDt
 import { DashboardService } from '../dashboard/dashboard.service';
 import { NotificationService } from '../notification/notification.service';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class AlertService {
+  private readonly repo: Repository<AlertRule>;
   constructor(
-    @InjectRepository(AlertRule) private readonly repo: Repository<AlertRule>,
+    @InjectRepository(AlertRule) repo: Repository<AlertRule>,
     private readonly dashboard: DashboardService,
     private readonly notification: NotificationService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   async createRule(tenantId: number, d: CreateAlertRuleDto) {
     const r = this.repo.create({ tenantId, ...(d as any) } as AlertRule);

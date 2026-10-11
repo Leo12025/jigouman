@@ -11,12 +11,19 @@ function randCode(prefix: string) {
   return `${prefix}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class DistributionService {
+  private readonly dist: Repository<Distributor>;
+  private readonly comm: Repository<Commission>;
   constructor(
-    @InjectRepository(Distributor) private readonly dist: Repository<Distributor>,
-    @InjectRepository(Commission) private readonly comm: Repository<Commission>,
-  ) {}
+    @InjectRepository(Distributor) dist: Repository<Distributor>,
+    @InjectRepository(Commission) comm: Repository<Commission>,
+  ) {
+    this.dist = orgRepo(dist);
+    this.comm = orgRepo(comm);
+  }
 
   async createDistributor(tenantId: number, d: CreateDistributorDto) {
     if (d.parentId) {

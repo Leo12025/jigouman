@@ -1,3 +1,4 @@
+import { orgRepo as orgScoped } from '../../common/org-scope';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -50,7 +51,27 @@ export class DashboardService {
     @InjectRepository(Organization) private orgRepo: Repository<Organization>,
     @InjectRepository(CostRecord) private costRepo: Repository<CostRecord>,
     @InjectRepository(Material) private materialRepo: Repository<Material>,
-  ) {}
+  ) {
+    // 看板按校区口径聚合：套用校区隔离（读自动过滤 org_id）
+    // 注意：本类已有字段 orgRepo(Organization 仓库)，故用别名引入隔离助手
+    this.leadRepo = orgScoped(this.leadRepo);
+    this.studentRepo = orgScoped(this.studentRepo);
+    this.scRepo = orgScoped(this.scRepo);
+    this.orderRepo = orgScoped(this.orderRepo);
+    this.haRepo = orgScoped(this.haRepo);
+    this.hcRepo = orgScoped(this.hcRepo);
+    this.attRepo = orgScoped(this.attRepo);
+    this.cgRepo = orgScoped(this.cgRepo);
+    this.hwRepo = orgScoped(this.hwRepo);
+    this.hsRepo = orgScoped(this.hsRepo);
+    this.hrRepo = orgScoped(this.hrRepo);
+    this.taskRepo = orgScoped(this.taskRepo);
+    this.reviewRepo = orgScoped(this.reviewRepo);
+    this.channelRepo = orgScoped(this.channelRepo);
+    this.campaignRepo = orgScoped(this.campaignRepo);
+    this.costRepo = orgScoped(this.costRepo);
+    this.materialRepo = orgScoped(this.materialRepo);
+  }
 
   async byRole(t: number, role: string, q: any) {
     if (!DASHBOARD_ROLES.includes(role as DashboardRole)) {

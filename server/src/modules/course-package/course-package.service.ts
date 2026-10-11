@@ -10,14 +10,23 @@ import {
 import { Course } from '../course/entities/course.entity';
 import { HourService } from '../hour/hour.service';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class CoursePackageService {
+  private readonly pkgRepo: Repository<CoursePackage>;
+  private readonly pcRepo: Repository<PackageCourse>;
+  private readonly courseRepo: Repository<Course>;
   constructor(
-    @InjectRepository(CoursePackage) private readonly pkgRepo: Repository<CoursePackage>,
-    @InjectRepository(PackageCourse) private readonly pcRepo: Repository<PackageCourse>,
-    @InjectRepository(Course) private readonly courseRepo: Repository<Course>,
+    @InjectRepository(CoursePackage) pkgRepo: Repository<CoursePackage>,
+    @InjectRepository(PackageCourse) pcRepo: Repository<PackageCourse>,
+    @InjectRepository(Course) courseRepo: Repository<Course>,
     private readonly hourSvc: HourService,
-  ) {}
+  ) {
+    this.pkgRepo = orgRepo(pkgRepo);
+    this.pcRepo = orgRepo(pcRepo);
+    this.courseRepo = orgRepo(courseRepo);
+  }
 
   async create(tenantId: number, d: CreateCoursePackageDto) {
     const p = this.pkgRepo.create({

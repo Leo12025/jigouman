@@ -13,18 +13,25 @@ import { NotificationService } from '../notification/notification.service';
 import { ApprovalFlowService } from './approval-flow.service';
 import { approvalEvents } from '../../common/approval-events';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ApprovalService {
+  private readonly instanceRepo: Repository<ApprovalInstance>;
+  private readonly nodeRepo: Repository<ApprovalNode>;
   constructor(
     @InjectRepository(ApprovalInstance)
-    private readonly instanceRepo: Repository<ApprovalInstance>,
+    instanceRepo: Repository<ApprovalInstance>,
     @InjectRepository(ApprovalNode)
-    private readonly nodeRepo: Repository<ApprovalNode>,
+    nodeRepo: Repository<ApprovalNode>,
     private readonly taskSvc: TaskService,
     private readonly auditSvc: AuditService,
     private readonly notifySvc: NotificationService,
     private readonly flowSvc: ApprovalFlowService,
-  ) {}
+  ) {
+    this.instanceRepo = orgRepo(instanceRepo);
+    this.nodeRepo = orgRepo(nodeRepo);
+  }
 
   /** 发起审批：引用 flowId 自动套用节点，或直接指定 approverIds（向后兼容）。
    *  为当前节点审批人(集合)生成 APPROVAL 任务并入待办中心（§4.26 与审批打通）。 */

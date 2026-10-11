@@ -9,14 +9,23 @@ import { CreateNoticeDto, NoticePageQueryDto, CreateRenewalReminderDto } from '.
 import { TaskService } from '../task/task.service';
 import { TaskStatus } from '../task/entities/task.entity';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class FamilyService {
+  private readonly repo: Repository<CourseReview>;
+  private readonly noticeRepo: Repository<Notice>;
+  private readonly renewalRepo: Repository<RenewalReminder>;
   constructor(
-    @InjectRepository(CourseReview) private readonly repo: Repository<CourseReview>,
-    @InjectRepository(Notice) private readonly noticeRepo: Repository<Notice>,
-    @InjectRepository(RenewalReminder) private readonly renewalRepo: Repository<RenewalReminder>,
+    @InjectRepository(CourseReview) repo: Repository<CourseReview>,
+    @InjectRepository(Notice) noticeRepo: Repository<Notice>,
+    @InjectRepository(RenewalReminder) renewalRepo: Repository<RenewalReminder>,
     private readonly taskSvc: TaskService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+    this.noticeRepo = orgRepo(noticeRepo);
+    this.renewalRepo = orgRepo(renewalRepo);
+  }
 
   // ---------- 通知（§5.7 / §6.6） ----------
   /** 发送通知。家长端按绑定学员可见（studentId 为空表示全员通知） */

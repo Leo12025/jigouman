@@ -18,17 +18,30 @@ import { approvalEvents, ApprovalEventPayload } from '../../common/approval-even
  * 调课/转班业务。两者均通过审批中心流转（仅系统内生效，不关联外部账户）：
  * 创建即生成审批实例 → 审批中心终审 → 事件总线回写业务效果（§4 资金联动）。
  */
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ClassChangeService implements OnModuleInit {
+  private readonly transferRepo: Repository<ClassTransfer>;
+  private readonly reschedRepo: Repository<LessonReschedule>;
+  private readonly scRepo: Repository<StudentCourse>;
+  private readonly lessonRepo: Repository<Lesson>;
+  private readonly cgRepo: Repository<ClassGroup>;
   constructor(
-    @InjectRepository(ClassTransfer) private transferRepo: Repository<ClassTransfer>,
-    @InjectRepository(LessonReschedule) private reschedRepo: Repository<LessonReschedule>,
-    @InjectRepository(StudentCourse) private scRepo: Repository<StudentCourse>,
-    @InjectRepository(Lesson) private lessonRepo: Repository<Lesson>,
-    @InjectRepository(ClassGroup) private cgRepo: Repository<ClassGroup>,
+    @InjectRepository(ClassTransfer) transferRepo: Repository<ClassTransfer>,
+    @InjectRepository(LessonReschedule) reschedRepo: Repository<LessonReschedule>,
+    @InjectRepository(StudentCourse) scRepo: Repository<StudentCourse>,
+    @InjectRepository(Lesson) lessonRepo: Repository<Lesson>,
+    @InjectRepository(ClassGroup) cgRepo: Repository<ClassGroup>,
     private readonly approval: ApprovalService,
     private readonly order: OrderService,
-  ) {}
+  ) {
+    this.transferRepo = orgRepo(transferRepo);
+    this.reschedRepo = orgRepo(reschedRepo);
+    this.scRepo = orgRepo(scRepo);
+    this.lessonRepo = orgRepo(lessonRepo);
+    this.cgRepo = orgRepo(cgRepo);
+  }
 
   onModuleInit() {
     approvalEvents.on('approval.approved', (p: ApprovalEventPayload) => {

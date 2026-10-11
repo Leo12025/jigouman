@@ -10,13 +10,22 @@ import {
   CreateMemberLevelDto, UpdateMemberLevelDto, AdjustPointsDto, MemberPageQueryDto,
 } from './dto/membership.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class MembershipService {
+  private readonly level: Repository<MemberLevel>;
+  private readonly member: Repository<Member>;
+  private readonly ledger: Repository<PointLedger>;
   constructor(
-    @InjectRepository(MemberLevel) private readonly level: Repository<MemberLevel>,
-    @InjectRepository(Member) private readonly member: Repository<Member>,
-    @InjectRepository(PointLedger) private readonly ledger: Repository<PointLedger>,
-  ) {}
+    @InjectRepository(MemberLevel) level: Repository<MemberLevel>,
+    @InjectRepository(Member) member: Repository<Member>,
+    @InjectRepository(PointLedger) ledger: Repository<PointLedger>,
+  ) {
+    this.level = orgRepo(level);
+    this.member = orgRepo(member);
+    this.ledger = orgRepo(ledger);
+  }
 
   // ---- 等级 ----
   async createLevel(tenantId: number, d: CreateMemberLevelDto) {

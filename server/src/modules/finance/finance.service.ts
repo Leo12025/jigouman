@@ -24,16 +24,31 @@ function r2(n: number): number {
   return Math.round((n || 0) * 100) / 100;
 }
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class FinanceService {
+  private readonly cfgRepo: Repository<SplitConfig>;
+  private readonly splitRepo: Repository<SplitRecord>;
+  private readonly salaryRepo: Repository<Salary>;
+  private readonly invoiceRepo: Repository<Invoice>;
+  private readonly accRepo: Repository<HourAccount>;
+  private readonly consRepo: Repository<HourConsumption>;
   constructor(
-    @InjectRepository(SplitConfig) private readonly cfgRepo: Repository<SplitConfig>,
-    @InjectRepository(SplitRecord) private readonly splitRepo: Repository<SplitRecord>,
-    @InjectRepository(Salary) private readonly salaryRepo: Repository<Salary>,
-    @InjectRepository(Invoice) private readonly invoiceRepo: Repository<Invoice>,
-    @InjectRepository(HourAccount) private readonly accRepo: Repository<HourAccount>,
-    @InjectRepository(HourConsumption) private readonly consRepo: Repository<HourConsumption>,
-  ) {}
+    @InjectRepository(SplitConfig) cfgRepo: Repository<SplitConfig>,
+    @InjectRepository(SplitRecord) splitRepo: Repository<SplitRecord>,
+    @InjectRepository(Salary) salaryRepo: Repository<Salary>,
+    @InjectRepository(Invoice) invoiceRepo: Repository<Invoice>,
+    @InjectRepository(HourAccount) accRepo: Repository<HourAccount>,
+    @InjectRepository(HourConsumption) consRepo: Repository<HourConsumption>,
+  ) {
+    this.cfgRepo = orgRepo(cfgRepo);
+    this.splitRepo = orgRepo(splitRepo);
+    this.salaryRepo = orgRepo(salaryRepo);
+    this.invoiceRepo = orgRepo(invoiceRepo);
+    this.accRepo = orgRepo(accRepo);
+    this.consRepo = orgRepo(consRepo);
+  }
 
   // ---------------- 分账配置 ----------------
   async getConfig(tenantId: number): Promise<SplitConfig> {

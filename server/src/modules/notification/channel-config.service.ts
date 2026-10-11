@@ -5,12 +5,17 @@ import { ChannelConfig } from './entities/channel-config.entity';
 import { UpsertChannelConfigDto } from './dto/channel-config.dto';
 
 /** 外部消息渠道配置服务（§4.26 多渠道提醒：按租户/渠道管理密钥与启停） */
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ChannelConfigService {
+  private readonly repo: Repository<ChannelConfig>;
   constructor(
     @InjectRepository(ChannelConfig)
-    private readonly repo: Repository<ChannelConfig>,
-  ) {}
+    repo: Repository<ChannelConfig>,
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   list(tenantId: number) {
     return this.repo.find({ where: { tenantId } as any, order: { id: 'DESC' } as any });

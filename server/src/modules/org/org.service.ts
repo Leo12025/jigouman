@@ -7,12 +7,17 @@ import { TenantService } from '../tenant/tenant.service';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class OrgService {
+  private readonly repo: Repository<Organization>;
   constructor(
-    @InjectRepository(Organization) private readonly repo: Repository<Organization>,
+    @InjectRepository(Organization) repo: Repository<Organization>,
     private readonly tenantService: TenantService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   async create(tenantId: number, d: CreateOrgDto) {
     // 每租户仅允许一个 HQ（总校区）：已有则拒绝新建

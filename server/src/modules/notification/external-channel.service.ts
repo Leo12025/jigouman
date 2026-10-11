@@ -7,6 +7,8 @@ import { tencentSmsSend } from './providers/tencent-sms.provider';
 import { aliyunSmsSend } from './providers/aliyun-sms.provider';
 import { wechatTemplateSend } from './providers/wechat.provider';
 
+import { orgRepo } from '../../common/org-scope';
+
 export interface ExternalPushPayload {
   title: string;
   content?: string;
@@ -21,10 +23,13 @@ export interface ExternalPushPayload {
 export class ExternalChannelService {
   private readonly logger = new Logger(ExternalChannelService.name);
 
+  private readonly userRepo: Repository<User>;
   constructor(
-    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(User) userRepo: Repository<User>,
     private readonly configSvc: ChannelConfigService,
-  ) {}
+  ) {
+    this.userRepo = orgRepo(userRepo);
+  }
 
   async pushExternal(tenantId: number, userId: number, payload: ExternalPushPayload) {
     const user = await this.userRepo.findOne({ where: { tenantId, id: userId } as any });

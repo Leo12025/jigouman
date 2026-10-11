@@ -13,13 +13,22 @@ import {
   UpdateCertificateDto,
 } from './dto/staff.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class StaffService {
+  private readonly emp: Repository<Employee>;
+  private readonly profile: Repository<TeacherProfile>;
+  private readonly cert: Repository<Certificate>;
   constructor(
-    @InjectRepository(Employee) private readonly emp: Repository<Employee>,
-    @InjectRepository(TeacherProfile) private readonly profile: Repository<TeacherProfile>,
-    @InjectRepository(Certificate) private readonly cert: Repository<Certificate>,
-  ) {}
+    @InjectRepository(Employee) emp: Repository<Employee>,
+    @InjectRepository(TeacherProfile) profile: Repository<TeacherProfile>,
+    @InjectRepository(Certificate) cert: Repository<Certificate>,
+  ) {
+    this.emp = orgRepo(emp);
+    this.profile = orgRepo(profile);
+    this.cert = orgRepo(cert);
+  }
 
   async create(tenantId: number, d: CreateEmployeeDto) {
     const e = this.emp.create({ tenantId, ...(d as any) } as Employee);

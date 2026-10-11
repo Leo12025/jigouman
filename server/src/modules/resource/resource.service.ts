@@ -7,12 +7,17 @@ import { StorageService } from './storage/storage.service';
 import { UploadedFile } from './storage/storage-driver.interface';
 import { ResourcePageQueryDto, UploadMeta } from './dto/resource.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ResourceService {
+  private readonly repo: Repository<Resource>;
   constructor(
-    @InjectRepository(Resource) private readonly repo: Repository<Resource>,
+    @InjectRepository(Resource) repo: Repository<Resource>,
     private readonly storage: StorageService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   /** 批量上传并落库（文档 §4.1 统一资源） */
   async upload(tenantId: number, files: UploadedFile[], meta: UploadMeta) {

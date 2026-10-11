@@ -5,6 +5,8 @@ import { Notification, NotifyChannel } from './entities/notification.entity';
 import { NotifyPageQueryDto } from './dto/notification.dto';
 import { ExternalChannelService } from './external-channel.service';
 
+import { orgRepo } from '../../common/org-scope';
+
 export interface CreateNotificationDto {
   userId: number;
   channel?: NotifyChannel;
@@ -17,11 +19,14 @@ export interface CreateNotificationDto {
 
 @Injectable()
 export class NotificationService {
+  private readonly repo: Repository<Notification>;
   constructor(
     @InjectRepository(Notification)
-    private readonly repo: Repository<Notification>,
+    repo: Repository<Notification>,
     private readonly external: ExternalChannelService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   /** 创建通知（系统事件调用；本人可见，外部不暴露创建接口） */
   async create(tenantId: number, d: CreateNotificationDto) {

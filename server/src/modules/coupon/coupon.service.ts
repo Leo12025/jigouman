@@ -20,6 +20,8 @@ interface AppliedPromo {
   templateId: number; name: string; type: string; discount: number;
   giftItems?: GiftItem[];
 }
+import { orgRepo } from '../../common/org-scope';
+
 export interface CalcResult {
   totalDiscount: number;
   applied: AppliedPromo[];
@@ -35,10 +37,15 @@ function addDays(date: Date, days: number): Date {
 
 @Injectable()
 export class CouponService {
+  private readonly tpl: Repository<CouponTemplate>;
+  private readonly grantRepo: Repository<CouponGrant>;
   constructor(
-    @InjectRepository(CouponTemplate) private readonly tpl: Repository<CouponTemplate>,
-    @InjectRepository(CouponGrant) private readonly grantRepo: Repository<CouponGrant>,
-  ) {}
+    @InjectRepository(CouponTemplate) tpl: Repository<CouponTemplate>,
+    @InjectRepository(CouponGrant) grantRepo: Repository<CouponGrant>,
+  ) {
+    this.tpl = orgRepo(tpl);
+    this.grantRepo = orgRepo(grantRepo);
+  }
 
   async createTemplate(tenantId: number, d: CreateCouponTemplateDto) {
     const t = this.tpl.create({ tenantId, ...(d as any) } as CouponTemplate);

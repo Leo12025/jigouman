@@ -12,13 +12,22 @@ function randCode(prefix: string) {
   return `${prefix}${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class GroupBuyService {
+  private readonly act: Repository<GroupBuyActivity>;
+  private readonly team: Repository<GroupBuyTeam>;
+  private readonly member: Repository<GroupBuyMember>;
   constructor(
-    @InjectRepository(GroupBuyActivity) private readonly act: Repository<GroupBuyActivity>,
-    @InjectRepository(GroupBuyTeam) private readonly team: Repository<GroupBuyTeam>,
-    @InjectRepository(GroupBuyMember) private readonly member: Repository<GroupBuyMember>,
-  ) {}
+    @InjectRepository(GroupBuyActivity) act: Repository<GroupBuyActivity>,
+    @InjectRepository(GroupBuyTeam) team: Repository<GroupBuyTeam>,
+    @InjectRepository(GroupBuyMember) member: Repository<GroupBuyMember>,
+  ) {
+    this.act = orgRepo(act);
+    this.team = orgRepo(team);
+    this.member = orgRepo(member);
+  }
 
   async createActivity(tenantId: number, d: CreateGroupBuyActivityDto) {
     const a = this.act.create({

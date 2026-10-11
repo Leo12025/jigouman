@@ -8,12 +8,19 @@ import {
   CoursewarePageQueryDto,
 } from './dto/courseware.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class CoursewareService {
+  private readonly stageRepo: Repository<CourseStage>;
+  private readonly cwRepo: Repository<Courseware>;
   constructor(
-    @InjectRepository(CourseStage) private readonly stageRepo: Repository<CourseStage>,
-    @InjectRepository(Courseware) private readonly cwRepo: Repository<Courseware>,
-  ) {}
+    @InjectRepository(CourseStage) stageRepo: Repository<CourseStage>,
+    @InjectRepository(Courseware) cwRepo: Repository<Courseware>,
+  ) {
+    this.stageRepo = orgRepo(stageRepo);
+    this.cwRepo = orgRepo(cwRepo);
+  }
 
   // ---------------- 阶段 ----------------
   async createStage(tenantId: number, courseId: number, d: CreateStageDto) {

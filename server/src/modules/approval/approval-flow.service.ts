@@ -8,12 +8,19 @@ import {
 import { User } from '../../core/rbac/user.entity';
 
 /** 审批流模板服务（§4.16 审批中心增强：可视化配置、按业务类型复用） */
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ApprovalFlowService {
+  private readonly repo: Repository<ApprovalFlow>;
+  private readonly userRepo: Repository<User>;
   constructor(
-    @InjectRepository(ApprovalFlow) private readonly repo: Repository<ApprovalFlow>,
-    @InjectRepository(User) private readonly userRepo: Repository<User>,
-  ) {}
+    @InjectRepository(ApprovalFlow) repo: Repository<ApprovalFlow>,
+    @InjectRepository(User) userRepo: Repository<User>,
+  ) {
+    this.repo = orgRepo(repo);
+    this.userRepo = orgRepo(userRepo);
+  }
 
   async create(tenantId: number, d: CreateApprovalFlowDto) {
     this.validateNodes(d.nodes);

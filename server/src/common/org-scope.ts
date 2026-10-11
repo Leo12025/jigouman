@@ -56,12 +56,12 @@ export function orgRepo<T>(repo: Repository<any>): Repository<any> {
       if (['find', 'findOne', 'findAndCount', 'count', 'findBy', 'findOneBy'].includes(String(prop))) {
         return (options: any) => {
           const orgId = getOrgId();
-          // 无校区上下文、无查询条件、或 where 为数组(OR 组合)时不改写，避免语义歧义
-          if (orgId == null || !options || Array.isArray(options.where)) {
+          // 无校区上下文、或 where 为数组(OR 组合)时不改写，避免语义歧义
+          if (orgId == null || Array.isArray(options?.where)) {
             return orig.call(target, options);
           }
-          const where = options.where ? { ...options.where, orgId } : { orgId };
-          return orig.call(target, { ...options, where });
+          const where = options?.where ? { ...options.where, orgId } : { orgId };
+          return orig.call(target, { ...(options || {}), where });
         };
       }
       if (prop === 'create') {

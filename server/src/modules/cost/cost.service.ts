@@ -4,9 +4,14 @@ import { Repository } from 'typeorm';
 import { CostRecord } from './entities/cost-record.entity';
 import { CreateCostDto, UpdateCostDto, CostPageQueryDto } from './dto/cost.dto';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class CostService {
-  constructor(@InjectRepository(CostRecord) private readonly repo: Repository<CostRecord>) {}
+  private readonly repo: Repository<CostRecord>;
+  constructor(@InjectRepository(CostRecord) repo: Repository<CostRecord>) {
+    this.repo = orgRepo(repo);
+  }
 
   async create(tenantId: number, d: CreateCostDto) {
     const r = this.repo.create({ tenantId, ...(d as any) } as CostRecord);

@@ -10,12 +10,17 @@ import { TaskService } from '../task/task.service';
 const TASK_TYPE = 'COMPLAINT';
 const REF_TYPE = 'COMPLAINT';
 
+import { orgRepo } from '../../common/org-scope';
+
 @Injectable()
 export class ComplaintService {
+  private readonly repo: Repository<Complaint>;
   constructor(
-    @InjectRepository(Complaint) private readonly repo: Repository<Complaint>,
+    @InjectRepository(Complaint) repo: Repository<Complaint>,
     private readonly taskSvc: TaskService,
-  ) {}
+  ) {
+    this.repo = orgRepo(repo);
+  }
 
   /** 登记客诉；若建单即分派则生成 COMPLAINT 待办并通知处理人（§4.26 事件化来源） */
   async create(tenantId: number, d: CreateComplaintDto, operatorId?: number) {
