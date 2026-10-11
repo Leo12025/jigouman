@@ -15,6 +15,10 @@ export enum SalaryStatus {
 @Index(['tenantId', 'period'])
 @Index(['tenantId', 'teacherId'])
 export class Salary extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'period', length: 7, comment: '工资周期(YYYY-MM)' })
   period: string;
 

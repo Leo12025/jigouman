@@ -4,6 +4,10 @@ import { Column, Entity, Index } from 'typeorm';
 /** 师资档案（仅老师类员工具备）：任教学科 / 擅长年龄段 / 简介 / 头像 */
 @Entity({ name: 'teacher_profiles' })
 export class TeacherProfile extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Index({ unique: true })
   @Column({ name: 'employee_id', type: 'bigint' })
   employeeId: number;

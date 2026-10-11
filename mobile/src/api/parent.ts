@@ -4,8 +4,13 @@ import { apiGet, apiPost, apiDelete } from './client';
 
 // 登录：发送/校验短信验证码
 export const sendOtp = (phone: string) => apiPost<{ sent: boolean; code?: string }>('/parents/otp', { phone });
-export const parentLogin = (phone: string, code: string) =>
-  apiPost<{ accessToken: string; refreshToken: string; parent: any }>('/parents/login', { phone, code });
+/** 家长登录：手机号+短信验证码，或 手机号+后6位（二选一） */
+export const parentLogin = (phone: string, code?: string, last6?: string) =>
+  apiPost<{ accessToken: string; refreshToken: string; parent: any }>('/parents/login', { phone, code, last6 });
+
+// 跨品牌/校区切换：本品牌内校区列表 + 按手机号发现所在品牌域
+export const myCampuses = () => apiGet<{ orgId: number; name: string }[]>('/parents/campuses');
+export const myBrands = (phone: string) => apiGet<any[]>('/parents/brands', { phone });
 
 // 学员绑定（多对多）
 export const myStudents = () => apiGet<any[]>('/parents/students');

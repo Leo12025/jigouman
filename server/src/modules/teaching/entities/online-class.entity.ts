@@ -4,6 +4,10 @@ import { Column, Entity } from 'typeorm';
 /** 在线课堂（§4.13 直播/录播课） */
 @Entity({ name: 'online_classes' })
 export class OnlineClass extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'title', length: 128 })
   title: string;
 

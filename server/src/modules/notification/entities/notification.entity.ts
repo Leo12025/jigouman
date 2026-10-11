@@ -15,6 +15,10 @@ export enum NotifyChannel {
 @Index(['tenantId', 'userId'])
 @Index(['tenantId', 'readAt'])
 export class Notification extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'user_id', type: 'bigint', comment: '接收人' })
   userId: number;
 

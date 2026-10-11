@@ -4,6 +4,10 @@ import { Column, Entity } from 'typeorm';
 /** 拼团活动（§4.24 团购对接/自运营拼团） */
 @Entity({ name: 'group_buy_activities' })
 export class GroupBuyActivity extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'name', length: 128 })
   name: string;
 

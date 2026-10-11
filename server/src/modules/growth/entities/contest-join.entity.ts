@@ -6,6 +6,10 @@ import { BaseEntity } from '../../../common/base.entity';
 @Index(['tenantId', 'contestId'])
 @Index(['tenantId', 'studentId'])
 export class ContestJoin extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'contest_id', type: 'bigint', comment: '赛事' })
   contestId: number;
 

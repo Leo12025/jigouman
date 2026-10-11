@@ -10,6 +10,10 @@ import { BaseEntity } from '../../../common/base.entity';
 @Index(['tenantId', 'studentId'])
 @Unique(['tenantId', 'submitId'])
 export class HomeworkReview extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'submit_id', type: 'bigint', comment: '提交记录' })
   submitId: number;
 

@@ -16,6 +16,10 @@ export enum HomeworkStatus {
 @Index(['tenantId', 'classGroupId'])
 @Index(['tenantId', 'status'])
 export class Homework extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'lesson_id', type: 'bigint', nullable: true, comment: '关联课次' })
   lessonId?: number;
 

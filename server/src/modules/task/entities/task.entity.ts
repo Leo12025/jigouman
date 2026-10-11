@@ -15,6 +15,10 @@ export enum TaskStatus {
 @Index(['tenantId', 'status'])
 @Index(['tenantId', 'refType', 'refId'])
 export class Task extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'type', length: 32, comment: '任务类型(如 AFTER_CLASS_REVIEW)' })
   type: string;
 

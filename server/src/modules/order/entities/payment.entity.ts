@@ -9,6 +9,10 @@ export type PaymentStatus = 'SUCCESS' | 'FAILED' | 'REFUNDED';
 @Entity({ name: 'payment' })
 @Index(['tenantId', 'orderId'])
 export class Payment extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'order_id', type: 'bigint', comment: '订单' })
   orderId: number;
 

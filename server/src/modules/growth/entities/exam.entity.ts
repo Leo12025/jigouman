@@ -6,6 +6,10 @@ import { BaseEntity } from '../../../common/base.entity';
 @Index(['tenantId', 'courseId'])
 @Index(['tenantId', 'classGroupId'])
 export class Exam extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ length: 120, comment: '测评名称' })
   name: string;
 

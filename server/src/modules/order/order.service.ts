@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
+import { orgRepo } from '../../common/org-scope';
 import {
   Order,
   OrderStatus,
@@ -38,15 +39,25 @@ function parseTags(tags: any): string[] {
 @Injectable()
 export class OrderService implements OnModuleInit {
   constructor(
-    @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
-    @InjectRepository(OrderItem) private readonly itemRepo: Repository<OrderItem>,
-    @InjectRepository(Payment) private readonly payRepo: Repository<Payment>,
-    @InjectRepository(Refund) private readonly refundRepo: Repository<Refund>,
+    @InjectRepository(Order) orderRepo: Repository<Order>,
+    @InjectRepository(OrderItem) itemRepo: Repository<OrderItem>,
+    @InjectRepository(Payment) payRepo: Repository<Payment>,
+    @InjectRepository(Refund) refundRepo: Repository<Refund>,
     private readonly hourSvc: HourService,
     private readonly couponSvc: CouponService,
     private readonly studentSvc: StudentService,
     private readonly approvalSvc: ApprovalService,
-  ) {}
+  ) {
+    // 套用校区隔离：读自动过滤 org_id、写自动落 org_id 章
+    this.orderRepo = orgRepo(orderRepo);
+    this.itemRepo = orgRepo(itemRepo);
+    this.payRepo = orgRepo(payRepo);
+    this.refundRepo = orgRepo(refundRepo);
+  }
+  private readonly orderRepo: Repository<Order>;
+  private readonly itemRepo: Repository<OrderItem>;
+  private readonly payRepo: Repository<Payment>;
+  private readonly refundRepo: Repository<Refund>;
 
   async createOrder(tenantId: number, d: CreateOrderDto) {
     if (!d.items?.length) throw new BusinessException(ResCode.BAD_REQUEST, '订单至少需要一个订单项');

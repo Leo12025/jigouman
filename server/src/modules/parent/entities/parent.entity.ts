@@ -8,6 +8,10 @@ import { BaseEntity } from '../../../common/base.entity';
 @Entity({ name: 'parent' })
 @Index(['tenantId', 'phone'], { unique: true })
 export class Parent extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ type: 'varchar', length: 32, comment: '手机号(登录账号)' })
   phone: string;
 

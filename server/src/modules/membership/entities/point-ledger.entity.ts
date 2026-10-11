@@ -4,6 +4,10 @@ import { Column, Entity } from 'typeorm';
 /** 积分流水（§4.19） */
 @Entity({ name: 'point_ledgers' })
 export class PointLedger extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'member_id', type: 'bigint' })
   memberId: number;
 

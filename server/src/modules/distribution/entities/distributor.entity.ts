@@ -4,6 +4,10 @@ import { Column, Entity, Index } from 'typeorm';
 /** 分销员/推广员（§4.28 分销裂变） */
 @Entity({ name: 'distributors' })
 export class Distributor extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'name', length: 64 })
   name: string;
 

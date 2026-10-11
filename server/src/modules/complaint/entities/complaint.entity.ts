@@ -26,6 +26,10 @@ export enum ComplaintStatus {
 @Index(['tenantId', 'status'])
 @Index(['tenantId', 'assigneeId'])
 export class Complaint extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'student_id', type: 'bigint', nullable: true, comment: '关联学员' })
   studentId?: number;
 

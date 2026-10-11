@@ -6,6 +6,10 @@ import { BaseEntity } from '../../../common/base.entity';
 @Index(['tenantId', 'category'])
 @Index(['tenantId', 'refType', 'refId'])
 export class Resource extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   /** 上传者（员工/管理员） */
   @Column({ name: 'owner_id', type: 'bigint', nullable: true, comment: '上传者' })
   ownerId?: number;

@@ -4,6 +4,10 @@ import { Column, Entity } from 'typeorm';
 /** 问卷回收（§4.22） */
 @Entity({ name: 'survey_responses' })
 export class SurveyResponse extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'template_id', type: 'bigint' })
   templateId: number;
 

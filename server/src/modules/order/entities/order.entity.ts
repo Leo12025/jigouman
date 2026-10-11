@@ -23,6 +23,10 @@ export const MONEY: { from: (v: any) => any; to: (v: any) => any } = {
 @Index(['tenantId', 'studentId'])
 @Index(['tenantId', 'status'])
 export class Order extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'order_no', length: 32, comment: '订单号' })
   orderNo: string;
 

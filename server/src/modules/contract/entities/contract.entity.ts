@@ -6,6 +6,10 @@ export type ContractStatus = 'DRAFT' | 'SIGNED' | 'INVALID';
 /** 合同实例（§4.23）：实名 + 手写签名 + 存证链，无需第三方即可用 */
 @Entity({ name: 'contracts' })
 export class Contract extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'template_id', type: 'bigint' })
   templateId: number;
 

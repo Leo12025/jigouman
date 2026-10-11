@@ -4,6 +4,10 @@ import { Column, Entity, Index } from 'typeorm';
 /** 资质证书：教师资格证 / 学历 / 考级或赛事指导资质（含到期提醒） */
 @Entity({ name: 'certificates' })
 export class Certificate extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Index()
   @Column({ name: 'employee_id', type: 'bigint' })
   employeeId: number;

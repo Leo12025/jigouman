@@ -6,6 +6,10 @@ import { MONEY } from '../../order/entities/order.entity';
 @Entity({ name: 'course_package' })
 @Index(['tenantId', 'status'])
 export class CoursePackage extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ length: 128, comment: '套餐名称' })
   name: string;
 

@@ -4,6 +4,10 @@ import { Column, Entity, Index } from 'typeorm';
 /** 会员（按学员唯一） */
 @Entity({ name: 'members' })
 export class Member extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Index({ unique: true })
   @Column({ name: 'student_id', type: 'bigint' })
   studentId: number;

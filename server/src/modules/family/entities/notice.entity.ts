@@ -6,6 +6,10 @@ import { BaseEntity } from '../../../common/base.entity';
 @Index(['tenantId', 'studentId'])
 @Index(['tenantId', 'type'])
 export class Notice extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ length: 32, comment: '类型 CONSUME/ LESSON/ ACTIVITY/ SYSTEM' })
   type: string;
 

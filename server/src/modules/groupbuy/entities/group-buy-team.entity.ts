@@ -4,6 +4,10 @@ import { Column, Entity, Index } from 'typeorm';
 /** 拼团实例（成团） */
 @Entity({ name: 'group_buy_teams' })
 export class GroupBuyTeam extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Column({ name: 'activity_id', type: 'bigint' })
   activityId: number;
 

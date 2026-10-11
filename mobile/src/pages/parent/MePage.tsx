@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { List, Button, Toast, Dialog } from 'antd-mobile';
 import { clearToken, getToken, decodeJwt, getRole } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
+import CampusSwitcher from '../../components/CampusSwitcher';
 
 const ENTRIES = [
   { key: 'consumptions', title: '消课与考勤', desc: '上课消课记录' },
@@ -46,6 +47,7 @@ export default function MePage() {
             {e.title}
           </List.Item>
         ))}
+        <CampusSwitcher />
       </List>
       <div style={{ padding: 16 }}>
         <Button block color="danger" fill="outline" onClick={onLogout} disabled={!getToken()}>

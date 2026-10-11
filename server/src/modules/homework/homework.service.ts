@@ -14,18 +14,33 @@ import { Student } from '../student/entities/student.entity';
 import { Lesson } from '../course/entities/lesson.entity';
 import { TaskService } from '../task/task.service';
 import { TASK_TYPES } from '../task/task-types';
+import { orgRepo } from '../../common/org-scope';
 
 @Injectable()
 export class HomeworkService {
   constructor(
-    @InjectRepository(Homework) private readonly hwRepo: Repository<Homework>,
-    @InjectRepository(HomeworkSubmit) private readonly submitRepo: Repository<HomeworkSubmit>,
-    @InjectRepository(HomeworkReview) private readonly reviewRepo: Repository<HomeworkReview>,
-    @InjectRepository(StudentCourse) private readonly scRepo: Repository<StudentCourse>,
-    @InjectRepository(Student) private readonly stuRepo: Repository<Student>,
-    @InjectRepository(Lesson) private readonly lessonRepo: Repository<Lesson>,
+    @InjectRepository(Homework) hwRepo: Repository<Homework>,
+    @InjectRepository(HomeworkSubmit) submitRepo: Repository<HomeworkSubmit>,
+    @InjectRepository(HomeworkReview) reviewRepo: Repository<HomeworkReview>,
+    @InjectRepository(StudentCourse) scRepo: Repository<StudentCourse>,
+    @InjectRepository(Student) stuRepo: Repository<Student>,
+    @InjectRepository(Lesson) lessonRepo: Repository<Lesson>,
     private readonly taskSvc: TaskService,
-  ) {}
+  ) {
+    // 套用校区隔离：读自动过滤 org_id、写自动落 org_id 章
+    this.hwRepo = orgRepo(hwRepo);
+    this.submitRepo = orgRepo(submitRepo);
+    this.reviewRepo = orgRepo(reviewRepo);
+    this.scRepo = orgRepo(scRepo);
+    this.stuRepo = orgRepo(stuRepo);
+    this.lessonRepo = orgRepo(lessonRepo);
+  }
+  private readonly hwRepo: Repository<Homework>;
+  private readonly submitRepo: Repository<HomeworkSubmit>;
+  private readonly reviewRepo: Repository<HomeworkReview>;
+  private readonly scRepo: Repository<StudentCourse>;
+  private readonly stuRepo: Repository<Student>;
+  private readonly lessonRepo: Repository<Lesson>;
 
   /** 布置作业（§4.7）。按班级布置时，若未传 courseId 则尝试从课次/班级补全 */
   async create(tenantId: number, d: CreateHomeworkDto, operatorId?: number) {

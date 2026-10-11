@@ -6,6 +6,10 @@ export type CouponGrantStatus = 'UNUSED' | 'USED' | 'EXPIRED';
 /** 优惠券发放记录（学员持有的一张券） */
 @Entity({ name: 'coupon_grants' })
 export class CouponGrant extends BaseEntity {
+  /** 归属校区(org_id)：校区独立隔离键，空=租户级(总校区可见) */
+  @Column({ name: 'org_id', type: 'bigint', nullable: true })
+  orgId?: number;
+
   @Index()
   @Column({ name: 'template_id', type: 'bigint' })
   templateId: number;
