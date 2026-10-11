@@ -4,6 +4,7 @@ import { listHomeworks, getHomework, reviewHomework } from '../../api/staff';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 老师端作业批改（§11.6） */
 export default function HomeworkPage() {
@@ -34,7 +35,8 @@ export default function HomeworkPage() {
   };
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">作业批改</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -89,6 +91,7 @@ export default function HomeworkPage() {
         }
       />
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

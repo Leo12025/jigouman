@@ -3,6 +3,7 @@ import { myNotices, myRenewals } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 我的通知 + 续费提醒（§6.6 / §11.6） */
 export default function NoticesPage() {
@@ -12,7 +13,8 @@ export default function NoticesPage() {
   const renewals: any[] = rd || [];
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => { rn(); rr(); }}>
+      <div className="page">
       <div className="page-title">我的通知</div>
       <Tabs defaultActiveKey="notice">
         <Tabs.Tab title="通知" key="notice">
@@ -52,6 +54,7 @@ export default function NoticesPage() {
         </Tabs.Tab>
       </Tabs>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

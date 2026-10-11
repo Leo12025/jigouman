@@ -4,6 +4,7 @@ import { myStudents, bindStudent, unbindStudent } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 我的学员（多对多绑定，§6.23） */
 export default function StudentsPage() {
@@ -31,7 +32,8 @@ export default function StudentsPage() {
   };
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">我的学员</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -61,6 +63,7 @@ export default function StudentsPage() {
         </div>
       )}
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

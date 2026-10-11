@@ -18,8 +18,17 @@ export function useApi<T = any>(
   const load = useCallback(() => {
     setLoading(true);
     setError(false);
-    const p = isList ? (getList(fetcher()) as unknown as Promise<T>) : fetcher();
-    p.then((d) => setData(d))
+    const req = fetcher();
+    // 列表页 getList 会吞掉异常返回 []，这里单独捕获真实请求错误以驱动 error 态
+    let failed = false;
+    req.catch(() => {
+      failed = true;
+      setError(true);
+    });
+    const p = isList ? (getList(req) as unknown as Promise<T>) : req;
+    p.then((d) => {
+      if (!failed) setData(d);
+    })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps

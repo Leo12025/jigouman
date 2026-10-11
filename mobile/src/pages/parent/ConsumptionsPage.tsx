@@ -3,6 +3,7 @@ import { myConsumptions } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 const ATT_LABEL: Record<string, { text: string; color: string }> = {
   PRESENT: { text: '出勤', color: 'success' },
@@ -18,7 +19,8 @@ export default function ConsumptionsPage() {
   const rows: any[] = data || [];
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">消课与考勤</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -41,6 +43,7 @@ export default function ConsumptionsPage() {
         </StateView>
       </div>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

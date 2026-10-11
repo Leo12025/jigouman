@@ -4,6 +4,7 @@ import { listLeads, followLead } from '../../api/staff';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 顾问端线索跟进（§11.6 顾问端） */
 export default function LeadsPage() {
@@ -23,7 +24,8 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">线索跟进</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -57,6 +59,7 @@ export default function LeadsPage() {
         }
       />
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

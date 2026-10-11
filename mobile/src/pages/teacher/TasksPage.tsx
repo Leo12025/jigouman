@@ -3,6 +3,7 @@ import { listTasks, completeTask } from '../../api/staff';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 const TYPE_LABEL: Record<string, string> = {
   AFTER_CLASS_REVIEW: '课后点评',
@@ -22,7 +23,8 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">待办中心</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -42,6 +44,7 @@ export default function TasksPage() {
         </StateView>
       </div>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

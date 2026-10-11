@@ -3,6 +3,7 @@ import { myLessons } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 我的课表（按绑定学员所在班级，§11.6 家长端） */
 export default function LessonsPage() {
@@ -10,7 +11,8 @@ export default function LessonsPage() {
   const rows: any[] = data || [];
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">我的课表</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -28,6 +30,7 @@ export default function LessonsPage() {
         </StateView>
       </div>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

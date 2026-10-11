@@ -3,6 +3,7 @@ import { myOrders } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 const STATUS: Record<string, { text: string; color: string }> = {
   PENDING: { text: '待支付', color: 'warning' },
@@ -19,7 +20,8 @@ export default function OrdersPage() {
   const rows: any[] = data || [];
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">我的缴费</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -40,6 +42,7 @@ export default function OrdersPage() {
         </StateView>
       </div>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

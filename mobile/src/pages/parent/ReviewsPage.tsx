@@ -3,6 +3,7 @@ import { myReviews } from '../../api/parent';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 我的点评：老师课后点评（§6.6 / §11.6 家长端） */
 export default function ReviewsPage() {
@@ -10,7 +11,8 @@ export default function ReviewsPage() {
   const rows: any[] = data || [];
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">课后点评</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -29,6 +31,7 @@ export default function ReviewsPage() {
         </StateView>
       </div>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }

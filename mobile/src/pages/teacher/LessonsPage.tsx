@@ -5,6 +5,7 @@ import { getList } from '../../api/client';
 import BottomTab from '../../components/BottomTab';
 import { useApi } from '../../hooks/useApi';
 import StateView from '../../components/StateView';
+import { PullRefresh } from '../../components/PullRefresh';
 
 /** 老师端班级课表 + 点名消课（§11.6） */
 export default function LessonsPage() {
@@ -44,7 +45,8 @@ export default function LessonsPage() {
   ];
 
   return (
-    <div className="page">
+    <PullRefresh onRefresh={async () => reload()}>
+      <div className="page">
       <div className="page-title">班级课表</div>
       <div style={{ padding: 12 }}>
         <StateView loading={loading} error={error} onRetry={reload}>
@@ -82,6 +84,7 @@ export default function LessonsPage() {
         )}
       </div>
       <BottomTab />
-    </div>
+      </div>
+    </PullRefresh>
   );
 }
