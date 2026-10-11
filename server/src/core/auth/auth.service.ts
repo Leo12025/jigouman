@@ -34,8 +34,11 @@ export class AuthService {
   }
 
   /** 登录签发双令牌（access 短时效 / refresh 长时效，§9.2） */
-  async login(dto: LoginDto) {
-    const tenantId = dto.tenantId ?? (Number(process.env.DEFAULT_TENANT_ID) || 0);
+  async login(dto: LoginDto, resolvedTenantId?: number) {
+    // 优先用调用方显式指定的租户（超级管理员跨租户登录），
+    // 否则用网关/域名解析出的租户（多租户按域名隔离登录），再回退默认租户。
+    const tenantId =
+      dto.tenantId ?? resolvedTenantId ?? (Number(process.env.DEFAULT_TENANT_ID) || 0);
     const user = await this.validate(dto.username, dto.password, tenantId);
     const base: JwtPayload = {
       sub: user.id,

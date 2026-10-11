@@ -14,8 +14,8 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   @Post('login')
   @ApiOperation({ summary: '账号密码登录（签发 access/refresh 双令牌）' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @TenantId() t: number) {
+    return this.authService.login(dto, t);
   }
 
   @Public()

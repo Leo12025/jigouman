@@ -63,7 +63,7 @@ const MODULES = [
 const ACTIONS = ['view', 'create', 'update', 'delete', 'export'];
 
 /** 业务动作型权限点（非标准 增删改查，如分配/跟进/转化/上传） */
-const EXTRA_PERMS = ['lead:assign', 'lead:follow', 'lead:convert', 'resource:upload'];
+const EXTRA_PERMS = ['lead:assign', 'lead:follow', 'lead:convert', 'resource:upload', 'tenant:manage', 'tenant:view'];
 
 @Injectable()
 export class RbacService {

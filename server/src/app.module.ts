@@ -39,6 +39,8 @@ import { MembershipModule } from './modules/membership/membership.module';
 import { SurveyModule } from './modules/survey/survey.module';
 import { AlertModule } from './modules/alert/alert.module';
 import { OrgModule } from './modules/org/org.module';
+import { TenantModule } from './modules/tenant/tenant.module';
+import { TenantService } from './modules/tenant/tenant.service';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { CostModule } from './modules/cost/cost.module';
 import { GroupBuyModule } from './modules/groupbuy/groupbuy.module';
@@ -89,6 +91,7 @@ import { ClassChangeModule } from './modules/class-change/class-change.module';
     TeachingModule,
     AttendanceModule,
     ClassChangeModule,
+    TenantModule,
   ],
   providers: [
     // 鉴权顺序：限流 → JWT 校验 → 解析租户 → 校验权限
@@ -101,11 +104,21 @@ import { ClassChangeModule } from './modules/class-change/class-change.module';
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly rbac: RbacService) {}
+  constructor(
+    private readonly rbac: RbacService,
+    private readonly tenantService: TenantService,
+  ) {}
 
   async onModuleInit() {
     // 默认租户初始化：权限点、角色、超级管理员（幂等）
     const tenantId = Number(process.env.DEFAULT_TENANT_ID) || 0;
     await this.rbac.seedTenant(tenantId);
+    // 确保默认租户在 tenants 表存在（与业务数据 tenant_id 对齐，供域名解析）
+    await this.tenantService.ensureDefaultTenant(
+      tenantId,
+      process.env.DEFAULT_TENANT_SLUG || 'default',
+      process.env.DEFAULT_TENANT_NAME || '默认机构',
+      process.env.DEFAULT_TENANT_DOMAIN || 'localhost',
+    );
   }
 }
