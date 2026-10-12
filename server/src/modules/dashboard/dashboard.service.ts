@@ -1,7 +1,7 @@
 import { orgRepo as orgScoped } from '../../common/org-scope';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { MetricDef } from './entities/metric-def.entity';
 import { Lead, LeadStage } from '../lead/entities/lead.entity';
 import { Student, StudentStatus } from '../student/entities/student.entity';
@@ -51,6 +51,7 @@ export class DashboardService {
     @InjectRepository(Organization) private orgRepo: Repository<Organization>,
     @InjectRepository(CostRecord) private costRepo: Repository<CostRecord>,
     @InjectRepository(Material) private materialRepo: Repository<Material>,
+    @InjectDataSource() private ds: DataSource,
   ) {
     // 看板按校区口径聚合：套用校区隔离（读自动过滤 org_id）
     // 注意：本类已有字段 orgRepo(Organization 仓库)，故用别名引入隔离助手
@@ -458,6 +459,194 @@ export class DashboardService {
           : 0,
       },
     };
+  }
+
+  // ---------------- 总校区视角·多校区汇总对比（§4.11 / §10 M8 多校区） ----------------
+  /**
+   * 总校区视角下的跨校区汇总对比：聚合各校区在招生/经营/学员/课时/教学/成本
+   * 六个维度的核心指标，并计算 HQ 合计与排名（营收冠军/转化冠军等）。
+   * 使用原始 DataSource 仓库，绕过 X-Org-Id 校区隔离，确保看到全部校区。
+   */
+  async campusOverview(t: number) {
+    const ds = this.ds;
+    const [orgs, leads, students, orders, ha, hc, att, hs, costs, materials] = await Promise.all([
+      ds.getRepository(Organization).find({ where: { tenantId: t } } as any),
+      ds.getRepository(Lead).find({ where: { tenantId: t } } as any),
+      ds.getRepository(Student).find({ where: { tenantId: t } } as any),
+      ds.getRepository(Order).find({ where: { tenantId: t } } as any),
+      ds.getRepository(HourAccount).find({ where: { tenantId: t } } as any),
+      ds.getRepository(HourConsumption).find({ where: { tenantId: t } } as any),
+      ds.getRepository(Attendance).find({ where: { tenantId: t } } as any),
+      ds.getRepository(HomeworkSubmit).find({ where: { tenantId: t } } as any),
+      ds.getRepository(CostRecord).find({ where: { tenantId: t } } as any),
+      ds.getRepository(Material).find({ where: { tenantId: t } } as any),
+    ]);
+
+    // 按 orgId 分组（无 orgId 的记录不计入任何校区，保持统计一致性）
+    const groupByOrg = <T extends { orgId?: number }>(arr: T[]) => {
+      const m = new Map<number, T[]>();
+      for (const x of arr) {
+        if (x.orgId == null) continue;
+        const list = m.get(x.orgId) || [];
+        list.push(x);
+        m.set(x.orgId, list);
+      }
+      return m;
+    };
+    const leadM = groupByOrg(leads);
+    const stuM = groupByOrg(students);
+    const ordM = groupByOrg(orders);
+    const haM = groupByOrg(ha);
+    const hcM = groupByOrg(hc);
+    const attM = groupByOrg(att);
+    const hsM = groupByOrg(hs);
+    const costM = groupByOrg(costs);
+    const matM = groupByOrg(materials);
+
+    const campuses = orgs
+      .filter((o) => o.type === 'CAMPUS' || o.type === 'BRANCH')
+      .map((o) => {
+        const orgLeads = (leadM.get(o.id) || []) as Lead[];
+        const orgStu = (stuM.get(o.id) || []) as Student[];
+        const orgOrd = (ordM.get(o.id) || []) as Order[];
+        const orgHa = (haM.get(o.id) || []) as HourAccount[];
+        const orgHc = (hcM.get(o.id) || []) as HourConsumption[];
+        const orgAtt = (attM.get(o.id) || []) as Attendance[];
+        const orgHs = (hsM.get(o.id) || []) as HomeworkSubmit[];
+        const orgCost = (costM.get(o.id) || []) as CostRecord[];
+        const orgMat = (matM.get(o.id) || []) as Material[];
+
+        const funnel = this.funnelOf(orgLeads);
+        const paidOrders = orgOrd.filter(
+          (x) => x.status === OrderStatus.PAID || x.status === OrderStatus.COMPLETED,
+        );
+        const refunded = orgOrd.filter((x) => x.status === OrderStatus.REFUNDED);
+        const receivable = this.sum(orgOrd, 'payableAmount');
+        const received = this.sum(orgOrd, 'paidAmount');
+        const refundAmount = this.sum(refunded, 'payableAmount');
+
+        const studying = orgStu.filter((s) => s.status === StudentStatus.STUDYING).length;
+        const refundedStu = orgStu.filter((s) => s.status === StudentStatus.REFUNDED).length;
+
+        const granted = this.sum(
+          orgHc.filter((h) => h.type === 'GRANT'),
+          'hours',
+        );
+        const consumed = -this.sum(
+          orgHc.filter((h) => h.type === 'CONSUME'),
+          'hours',
+        );
+        const consumeRate = granted ? Number((consumed / granted).toFixed(4)) : 0;
+
+        const present = orgAtt.filter((a) => a.status === 'PRESENT').length;
+        const attendanceRate = orgAtt.length ? Number((present / orgAtt.length).toFixed(4)) : 0;
+
+        const reviewed = orgHs.filter((s) => s.status === 'REVIEWED').length;
+        const reviewedRate = orgHs.length ? Number((reviewed / orgHs.length).toFixed(4)) : 0;
+        const homeworkPending = orgHs.filter((s) => s.status === 'SUBMITTED').length;
+
+        const costTotal = this.sum(orgCost, 'amount');
+        const stockValue = orgMat.reduce(
+          (a, m) => a + (Number((m as any).stockQty) || 0) * (Number((m as any).price) || 0),
+          0,
+        );
+
+        return {
+          id: o.id,
+          name: o.name,
+          type: o.type,
+          admission: {
+            leads: funnel.total,
+            trialed: funnel.trialed,
+            signed: funnel.signed,
+            conversionRate: funnel.conversionRate,
+          },
+          revenue: {
+            orderCount: orgOrd.length,
+            receivable: Number(receivable.toFixed(2)),
+            received: Number(received.toFixed(2)),
+            refundAmount: Number(refundAmount.toFixed(2)),
+            netCashflow: Number((received - refundAmount).toFixed(2)),
+          },
+          students: { total: orgStu.length, studying, refunded: refundedStu },
+          hours: {
+            granted,
+            consumed,
+            balance: this.sum(orgHa, 'balance'),
+            consumeRate,
+          },
+          teaching: { attendanceRate, reviewedRate, homeworkPending },
+          cost: {
+            costTotal: Number(costTotal.toFixed(2)),
+            stockValue: Number(stockValue.toFixed(2)),
+            materialCount: orgMat.length,
+          },
+          rank: 0,
+        };
+      });
+
+    // 按已收金额排名（HQ 营收视角）
+    const ranked = [...campuses].sort((a, b) => b.revenue.received - a.revenue.received);
+    ranked.forEach((c, i) => (c.rank = i + 1));
+
+    const agg = (sel: (c: (typeof campuses)[number]) => number) =>
+      campuses.reduce((a, c) => a + (Number(sel(c)) || 0), 0);
+    const round = (v: number, p = 2) => Number(v.toFixed(p));
+    const summary = {
+      campusCount: campuses.length,
+      received: round(agg((c) => c.revenue.received)),
+      receivable: round(agg((c) => c.revenue.receivable)),
+      netCashflow: round(agg((c) => c.revenue.netCashflow)),
+      refundAmount: round(agg((c) => c.revenue.refundAmount)),
+      studying: agg((c) => c.students.studying),
+      totalStudents: agg((c) => c.students.total),
+      signed: agg((c) => c.admission.signed),
+      leads: agg((c) => c.admission.leads),
+      costTotal: round(agg((c) => c.cost.costTotal)),
+      stockValue: round(agg((c) => c.cost.stockValue)),
+      avgConversion: campuses.length ? round(agg((c) => c.admission.conversionRate) / campuses.length, 4) : 0,
+      avgAttendance: campuses.length ? round(agg((c) => c.teaching.attendanceRate) / campuses.length, 4) : 0,
+      avgConsumeRate: campuses.length ? round(agg((c) => c.hours.consumeRate) / campuses.length, 4) : 0,
+    };
+
+    let compare: any = null;
+    if (campuses.length) {
+      const best = (sel: (c: (typeof campuses)[number]) => number) =>
+        campuses.reduce((b, c) => (sel(c) > sel(b) ? c : b));
+      const worst = (sel: (c: (typeof campuses)[number]) => number) =>
+        campuses.reduce((b, c) => (sel(c) < sel(b) ? c : b));
+      const avg = (sel: (c: (typeof campuses)[number]) => number) =>
+        round(agg(sel) / campuses.length, 4);
+      compare = {
+        received: {
+          top: { id: best((c) => c.revenue.received).id, name: best((c) => c.revenue.received).name, value: best((c) => c.revenue.received).revenue.received },
+          bottom: { id: worst((c) => c.revenue.received).id, name: worst((c) => c.revenue.received).name, value: worst((c) => c.revenue.received).revenue.received },
+          avg: avg((c) => c.revenue.received),
+        },
+        conversion: {
+          top: { id: best((c) => c.admission.conversionRate).id, name: best((c) => c.admission.conversionRate).name, value: best((c) => c.admission.conversionRate).admission.conversionRate },
+          bottom: { id: worst((c) => c.admission.conversionRate).id, name: worst((c) => c.admission.conversionRate).name, value: worst((c) => c.admission.conversionRate).admission.conversionRate },
+          avg: avg((c) => c.admission.conversionRate),
+        },
+        attendance: {
+          top: { id: best((c) => c.teaching.attendanceRate).id, name: best((c) => c.teaching.attendanceRate).name, value: best((c) => c.teaching.attendanceRate).teaching.attendanceRate },
+          bottom: { id: worst((c) => c.teaching.attendanceRate).id, name: worst((c) => c.teaching.attendanceRate).name, value: worst((c) => c.teaching.attendanceRate).teaching.attendanceRate },
+          avg: avg((c) => c.teaching.attendanceRate),
+        },
+        consumeRate: {
+          top: { id: best((c) => c.hours.consumeRate).id, name: best((c) => c.hours.consumeRate).name, value: best((c) => c.hours.consumeRate).hours.consumeRate },
+          bottom: { id: worst((c) => c.hours.consumeRate).id, name: worst((c) => c.hours.consumeRate).name, value: worst((c) => c.hours.consumeRate).hours.consumeRate },
+          avg: avg((c) => c.hours.consumeRate),
+        },
+        signed: {
+          top: { id: best((c) => c.admission.signed).id, name: best((c) => c.admission.signed).name, value: best((c) => c.admission.signed).admission.signed },
+          bottom: { id: worst((c) => c.admission.signed).id, name: worst((c) => c.admission.signed).name, value: worst((c) => c.admission.signed).admission.signed },
+          avg: avg((c) => c.admission.signed),
+        },
+      };
+    }
+
+    return { campuses, summary, compare };
   }
 
   // ---------------- 自定义报表（§4.10 报表增强） ----------------

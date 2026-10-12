@@ -20,6 +20,7 @@ import HomeworkPage from './pages/HomeworkPage';
 import UserPage from './pages/UserPage';
 import RolePage from './pages/RolePage';
 import DashboardPage from './pages/DashboardPage';
+import CampusOverviewPage from './pages/CampusOverviewPage';
 import BigScreenPage from './pages/BigScreenPage';
 import ApprovalFlowPage from './pages/ApprovalFlowPage';
 import ApprovalPage from './pages/ApprovalPage';
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="tasks" element={<TaskPage />} />
         <Route path="homework" element={<HomeworkPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="campus-overview" element={<CampusOverviewPage />} />
         <Route path="big-screen" element={<BigScreenPage />} />
         <Route path="leads" element={<LeadPage />} />
         <Route path="channels" element={<ChannelPage />} />

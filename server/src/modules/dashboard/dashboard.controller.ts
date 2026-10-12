@@ -35,6 +35,13 @@ export class DashboardController {
     return this.svc.campusBenchmark(t);
   }
 
+  @Get('campus-overview')
+  @RequirePermissions('dashboard:view')
+  @ApiOperation({ summary: '总校区视角·跨校区汇总对比(招生/经营/学员/课时/教学/成本+排名)' })
+  campusOverview(@TenantId() t: number) {
+    return this.svc.campusOverview(t);
+  }
+
   @Get('metrics')
   @RequirePermissions('dashboard:view')
   @ApiOperation({ summary: '指标定义列表(可按 category 过滤)' })

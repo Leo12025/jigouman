@@ -104,6 +104,7 @@ export default function MainLayout() {
   const menuItems = [
     { key: '/', icon: <HomeOutlined />, label: '首页' },
     { key: '/dashboard', icon: <BarChartOutlined />, label: '数据看板' },
+    { key: '/campus-overview', icon: <PartitionOutlined />, label: '跨校区对比' },
     { key: '/big-screen', icon: <FundProjectionScreenOutlined />, label: '数据大屏' },
     {
       key: 'group-course',
