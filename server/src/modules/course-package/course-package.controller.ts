@@ -8,6 +8,7 @@ import { OperationLog } from '../../common/decorators/operation-log.decorator';
 import {
   CreateCoursePackageDto, UpdateCoursePackageDto, AddPackageCoursesDto,
   PurchasePackageDto, CoursePackagePageQueryDto,
+  SetPackageTiersDto, SetPackageItemsDto, SetPackagePriceRulesDto,
 } from './dto/course-package.dto';
 import { CoursePackageService } from './course-package.service';
 
@@ -82,6 +83,76 @@ export class CoursePackageController {
   @ApiOperation({ summary: '课包含的课程' })
   courses(@TenantId() t: number, @Param('id') id: number) {
     return this.svc.courses(t, Number(id));
+  }
+
+  @Post(':id/tiers')
+  @RequirePermissions('course-package:update')
+  @OperationLog({ action: 'course-package:set-tiers', target: 'package_tier' })
+  @ApiOperation({ summary: '设置阶梯规格(30/60课时两档,单价递减)' })
+  setTiers(
+    @TenantId() t: number,
+    @Param('id') id: number,
+    @Body() d: SetPackageTiersDto,
+  ) {
+    return this.svc.setTiers(t, Number(id), d);
+  }
+
+  @Get(':id/tiers')
+  @RequirePermissions('course-package:view')
+  @ApiOperation({ summary: '阶梯规格列表' })
+  tiers(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.listTiers(t, Number(id));
+  }
+
+  @Post(':id/items')
+  @RequirePermissions('course-package:update')
+  @OperationLog({ action: 'course-package:set-items', target: 'package_item' })
+  @ApiOperation({ summary: '设置组合套餐子项(每子项各自固定课时)' })
+  setItems(
+    @TenantId() t: number,
+    @Param('id') id: number,
+    @Body() d: SetPackageItemsDto,
+  ) {
+    return this.svc.setItems(t, Number(id), d);
+  }
+
+  @Get(':id/items')
+  @RequirePermissions('course-package:view')
+  @ApiOperation({ summary: '组合套餐子项列表' })
+  items(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.listItems(t, Number(id));
+  }
+
+  @Post(':id/price-rules')
+  @RequirePermissions('course-package:update')
+  @OperationLog({ action: 'course-package:set-price-rules', target: 'package_price_rule' })
+  @ApiOperation({ summary: '设置差异化定价(校区/老师级别/班型)' })
+  setPriceRules(
+    @TenantId() t: number,
+    @Param('id') id: number,
+    @Body() d: SetPackagePriceRulesDto,
+  ) {
+    return this.svc.setPriceRules(t, Number(id), d);
+  }
+
+  @Get(':id/price-rules')
+  @RequirePermissions('course-package:view')
+  @ApiOperation({ summary: '差异化定价列表' })
+  priceRules(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.listPriceRules(t, Number(id));
+  }
+
+  @Get(':id/price')
+  @RequirePermissions('course-package:view')
+  @ApiOperation({ summary: '按维度试算价格(campusId/teacherLevel/classType)' })
+  price(
+    @TenantId() t: number,
+    @Param('id') id: number,
+    @Query('campusId') campusId?: string,
+    @Query('teacherLevel') teacherLevel?: string,
+    @Query('classType') classType?: string,
+  ) {
+    return this.svc.resolvePrice(t, Number(id), { campusId, teacherLevel, classType });
   }
 
   @Post(':id/purchase')

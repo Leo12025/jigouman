@@ -2,6 +2,7 @@ import { Module, NestModule, OnModuleInit, RequestMethod, MiddlewareConsumer } f
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { DatabaseModule } from './core/database/database.module';
 import { AuditModule } from './core/audit/audit.module';
@@ -56,6 +57,8 @@ import { ClassChangeModule } from './modules/class-change/class-change.module';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     // 全局限流（文档 §9.2 防刷限流）；登录/刷新接口用 @Throttle 单独收紧
     ThrottlerModule.forRoot([{ name: 'default', ttl: minutes(1), limit: 300 }]),
+    // 定时任务（课时/权益到期清算等）
+    ScheduleModule.forRoot(),
     DatabaseModule,
     AuditModule,
     AuthModule,

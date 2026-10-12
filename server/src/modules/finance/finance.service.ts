@@ -72,11 +72,23 @@ export class FinanceService {
   /** 消课事件钩子：按课时价值(发放时单价) × 提成率生成教师分账记录（文档 §4.5） */
   async onConsume(
     tenantId: number,
-    p: { studentId: number; courseId?: number; teacherId?: number; lessonId?: number; consumptionId?: number; hours: number; channelPartnerId?: number },
+    p: {
+      studentId: number;
+      courseId?: number;
+      teacherId?: number;
+      lessonId?: number;
+      consumptionId?: number;
+      /** 实际被扣减的课时账户（课包账户 courseId=null，必须按 accountId 取，不能按 courseId 反查） */
+      accountId?: number;
+      hours: number;
+      channelPartnerId?: number;
+    },
   ) {
     if (!p.teacherId || !p.courseId || p.hours <= 0) return null;
-    // 取该账户发放记录(GRANT)中的课时单价 → 课时价值
-    const acc = await this.accRepo.findOne({ where: { tenantId, studentId: p.studentId, courseId: p.courseId } as any });
+    // 取"实际扣减账户"的课时单价 → 课时价值
+    const acc = p.accountId
+      ? await this.accRepo.findOne({ where: { tenantId, id: p.accountId } as any })
+      : await this.accRepo.findOne({ where: { tenantId, studentId: p.studentId, courseId: p.courseId } as any });
     let baseAmount = 0;
     let orderId: number | undefined;
     if (acc) {
@@ -89,7 +101,11 @@ export class FinanceService {
         .getOne();
       if (grantRow?.refOrderId) {
         orderId = grantRow.refOrderId;
-        const unit = Number(grantRow.unitValue) || 0;
+        const unit = Number(grantRow.unitValue) || Number(acc.unitValue) || 0;
+        baseAmount = r2(unit * p.hours);
+      } else {
+        // 无订单来源（如手动发放）：回退到账户级单价，避免分账静默丢失
+        const unit = Number(acc.unitValue) || 0;
         baseAmount = r2(unit * p.hours);
       }
     }

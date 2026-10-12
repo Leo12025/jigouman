@@ -1,9 +1,14 @@
 import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { orgRepo } from '../../common/org-scope';
+import { parseTenantConfig } from '../../common/compliance';
+import { CoursePackage } from '../course-package/entities/course-package.entity';
+import { PackageItem } from '../course-package/entities/package-item.entity';
+import { Tenant } from '../tenant/entities/tenant.entity';
+import { HourGrantType } from '../hour/entities/hour-account.entity';
 import {
   Order,
   OrderStatus,
@@ -22,6 +27,16 @@ import { ApprovalService } from '../approval/approval.service';
 
 function genOrderNo(): string {
   return `NO${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function r2(n: number): number {
+  return Math.round((n || 0) * 100) / 100;
+}
+
+function addDays(base: Date, days: number): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
 /** 解析学员人群标签（DB 存为 JSON 字符串） */
@@ -43,6 +58,9 @@ export class OrderService implements OnModuleInit {
     @InjectRepository(OrderItem) itemRepo: Repository<OrderItem>,
     @InjectRepository(Payment) payRepo: Repository<Payment>,
     @InjectRepository(Refund) refundRepo: Repository<Refund>,
+    @InjectRepository(CoursePackage) pkgRepo: Repository<CoursePackage>,
+    @InjectRepository(PackageItem) subItemRepo: Repository<PackageItem>,
+    @InjectRepository(Tenant) tenantRepo: Repository<Tenant>,
     private readonly hourSvc: HourService,
     private readonly couponSvc: CouponService,
     private readonly studentSvc: StudentService,
@@ -53,11 +71,17 @@ export class OrderService implements OnModuleInit {
     this.itemRepo = orgRepo(itemRepo);
     this.payRepo = orgRepo(payRepo);
     this.refundRepo = orgRepo(refundRepo);
+    this.pkgRepo = orgRepo(pkgRepo);
+    this.subItemRepo = orgRepo(subItemRepo);
+    this.tenantRepo = tenantRepo;
   }
   private readonly orderRepo: Repository<Order>;
   private readonly itemRepo: Repository<OrderItem>;
   private readonly payRepo: Repository<Payment>;
   private readonly refundRepo: Repository<Refund>;
+  private readonly pkgRepo: Repository<CoursePackage>;
+  private readonly subItemRepo: Repository<PackageItem>;
+  private readonly tenantRepo: Repository<Tenant>;
 
   async createOrder(tenantId: number, d: CreateOrderDto) {
     if (!d.items?.length) throw new BusinessException(ResCode.BAD_REQUEST, '订单至少需要一个订单项');
@@ -172,34 +196,87 @@ export class OrderService implements OnModuleInit {
 
     for (const it of items) {
       if (it.hours > 0) {
-        const perHour = Math.round((Number(it.amount) / it.hours) * 100) / 100;
-        if (it.itemType === 'HOUR_PACK' && it.packageId) {
-          // 课包订单：发放到学员"课包账户"(courseId=null, packageId=套餐)，可跨套餐内课程抵扣
-          await this.hourSvc.grant(tenantId, {
-            studentId: order.studentId,
-            type: 'GENERAL',
-            hours: it.hours,
-            packageId: Number(it.packageId),
-            operatorId,
-            refOrderId: order.id,
-            remark: it.name,
-            unitValue: perHour,
-          });
-        } else {
-          await this.hourSvc.grant(tenantId, {
-            studentId: order.studentId,
-            courseId: it.courseId,
-            type: 'CLASS',
-            hours: it.hours,
-            operatorId,
-            refOrderId: order.id,
-            remark: it.name,
-            unitValue: perHour,
-          });
-        }
+        await this.grantByItem(tenantId, order, it, operatorId);
       }
     }
     return this.getOrder(tenantId, id);
+  }
+
+  /**
+   * 支付发放（文档 §3.2）：按套餐 consume_mode 路由到不同账户模型，
+   * 并补齐此前缺失的有效期 / 课时单价 / 赠课标记 / 来源订单项（退费精确匹配用）。
+   */
+  private async grantByItem(tenantId: number, order: Order, it: OrderItem, operatorId?: number) {
+    const hours = Number(it.hours) || 0;
+    const perHour = hours > 0 ? r2(Number(it.amount) / hours) : 0;
+    const grantType: HourGrantType = it.itemType === 'GIFT' ? 'GIFT' : 'PAID';
+    const pkg = it.packageId
+      ? await this.pkgRepo.findOne({ where: { tenantId, id: Number(it.packageId) } as any })
+      : null;
+    const validDays = pkg?.validDays ?? undefined;
+    const base = {
+      studentId: order.studentId,
+      hours,
+      operatorId,
+      refOrderId: order.id,
+      orderItemId: it.id,
+      remark: it.name,
+      unitValue: perHour,
+      validDays,
+      grantType,
+    };
+
+    // BY_TIME：时间型权益（年卡/月卡/托班时段卡，有效期内不限次）
+    if (pkg?.consumeMode === 'BY_TIME') {
+      return this.hourSvc.grantEntitlement(tenantId, {
+        studentId: order.studentId,
+        packageId: pkg.id,
+        courseId: it.courseId,
+        expireAt: addDays(new Date(), validDays && validDays > 0 ? validDays : 30),
+        refOrderId: order.id,
+        operatorId,
+        remark: it.name,
+      });
+    }
+
+    // BY_PERIOD：期课报名（绑定班期，按课次出勤，不逐次建课时账户）
+    if (pkg?.consumeMode === 'BY_PERIOD') {
+      return this.hourSvc.enroll(tenantId, {
+        studentId: order.studentId,
+        classGroupId: pkg.classGroupId,
+        courseId: it.courseId,
+        packageId: pkg.id,
+        refOrderId: order.id,
+        totalLessons: hours,
+      });
+    }
+
+    // BY_HOUR 组合套餐：按子项拆分，每门课各自固定课时（Scratch 用完不能拿 Python 的补）
+    if (pkg?.sellType === 'COMBO') {
+      const subs = await this.subItemRepo.find({ where: { tenantId, packageId: pkg.id } as any });
+      if (subs.length && subs.every((s) => (s.hours || 0) > 0)) {
+        const out: any[] = [];
+        for (const s of subs) {
+          out.push(
+            await this.hourSvc.grant(tenantId, {
+              ...base,
+              courseId: Number(s.courseId),
+              packageId: pkg.id,
+              type: 'CLASS',
+              hours: Number(s.hours),
+            }),
+          );
+        }
+        return out;
+      }
+    }
+
+    // BY_HOUR 课包：课包账户（可跨套餐内课程抵扣）
+    if (pkg) {
+      return this.hourSvc.grant(tenantId, { ...base, type: 'GENERAL', packageId: pkg.id });
+    }
+    // 普通课程：课程专属账户
+    return this.hourSvc.grant(tenantId, { ...base, courseId: it.courseId, type: 'CLASS' });
   }
 
   async getOrder(tenantId: number, id: number) {
@@ -213,41 +290,125 @@ export class OrderService implements OnModuleInit {
     return { ...(order as any), items, payments, refunds };
   }
 
-  /** 退费预览：按消课比例计算可退金额（文档 §4.5「按消课比例扣费」） */
+  /** 违约金比例（因学员原因提前退学，按未消耗余额扣违约金；租户级可配，默认 0） */
+  private async penaltyRate(tenantId: number): Promise<number> {
+    const t = await this.tenantRepo.findOne({ where: { id: tenantId } as any });
+    const cfg = parseTenantConfig(t?.config);
+    const n = Number(cfg.refundPenaltyRate ?? process.env.REFUND_PENALTY_RATE ?? 0);
+    return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
+  }
+
+  /**
+   * 退费预览（文档 §4.3，严格对齐示范合同计算口径）：
+   * - 按课时：已消费 = 培训费 ÷ 总课时 × 实际消费课时
+   * - 按周期：已消费 = 培训费 ÷ 总天数 × 实际消费天数
+   * - 赠课不退、不计入可退金额；7 日内未消费无条件全额退
+   */
   async previewRefund(tenantId: number, id: number) {
     const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
     if (!order) throw new NotFoundException('订单不存在');
     const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
-    // bigint 列在 SQLite 下可能以字符串返回，统一转 Number 再查询/比较
     const studentId = Number(order.studentId);
-    const balances = (await this.hourSvc.balance(tenantId, studentId)) as any[];
-    const balOf = (courseId?: number) =>
-      balances.find((b) => Number(b.courseId ?? 0) === Number(courseId ?? 0))?.balance ?? 0;
+    const accounts = (await this.hourSvc.balance(tenantId, studentId)) as any[];
+
+    const pkgIds = items.map((it) => (it.packageId ? Number(it.packageId) : 0)).filter((x) => x > 0);
+    const pkgs = pkgIds.length
+      ? await this.pkgRepo.find({ where: { tenantId, id: In(pkgIds) } as any })
+      : [];
+    const pkgOf = (pid?: number) => pkgs.find((p) => Number(p.id) === Number(pid));
 
     let totalHours = 0;
     let remainingHours = 0;
     let consumedHours = 0;
     let refundable = 0;
-    const detail = items.map((it) => {
+    const detail: any[] = [];
+
+    for (const it of items) {
       const hours = Number(it.hours) || 0;
-      const unitPrice = hours > 0 ? Math.round((Number(it.amount) / hours) * 100) / 100 : 0;
-      const remain = hours > 0 ? Math.min(hours, balOf(it.courseId)) : 0;
+      const amount = Number(it.amount) || 0;
+      if (hours <= 0) {
+        detail.push({ name: it.name, hours: 0, refundable: 0, note: '非课时项' });
+        continue;
+      }
+      const pkg = pkgOf(it.packageId);
+      const mode = pkg?.consumeMode || 'BY_HOUR';
+      const unitPrice = r2(amount / hours);
+
+      // 按周期收费：培训费 ÷ 总天数 × 实际消费天数
+      if (mode === 'BY_TIME') {
+        const ents = (await this.hourSvc.listEntitlements(tenantId, studentId)) as any[];
+        const ent = ents.find((e) => Number(e.packageId || 0) === Number(it.packageId || 0));
+        const start = ent?.startAt ? new Date(ent.startAt).getTime() : Date.now();
+        const end = ent?.expireAt ? new Date(ent.expireAt).getTime() : start + 30 * 86400_000;
+        const totalDays = Math.max(1, Math.round((end - start) / 86400_000));
+        const usedDays = Math.min(totalDays, Math.max(0, Math.round((Date.now() - start) / 86400_000)));
+        const itemRefund = r2(amount * Math.max(0, 1 - usedDays / totalDays));
+        refundable = r2(refundable + itemRefund);
+        detail.push({ name: it.name, mode, totalDays, usedDays, amount, refundable: itemRefund });
+        continue;
+      }
+
+      // 按期：按已出勤课次占比扣减
+      if (mode === 'BY_PERIOD') {
+        const enrolls = (await this.hourSvc.listEnrollments(tenantId, studentId)) as any[];
+        const en = enrolls.find((e) => Number(e.packageId || 0) === Number(it.packageId || 0));
+        const total = Number(en?.totalLessons || 0) || hours;
+        const attended = Number(en?.attendedLessons || 0);
+        const remainLessons = Math.max(0, total - attended);
+        const itemRefund = r2((amount / Math.max(1, total)) * remainLessons);
+        refundable = r2(refundable + itemRefund);
+        remainingHours += remainLessons;
+        consumedHours += attended;
+        detail.push({ name: it.name, mode, totalLessons: total, attended, refundable: itemRefund });
+        continue;
+      }
+
+      // BY_HOUR：精确匹配来源账户（优先 orderItemId，其次 packageId/courseId），赠课不计入
+      const byItem = accounts.filter((a) => Number(a.orderItemId || 0) === Number(it.id));
+      const pool = byItem.length
+        ? byItem
+        : accounts.filter((a) =>
+            it.packageId != null
+              ? Number(a.packageId || 0) === Number(it.packageId)
+              : Number(a.courseId || 0) === Number(it.courseId || 0),
+          );
+      const remain = Math.min(
+        hours,
+        pool
+          .filter((a) => !a.isGranted && a.status !== 'CLOSED')
+          .reduce((s, a) => s + (Number(a.balance) || 0), 0),
+      );
       const consumed = hours - remain;
-      const itemRefund = Math.round(remain * unitPrice * 100) / 100;
+      const itemRefund = r2(remain * unitPrice);
       totalHours += hours;
       remainingHours += remain;
       consumedHours += consumed;
-      refundable = Math.round((refundable + itemRefund) * 100) / 100;
-      return {
-        courseId: it.courseId,
-        name: it.name,
-        hours,
-        unitPrice,
-        remainingHours: remain,
-        consumedHours: consumed,
-        refundable: itemRefund,
-      };
+      refundable = r2(refundable + itemRefund);
+      detail.push({
+        courseId: it.courseId, name: it.name, mode, hours, unitPrice,
+        remainingHours: remain, consumedHours: consumed, refundable: itemRefund,
+      });
+    }
+
+    // 7 日内未消费：无条件全额退（示范合同）
+    const payments = await this.payRepo.find({
+      where: { tenantId, orderId: id } as any,
+      order: { id: 'ASC' } as any,
     });
+    const firstPaidAt = payments[0]?.paidAt ? new Date(payments[0].paidAt as any).getTime() : 0;
+    const within7Days = firstPaidAt > 0 && Date.now() - firstPaidAt <= 7 * 86400_000;
+    if (within7Days && consumedHours === 0) {
+      refundable = r2(Number(order.paidAmount));
+    }
+
+    // 因学员原因提前退学：按未消耗余额扣违约金
+    const rate = await this.penaltyRate(tenantId);
+    let penalty = 0;
+    if (rate > 0 && consumedHours > 0) {
+      penalty = r2(refundable * rate);
+      refundable = Math.max(0, r2(refundable - penalty));
+    }
+
     return {
       orderId: id,
       paidAmount: Number(order.paidAmount),
@@ -255,6 +416,10 @@ export class OrderService implements OnModuleInit {
       remainingHours,
       consumedHours,
       refundable,
+      penaltyRate: rate,
+      penalty,
+      within7Days,
+      detail,
     };
   }
 
@@ -320,8 +485,14 @@ export class OrderService implements OnModuleInit {
       order.status = OrderStatus.REFUNDED;
       await this.orderRepo.save(order as any);
     }
-    // 退费必须触发课时回滚，防止资损
-    await this.hourSvc.rollbackByOrder(tenantId, refund.orderId, undefined);
+    // 退费必须触发课时回滚，防止资损；部分退费按比例回滚
+    // （此前无条件全额回滚，导致"只退部分钱却清零全部课时"，学员侧纠纷）
+    const preview = await this.previewRefund(tenantId, refund.orderId).catch(() => null);
+    const ratio =
+      preview && preview.refundable > 0
+        ? Math.min(1, Number(refund.amount) / preview.refundable)
+        : 1;
+    await this.hourSvc.rollbackByOrder(tenantId, refund.orderId, ratio, undefined);
   }
 
   /** 审批驳回后回写：退款单置驳回，订单退回已支付 */

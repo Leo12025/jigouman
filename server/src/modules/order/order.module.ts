@@ -10,10 +10,19 @@ import { HourModule } from '../../modules/hour/hour.module';
 import { CouponModule } from '../../modules/coupon/coupon.module';
 import { ApprovalModule } from '../../modules/approval/approval.module';
 import { StudentModule } from '../../modules/student/student.module';
+import { CoursePackage } from '../course-package/entities/course-package.entity';
+import { PackageItem } from '../course-package/entities/package-item.entity';
+import { Tenant } from '../tenant/entities/tenant.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, Payment, Refund]),
+    TypeOrmModule.forFeature([
+      Order, OrderItem, Payment, Refund,
+      // 支付发放需按套餐 consume_mode 路由、组合套餐按子项拆分
+      CoursePackage, PackageItem,
+      // 退费违约金比例按租户可配
+      Tenant,
+    ]),
     HourModule,
     CouponModule,
     ApprovalModule,
