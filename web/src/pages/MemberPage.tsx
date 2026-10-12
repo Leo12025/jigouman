@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Tag, Popconfirm, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listMemberLevels, createMemberLevel, deleteMemberLevel, listMembers, adjustPoints, listPointLedger } from '../api/crm';
 
@@ -83,7 +84,7 @@ export default function MemberPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="会员管理">
       <Tabs
         tabBarExtraContent={<Button type="primary" icon={<PlusOutlined />} onClick={() => { lvForm.resetFields(); lvForm.setFieldsValue({ level: 1, minPoints: 0, discount: 0, status: 'ACTIVE' }); setLvOpen(true); }}>新建等级</Button>}
         items={[
@@ -116,6 +117,6 @@ export default function MemberPage() {
           <Form.Item name="remark" label="说明"><Input /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

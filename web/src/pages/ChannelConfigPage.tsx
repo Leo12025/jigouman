@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Card, Switch, Button, Input, Typography, Space, Tag, Popconfirm, Alert, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listNotifyChannels, upsertNotifyChannel, deleteNotifyChannel } from '../api/crm';
 
 const { Text, Paragraph } = Typography;
@@ -84,7 +85,7 @@ export default function ChannelConfigPage() {
   };
 
   return (
-    <div>
+    <PageContainer title="消息渠道配置">
       <Alert
         type="info" showIcon
         message="外部消息渠道（§4.26 多渠道提醒）"
@@ -135,6 +136,6 @@ export default function ChannelConfigPage() {
           );
         })}
       </Space>
-    </div>
+    </PageContainer>
   );
 }

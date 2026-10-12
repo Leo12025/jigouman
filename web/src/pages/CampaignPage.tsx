@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, Tag, DatePicker, Popconfirm } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { listCampaigns, createCampaign, updateCampaign, deleteCampaign } from '../api/crm';
@@ -87,7 +88,7 @@ export default function CampaignPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="市场活动">
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建活动</Button>
       </Space>
@@ -101,6 +102,6 @@ export default function CampaignPage() {
           <Form.Item name="status" label="启用" valuePropName="checked" getValueProps={(v) => ({ checked: v === 1 })}><Switch /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

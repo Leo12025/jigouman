@@ -1,7 +1,9 @@
+import { theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDateTime } from '../utils/format';
 import { Steps, Tabs, Card, Descriptions, Table, Tag, Timeline, Button, Space, Spin, Result } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { getStudentLifecycle } from '../api/crm';
 
@@ -11,6 +13,7 @@ const COMPLAINT_COLOR: Record<string, string> = { PENDING: 'gold', PROCESSING: '
 const HW_COLOR: Record<string, string> = { SUBMITTED: 'gold', REVIEWED: 'green' };
 
 export default function StudentLifecyclePage() {
+  const { token } = theme.useToken();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
@@ -217,7 +220,7 @@ export default function StudentLifecyclePage() {
             color: e.stage === 'refund' ? 'red' : e.stage === 'purchase' ? 'green' : e.stage === 'class' ? 'blue' : 'gray',
             children: (
               <div>
-                <b>{e.title}</b> <span style={{ color: 'rgba(0,0,0,.45)' }}>{formatDateTime(e.at)}</span>
+                <b>{e.title}</b> <span style={{ color: 'token.colorTextSecondary' }}>{formatDateTime(e.at)}</span>
                 <div style={{ color: 'rgba(0,0,0,.65)' }}>{e.detail}</div>
               </div>
             ),
@@ -227,7 +230,7 @@ export default function StudentLifecyclePage() {
   ];
 
   return (
-    <div>
+    <PageContainer title="学员生命周期">
       <Space style={{ marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/students')}>返回</Button>
         <Button onClick={() => navigate(`/students/${id}`)}>学员资料</Button>
@@ -257,6 +260,6 @@ export default function StudentLifecyclePage() {
       <Card size="small">
         <Tabs items={items} />
       </Card>
-    </div>
+    </PageContainer>
   );
 }

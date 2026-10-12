@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listClassrooms, createClassroom, updateClassroom, deleteClassroom } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
@@ -45,7 +46,7 @@ export default function VenuePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="场地管理">
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建教室</Button>
@@ -64,6 +65,6 @@ export default function VenuePage() {
           <Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

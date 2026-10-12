@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, Drawer, Descriptions, Tabs, App,
@@ -19,6 +20,7 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function OrderPage() {
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -281,7 +283,7 @@ export default function OrderPage() {
                         { title: '审批实例', dataIndex: 'approvalInstanceId', render: (v: number) => v ? `#${v}` : '-' },
                       ]} />
                     {detail.refunds?.some((r: any) => r.status === 'PENDING') && (
-                      <div style={{ marginTop: 12, color: 'rgba(0,0,0,.45)', fontSize: 13 }}>
+                      <div style={{ marginTop: 12, color: 'token.colorTextSecondary', fontSize: 13 }}>
                         该退费单待审批，请到「审批中心」处理。
                       </div>
                     )}

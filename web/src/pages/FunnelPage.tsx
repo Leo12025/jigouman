@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Card, Row, Col, Statistic, Select, Button, Space, Progress, theme } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listChannels, listCampaigns, getFunnel } from '../api/crm';
 import type { Funnel, Channel, Campaign, LeadStage } from '../api/types';
 import { LEAD_STAGES, LEAD_STAGE_LABEL } from '../api/types';
@@ -55,7 +56,7 @@ export default function FunnelPage() {
   const total = data?.total || 0;
 
   return (
-    <div>
+    <PageContainer title="转化漏斗">
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           placeholder="渠道"
@@ -117,6 +118,6 @@ export default function FunnelPage() {
           );
         })}
       </Card>
-    </div>
+    </PageContainer>
   );
 }

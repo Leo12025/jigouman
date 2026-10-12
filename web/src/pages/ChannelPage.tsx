@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, Tag, Popconfirm } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined } from '@ant-design/icons';
 import { listChannels, createChannel, updateChannel, deleteChannel } from '../api/crm';
 import type { Channel } from '../api/types';
@@ -72,7 +73,7 @@ export default function ChannelPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="渠道管理">
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建渠道</Button>
       </Space>
@@ -86,6 +87,6 @@ export default function ChannelPage() {
           <Form.Item name="status" label="启用" valuePropName="checked" getValueProps={(v) => ({ checked: v === 1 })}><Switch /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Tag, Select, Space, Popconfirm, Card, Row, Col, Radio, Modal, Input, App,
@@ -17,6 +18,7 @@ const STATUS_OPTS = [
 ];
 
 export default function TaskPage() {
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -90,7 +92,7 @@ export default function TaskPage() {
         </Tag>
       );
     }
-    return <span style={{ color: 'rgba(0,0,0,.45)' }}>剩 {r.overdueHours}h</span>;
+    return <span style={{ color: 'token.colorTextSecondary' }}>剩 {r.overdueHours}h</span>;
   };
 
   const cols = useMemo(() => [
@@ -140,19 +142,19 @@ export default function TaskPage() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
           <Card size="small">
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>总待办</div>
+            <div style={{ color: 'token.colorTextSecondary' }}>总待办</div>
             <div style={{ fontSize: 24, fontWeight: 600 }}>{stats?.total ?? '-'}</div>
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small">
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>逾期</div>
+            <div style={{ color: 'token.colorTextSecondary' }}>逾期</div>
             <div style={{ fontSize: 24, fontWeight: 600, color: '#fa541c' }}>{stats?.overdue ?? '-'}</div>
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small">
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>严重逾期</div>
+            <div style={{ color: 'token.colorTextSecondary' }}>严重逾期</div>
             <div style={{ fontSize: 24, fontWeight: 600, color: '#cf1322' }}>{stats?.severeOverdue ?? '-'}</div>
           </Card>
         </Col>
@@ -163,7 +165,7 @@ export default function TaskPage() {
                 <Tag key={b.type} color={TASK_TYPE_LABELS[b.type]?.color}>{b.label} {b.count}</Tag>
               ))}
               {(!stats?.byType || stats.byType.length === 0) && (
-                <span style={{ color: 'rgba(0,0,0,.45)' }}>暂无</span>
+                <span style={{ color: 'token.colorTextSecondary' }}>暂无</span>
               )}
             </Space>
           </Card>

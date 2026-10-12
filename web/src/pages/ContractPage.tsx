@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Popconfirm, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import {
   listContractTemplates, createContractTemplate, deleteContractTemplate,
@@ -68,7 +69,7 @@ export default function ContractPage() {
   ], [message, loadContracts]);
 
   return (
-    <div>
+    <PageContainer title="合同管理">
       <Tabs
         tabBarExtraContent={<Button type="primary" icon={<PlusOutlined />} onClick={() => { tplForm.resetFields(); tplForm.setFieldsValue({ type: 'ENROLL', status: 'ACTIVE' }); setTplOpen(true); }}>新建模板</Button>}
         items={[
@@ -105,6 +106,6 @@ export default function ContractPage() {
           <Form.Item name="signatureResId" label="手写签名资源ID"><InputNumber style={{ width: '100%' }} min={1} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

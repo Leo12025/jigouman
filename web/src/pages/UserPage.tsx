@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Tag, Popconfirm, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons';
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listRoles } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
@@ -76,7 +77,7 @@ export default function UserPage() {
   };
 
   return (
-    <div>
+    <PageContainer title="用户管理">
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建用户</Button>
@@ -113,6 +114,6 @@ export default function UserPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

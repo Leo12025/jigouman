@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Tree, Button, Space, Modal, Form, Input, Select, Popconfirm, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { orgTree, createOrg, updateOrg, deleteOrg } from '../api/crm';
 
@@ -43,7 +44,7 @@ export default function OrgPage() {
   };
 
   return (
-    <div>
+    <PageContainer title="组织架构">
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(undefined)}>新建组织</Button>
@@ -71,6 +72,6 @@ export default function OrgPage() {
           <Form.Item name="status" label="状态"><Select options={[{ value: 'ACTIVE', label: '启用' }, { value: 'DISABLED', label: '停用' }]} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

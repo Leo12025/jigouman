@@ -1,5 +1,7 @@
+import { theme } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Statistic, Table, Tag, Alert, Spin, Empty, Tooltip } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { TrophyFilled, RiseOutlined, FallOutlined } from '@ant-design/icons';
 import { getCampusOverview } from '../api/dashboard';
 import { BarChart, GaugeChart } from '../components/Charts';
@@ -35,6 +37,7 @@ const COLS: { key: string; title: string; path: (c: Campus) => number; higherBet
 ];
 
 export default function CampusOverviewPage() {
+  const { token } = theme.useToken();
   const [data, setData] = useState<{ campuses: Campus[]; summary: any; compare: any } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -118,7 +121,7 @@ export default function CampusOverviewPage() {
     (data?.campuses || []).map((c) => ({ label: c.name, value: Number((path(c) * 100).toFixed(1)) }));
 
   return (
-    <div>
+    <PageContainer title="跨校区对比">
       <Alert
         type="info"
         showIcon
@@ -147,35 +150,35 @@ export default function CampusOverviewPage() {
               <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 营收冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.received.top.name}</div>
                 <div>{money(cmp.received.top.value)}</div>
-                <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>均值 {money(cmp.received.avg)}</div>
+                <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {money(cmp.received.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
               <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 转化冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.conversion.top.name}</div>
                 <div>{pct(cmp.conversion.top.value)}</div>
-                <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>均值 {pct(cmp.conversion.avg)}</div>
+                <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {pct(cmp.conversion.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
               <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 出勤冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.attendance.top.name}</div>
                 <div>{pct(cmp.attendance.top.value)}</div>
-                <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>均值 {pct(cmp.attendance.avg)}</div>
+                <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {pct(cmp.attendance.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
               <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 课消冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.consumeRate.top.name}</div>
                 <div>{pct(cmp.consumeRate.top.value)}</div>
-                <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>均值 {pct(cmp.consumeRate.avg)}</div>
+                <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {pct(cmp.consumeRate.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
               <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 报名冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.signed.top.name}</div>
                 <div>{cmp.signed.top.value} 人</div>
-                <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>均值 {cmp.signed.avg.toFixed(1)}</div>
+                <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {cmp.signed.avg.toFixed(1)}</div>
               </Card>
             </Col>
             <Col span={4}>
@@ -230,6 +233,6 @@ export default function CampusOverviewPage() {
           </Row>
         ) : null}
       </Spin>
-    </div>
+    </PageContainer>
   );
 }

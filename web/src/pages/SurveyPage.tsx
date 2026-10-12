@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, Select, Popconfirm, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listSurveyTemplates, createSurveyTemplate, deleteSurveyTemplate, listSurveyResponses, surveyStats } from '../api/crm';
 
@@ -45,7 +46,7 @@ export default function SurveyPage() {
   ], [message, loadTpl]);
 
   return (
-    <div>
+    <PageContainer title="问卷调研">
       <Tabs
         tabBarExtraContent={<Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); form.setFieldsValue({ type: 'SATISFACTION', status: 'ACTIVE' }); setOpen(true); }}>新建问卷</Button>}
         items={[
@@ -70,6 +71,6 @@ export default function SurveyPage() {
           <Form.Item name="status" label="状态"><Input placeholder="ACTIVE" /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

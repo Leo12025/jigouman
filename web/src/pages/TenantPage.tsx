@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Popconfirm, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listTenants, createTenant, updateTenant, deleteTenant } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
@@ -67,7 +68,7 @@ export default function TenantPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="租户中心">
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建租户</Button>
@@ -89,6 +90,6 @@ export default function TenantPage() {
           <Form.Item name="config" label="配置(JSON，可选)"><Input.TextArea rows={3} placeholder='{"theme":"blue"}' /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

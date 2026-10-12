@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Tag, Space, Button, Modal, Input, Tabs, Select, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listApprovals, myApprovalTodos, approveApproval, rejectApproval } from '../api/crm';
 import { formatDateTime } from '../utils/format';
 
@@ -72,7 +73,7 @@ export default function ApprovalPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="审批中心">
       <Tabs
         activeKey={tab}
         onChange={setTab}
@@ -108,6 +109,6 @@ export default function ApprovalPage() {
           onChange={(e) => setComment(e.target.value)}
         />
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

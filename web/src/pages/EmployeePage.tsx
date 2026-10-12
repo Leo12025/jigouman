@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, Popconfirm, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import dayjs from 'dayjs';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
@@ -128,7 +129,7 @@ export default function EmployeePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="员工管理">
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建员工</Button>
@@ -180,6 +181,6 @@ export default function EmployeePage() {
             { title: '操作', render: (_: any, r: any) => <Popconfirm title="删除?" onConfirm={() => delCert(r.id)}><Button type="link" danger size="small">删除</Button></Popconfirm> },
           ]} />
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

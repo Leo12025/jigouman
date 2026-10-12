@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listMaterials, createMaterial, deleteMaterial, adjustStock, listCosts, createCost, deleteCost } from '../api/crm';
 
@@ -77,7 +78,7 @@ export default function InventoryCostPage() {
   ], [message, loadCost]);
 
   return (
-    <div>
+    <PageContainer title="库存成本">
       <Tabs items={[
         {
           key: 'mat', label: '教材库存',
@@ -126,6 +127,6 @@ export default function InventoryCostPage() {
           <Form.Item name="remark" label="备注"><Input /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

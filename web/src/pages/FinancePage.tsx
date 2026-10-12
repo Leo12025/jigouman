@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Tabs, Table, Button, Tag, Modal, Form, InputNumber, Input, Select, Card, Row, Col, Statistic, Space, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import {
   getSplitConfig, upsertSplitConfig, listSplits, settleSplits,
   generateSalary, listSalary, confirmSalary, paySalary,
@@ -29,6 +30,7 @@ const INVOICE_STATUS: Record<string, { label: string; color: string }> = {
 
 export default function FinancePage() {
   return (
+    <PageContainer title="财务对账">
     <Tabs
       defaultActiveKey="split"
       items={[
@@ -37,6 +39,7 @@ export default function FinancePage() {
         { key: 'report', label: '财务报表', children: <ReportTab /> },
       ]}
     />
+    </PageContainer>
   );
 }
 

@@ -3,6 +3,7 @@ import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, Drawer,
   Switch, Divider, Card, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, GiftOutlined, CalculatorOutlined } from '@ant-design/icons';
 import {
   listCouponTemplates, createCouponTemplate, updateCouponTemplate, deleteCouponTemplate,
@@ -149,7 +150,7 @@ export default function CouponPage() {
   const cgOpts = useMemo(() => classGroups.map((c) => ({ value: c.id, label: c.name })), [classGroups]);
 
   return (
-    <div>
+    <PageContainer title="优惠券管理">
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建促销/券模板</Button>
@@ -286,6 +287,6 @@ export default function CouponPage() {
           </Card>
         )}
       </Drawer>
-    </div>
+    </PageContainer>
   );
 }

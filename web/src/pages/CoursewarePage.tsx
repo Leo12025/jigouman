@@ -1,8 +1,10 @@
+import { theme } from 'antd';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Select, Button, Modal, Form, Input, InputNumber, Space, Card, Table, Tag, Empty, Popconfirm,
   Typography, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import {
   listCourses, listStages, createStage, updateStage, deleteStage,
   createCourseware, deleteCourseware,
@@ -14,6 +16,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function CoursewarePage() {
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const [courses, setCourses] = useState<any[]>([]);
   const [courseId, setCourseId] = useState<number | undefined>();
@@ -95,7 +98,7 @@ export default function CoursewarePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="课件管理">
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
         <Space>
           <span>课程：</span>
@@ -113,7 +116,7 @@ export default function CoursewarePage() {
         </Button>
       </Space>
 
-      {loading && <div style={{ color: 'rgba(0,0,0,.45)' }}>加载中…</div>}
+      {loading && <div style={{ color: 'token.colorTextSecondary' }}>加载中…</div>}
       {!loading && stages.length === 0 && <Empty description="该课程暂无阶段" />}
 
       {stages.map((s: any) => (
@@ -191,6 +194,6 @@ export default function CoursewarePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

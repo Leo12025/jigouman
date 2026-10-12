@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, Tag, Popconfirm, Tabs, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   listCourses, createCourse, updateCourse, deleteCourse,
@@ -136,7 +137,7 @@ export default function CoursePage() {
   );
 
   return (
-    <div>
+    <PageContainer title="课程管理">
       <Tabs items={[{ key: 'course', label: '课程列表', children: courseTab }, { key: 'cat', label: '课程分类', children: catTab }]} />
 
       <Modal title={editing ? '编辑课程' : '新建课程'} open={open} confirmLoading={courseSubmitting} onOk={submitCourse} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
@@ -166,6 +167,6 @@ export default function CoursePage() {
           <Form.Item name="sort" label="排序"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

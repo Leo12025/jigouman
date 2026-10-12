@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, Card, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   listDistributors, createDistributor, updateDistributor, deleteDistributor, recordCommission, listCommissions, settleCommission, distributionStats,
@@ -81,7 +82,7 @@ export default function DistributionPage() {
   ], [message, loadComms, commDistId]);
 
   return (
-    <div>
+    <PageContainer title="分销裂变">
       <Tabs items={[
         {
           key: 'dist', label: '分销员',
@@ -130,6 +131,6 @@ export default function DistributionPage() {
           <Form.Item name="remark" label="备注"><Input /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

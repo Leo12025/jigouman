@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Tabs, Table, Button, Modal, Form, Input, Select, Switch, InputNumber, Space, Card, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import {
   listMetricDefs, createMetricDef, updateMetricDef, removeMetricDef,
   getBenchmark, customReport, evaluateAlerts, exportReportFile, exportBenchmarkFile,
@@ -13,14 +14,14 @@ const REPORT_MET: Record<string, string[]> = {
 
 export default function ReportPage() {
   return (
-    <div style={{ padding: 16 }}>
+    <PageContainer title="看板配置/报表">
       <Tabs items={[
         { key: 'metric', label: '指标配置', children: <MetricTab /> },
         { key: 'bench', label: '多校区对标', children: <BenchmarkTab /> },
         { key: 'report', label: '自定义报表', children: <ReportTab /> },
         { key: 'alert', label: '预警评估', children: <AlertTab /> },
       ]} />
-    </div>
+    </PageContainer>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Tree, Tag, Popconfirm, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listRoles, createRole, updateRole, deleteRole, listPermissions } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
@@ -74,7 +75,7 @@ export default function RolePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="角色权限">
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建角色</Button>
@@ -106,6 +107,6 @@ export default function RolePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

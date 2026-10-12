@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag, Popconfirm, List, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import {
   listCoursePackages, createCoursePackage, updateCoursePackage, deleteCoursePackage,
   listPackageCourses, addPackageCourses, removePackageCourse, purchaseCoursePackage, listCourses,
@@ -132,7 +133,7 @@ export default function CoursePackagePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="课包管理">
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
         <Select
           placeholder="状态" allowClear style={{ width: 120 }}
@@ -221,6 +222,6 @@ export default function CoursePackagePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

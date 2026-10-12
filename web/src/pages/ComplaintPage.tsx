@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Modal, Form, Select, Input, InputNumber, Tag, Space, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listComplaints, createComplaint, assignComplaint, resolveComplaint, listAllUsers } from '../api/crm';
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -89,7 +90,7 @@ export default function ComplaintPage() {
   ], [userMap]);
 
   return (
-    <div>
+    <PageContainer title="客诉管理">
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
         <Space>
           <Select
@@ -151,6 +152,6 @@ export default function ComplaintPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

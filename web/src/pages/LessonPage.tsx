@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, TimePicker, Tag, Popconfirm, Alert, Radio, Empty, App,
@@ -15,6 +16,7 @@ const LESSON_STATUS: Record<string, string> = {
 };
 
 export default function LessonPage() {
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -250,7 +252,7 @@ export default function LessonPage() {
                 />
               </div>
             ))}
-            <div style={{ marginTop: 8, color: 'rgba(0,0,0,.45)', fontSize: 12 }}>出勤/补课各扣 1 课时；请假/缺勤不扣课（§4.6）</div>
+            <div style={{ marginTop: 8, color: 'token.colorTextSecondary', fontSize: 12 }}>出勤/补课各扣 1 课时；请假/缺勤不扣课（§4.6）</div>
           </div>
         ) : (
           <Empty description="该班级暂无在读学员，请先在学员档案中报名" />

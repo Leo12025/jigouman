@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Tag, Space, Alert, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listExams, createExam, createScore } from '../api/crm';
 
 const EXAM_TYPE_LABEL: Record<string, string> = {
@@ -63,7 +64,7 @@ export default function ScorePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="成绩管理">
       <Alert
         type="info" showIcon style={{ marginBottom: 12 }}
         message="成绩录入事件化（§4.26）"
@@ -119,6 +120,6 @@ export default function ScorePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

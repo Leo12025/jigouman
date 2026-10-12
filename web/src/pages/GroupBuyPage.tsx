@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   listGroupBuyActivities, createGroupBuyActivity, updateGroupBuyActivity, deleteGroupBuyActivity,
@@ -90,7 +91,7 @@ export default function GroupBuyPage() {
   ], [message, loadTeams, teamActId]);
 
   return (
-    <div>
+    <PageContainer title="团购拼团">
       <Tabs items={[
         {
           key: 'act', label: '拼团活动',
@@ -138,6 +139,6 @@ export default function GroupBuyPage() {
           <Form.Item name="studentId" label="学员ID" rules={[{ required: true, message: '必填' }]}><InputNumber min={1} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, Card } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listAlertRules, createAlertRule, deleteAlertRule, checkAlert } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
@@ -44,7 +45,7 @@ export default function AlertPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="预警管理">
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button>
@@ -65,6 +66,6 @@ export default function AlertPage() {
           <Form.Item name="channel" label="渠道"><Select options={[{ value: 'INAPP', label: '站内' }, { value: 'SMS', label: '短信' }, { value: 'WECHAT', label: '微信' }]} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

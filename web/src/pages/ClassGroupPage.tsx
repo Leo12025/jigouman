@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, Popconfirm } from 'antd';
+import PageContainer from '../components/PageContainer';
 import dayjs from 'dayjs';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listClassGroups, createClassGroup, updateClassGroup, deleteClassGroup, listCourses } from '../api/crm';
@@ -60,7 +61,7 @@ export default function ClassGroupPage() {
   ], [courseOptions]);
 
   return (
-    <div>
+    <PageContainer title="班级管理">
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>开班</Button>
@@ -79,6 +80,6 @@ export default function ClassGroupPage() {
           <Form.Item name="startDate" label="开班日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

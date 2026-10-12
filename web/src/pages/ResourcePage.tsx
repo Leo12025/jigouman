@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Table, Select, Space, Tag, Button, Popconfirm, Typography, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listResources, deleteResource } from '../api/crm';
 import ResourceUpload from '../components/ResourceUpload';
 
@@ -72,7 +73,7 @@ export default function ResourcePage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="资源库">
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
         <Space>
           <Select
@@ -97,6 +98,6 @@ export default function ResourcePage() {
         pagination={{ current: page, total, pageSize: 20, onChange: setPage }}
         size="small"
       />
-    </div>
+    </PageContainer>
   );
 }

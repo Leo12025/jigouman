@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, Card, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   listClasses, createClass, updateClass, deleteClass, startClass, endClass,
@@ -78,7 +79,7 @@ export default function TeachingPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="在线课堂/督学">
       <Tabs items={[
         {
           key: 'cls', label: '在线课堂',
@@ -128,6 +129,6 @@ export default function TeachingPage() {
           <Form.Item name="durationSec" label="时长(秒)"><InputNumber min={0} /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

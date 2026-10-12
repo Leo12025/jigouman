@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Tabs, Form, Select, InputNumber, Input, Button, Table, Tag, Space, DatePicker, App } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { listStudents, listClassGroups, listLessons, listUsers, createTransfer, listTransfers, createReschedule, listReschedules } from '../api/crm';
 import { formatDateTime } from '../utils/format';
 
@@ -84,7 +85,7 @@ export default function ClassChangePage() {
   ], [users]);
 
   return (
-    <div>
+    <PageContainer title="调课/转班">
       <Tabs activeKey={tab} onChange={setTab} items={[
         { key: 'transfer', label: '转班申请' },
         { key: 'reschedule', label: '调课申请' },
@@ -141,6 +142,6 @@ export default function ClassChangePage() {
           <Table rowKey="id" size="small" loading={loading} columns={reschedCols} dataSource={reschedRows} pagination={false} />
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

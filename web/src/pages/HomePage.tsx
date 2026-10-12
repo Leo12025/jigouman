@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { Card, Row, Col, Space, Typography } from 'antd';
 import PageContainer from '../components/PageContainer';
@@ -19,6 +20,7 @@ const ENTRIES = [
 ];
 
 export default function HomePage() {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [todoStats, setTodoStats] = useState<any>(null);
@@ -39,7 +41,7 @@ export default function HomePage() {
         ].map((s) => (
           <Col span={6} key={s.title}>
             <Card size="small">
-              <div style={{ color: 'rgba(0,0,0,.45)' }}>{s.title}</div>
+              <div style={{ color: 'token.colorTextSecondary' }}>{s.title}</div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>{s.value}</div>
             </Card>
           </Col>
@@ -48,19 +50,19 @@ export default function HomePage() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={8}>
           <Card size="small" hoverable onClick={() => navigate('/tasks')}>
-            <div style={{ color: 'rgba(0,0,0,.45)' }}><BellOutlined /> 我的待办</div>
+            <div style={{ color: 'token.colorTextSecondary' }}><BellOutlined /> 我的待办</div>
             <div style={{ fontSize: 24, fontWeight: 600 }}>{todoStats?.total ?? '-'}</div>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" hoverable onClick={() => navigate('/tasks')}>
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>逾期</div>
+            <div style={{ color: 'token.colorTextSecondary' }}>逾期</div>
             <div style={{ fontSize: 24, fontWeight: 600 }}><Typography.Text type="warning">{todoStats?.overdue ?? '-'}</Typography.Text></div>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" hoverable onClick={() => navigate('/tasks')}>
-            <div style={{ color: 'rgba(0,0,0,.45)' }}>严重逾期</div>
+            <div style={{ color: 'token.colorTextSecondary' }}>严重逾期</div>
             <div style={{ fontSize: 24, fontWeight: 600 }}><Typography.Text type="danger">{todoStats?.severeOverdue ?? '-'}</Typography.Text></div>
           </Card>
         </Col>
@@ -73,7 +75,7 @@ export default function HomePage() {
                 <Space direction="vertical">
                   {e.icon}
                   <div style={{ fontWeight: 600 }}>{e.label}</div>
-                  <div style={{ color: 'rgba(0,0,0,.45)' }}>{e.desc}</div>
+                  <div style={{ color: 'token.colorTextSecondary' }}>{e.desc}</div>
                 </Space>
               </Card>
             </Col>
