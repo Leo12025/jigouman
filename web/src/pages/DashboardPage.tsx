@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Tabs, Card, Row, Col, Statistic, Table, Tag, Alert, Spin, DatePicker, Segmented, Space } from 'antd';
 import dayjs from 'dayjs';
@@ -10,6 +11,7 @@ type Role = 'principal' | 'admission' | 'teaching';
 const pct = (v: number) => `${((v || 0) * 100).toFixed(1)}%`;
 
 export default function DashboardPage() {
+  const { token } = theme.useToken();
   const [role, setRole] = useState<Role>('principal');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -76,6 +78,7 @@ export default function DashboardPage() {
 }
 
 function DynamicMetrics({ items }: { items: any[] }) {
+  const { token } = theme.useToken();
   if (!items?.length) return null;
   return (
     <Card title="自定义指标" size="small" style={{ marginBottom: 16 }}>
@@ -91,6 +94,7 @@ function DynamicMetrics({ items }: { items: any[] }) {
 }
 
 function Principal({ data }: { data: any }) {
+  const { token } = theme.useToken();
   const r = data.revenue || {};
   const s = data.students || {};
   const h = data.hours || {};
@@ -103,12 +107,12 @@ function Principal({ data }: { data: any }) {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}><Card size="small"><Statistic title="应收总额" value={r.receivable ?? 0} precision={2} prefix="¥" /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="已收总额" value={r.received ?? 0} precision={2} prefix="¥" /></Card></Col>
-        <Col span={6}><Card size="small"><Statistic title="退款金额" value={r.refundAmount ?? 0} precision={2} prefix="¥" valueStyle={{ color: '#cf1322' }} /></Card></Col>
-        <Col span={6}><Card size="small"><Statistic title="净现金流" value={r.netCashflow ?? 0} precision={2} prefix="¥" valueStyle={{ color: (r.netCashflow ?? 0) >= 0 ? '#3f8600' : '#cf1322' }} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="退款金额" value={r.refundAmount ?? 0} precision={2} prefix="¥" valueStyle={{ color: token.colorError }} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="净现金流" value={r.netCashflow ?? 0} precision={2} prefix="¥" valueStyle={{ color: (r.netCashflow ?? 0) >= 0 ? token.colorSuccess : token.colorError }} /></Card></Col>
       </Row>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}><Card size="small"><Statistic title="在读数" value={s.studying ?? 0} /></Card></Col>
-        <Col span={6}><Card size="small"><Statistic title="退费学员" value={s.refunded ?? 0} valueStyle={{ color: '#cf1322' }} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="退费学员" value={s.refunded ?? 0} valueStyle={{ color: token.colorError }} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="课消率" value={pct(h.consumeRate)} suffix="" /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="班级满班率" value={pct(c.fullRate)} /></Card></Col>
       </Row>
@@ -123,8 +127,8 @@ function Principal({ data }: { data: any }) {
         <GroupedBar
           categories={(data.trend || []).map((t: any) => t.month)}
           series={[
-            { name: '已收', color: '#52c41a', data: (data.trend || []).map((t: any) => t.received) },
-            { name: '应收', color: '#1890ff', data: (data.trend || []).map((t: any) => t.receivable) },
+            { name: '已收', color: token.colorSuccess, data: (data.trend || []).map((t: any) => t.received) },
+            { name: '应收', color: token.colorPrimary, data: (data.trend || []).map((t: any) => t.receivable) },
           ]}
         />
         <LineChart data={(data.trend || []).map((t: any) => ({ label: t.month, value: t.consumed }))} color="#fa8c16" />
@@ -138,7 +142,7 @@ function Principal({ data }: { data: any }) {
             { title: '已收', dataIndex: 'received', render: (v: number) => `¥${v ?? 0}` },
             { title: '消课(课时)', dataIndex: 'consumed' },
           ]}
-        />
+         scroll={{ x: 'max-content' }} />
       </Card>
 
       <Card title="招生漏斗摘要" size="small">
@@ -168,6 +172,7 @@ function Principal({ data }: { data: any }) {
 }
 
 function Admission({ data }: { data: any }) {
+  const { token } = theme.useToken();
   const f = data.funnel || {};
   const byStage = f.byStage || {};
   return (
@@ -229,7 +234,7 @@ function Admission({ data }: { data: any }) {
                 { title: '阶段', dataIndex: 'stage' },
                 { title: '数量', dataIndex: 'count' },
               ]}
-            />
+             scroll={{ x: 'max-content' }} />
           </Card>
         </Col>
         <Col span={8}>
@@ -242,7 +247,7 @@ function Admission({ data }: { data: any }) {
                 { title: '渠道', dataIndex: 'name' },
                 { title: '线索数', dataIndex: 'count' },
               ]}
-            />
+             scroll={{ x: 'max-content' }} />
           </Card>
         </Col>
         <Col span={8}>
@@ -255,7 +260,7 @@ function Admission({ data }: { data: any }) {
                 { title: '活动', dataIndex: 'name' },
                 { title: '线索数', dataIndex: 'count' },
               ]}
-            />
+             scroll={{ x: 'max-content' }} />
           </Card>
         </Col>
       </Row>
@@ -264,6 +269,7 @@ function Admission({ data }: { data: any }) {
 }
 
 function Teaching({ data }: { data: any }) {
+  const { token } = theme.useToken();
   const a = data.attendance || {};
   const hw = data.homework || {};
   const tasks = data.tasks || {};
@@ -285,8 +291,8 @@ function Teaching({ data }: { data: any }) {
         <Col span={8}>
           <Card size="small" title="关键计数">
             <Statistic title="布置作业" value={hw.assigned ?? 0} />
-            <Statistic title="优秀作业" value={hw.excellent ?? 0} valueStyle={{ color: '#3f8600' }} />
-            <Statistic title="逾期提交" value={hw.late ?? 0} valueStyle={{ color: '#cf1322' }} />
+            <Statistic title="优秀作业" value={hw.excellent ?? 0} valueStyle={{ color: token.colorSuccess }} />
+            <Statistic title="逾期提交" value={hw.late ?? 0} valueStyle={{ color: token.colorError }} />
           </Card>
         </Col>
       </Row>
@@ -312,7 +318,7 @@ function Teaching({ data }: { data: any }) {
                 { title: '类型', dataIndex: 'type' },
                 { title: '待办数', dataIndex: 'count' },
               ]}
-            />
+             scroll={{ x: 'max-content' }} />
           </Card>
         </Col>
       </Row>

@@ -123,7 +123,7 @@ export default function CoursePage() {
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-        onChange={(p, s) => load(p.current, p.pageSize || size)} />
+        onChange={(p, s) => load(p.current, p.pageSize || size)}  scroll={{ x: 'max-content' }} />
     </div>
   );
 
@@ -132,7 +132,7 @@ export default function CoursePage() {
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCatEditing(null); catForm.resetFields(); setCatOpen(true); }}>新建分类</Button>
       </Space>
-      <Table rowKey="id" size="small" columns={catColumns} dataSource={cats} pagination={false} />
+      <Table rowKey="id" size="small" columns={catColumns} dataSource={cats} pagination={false}  scroll={{ x: 'max-content' }} />
     </div>
   );
 

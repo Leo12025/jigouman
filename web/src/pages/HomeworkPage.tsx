@@ -134,7 +134,7 @@ export default function HomeworkPage() {
       </Space>
 
       <Table rowKey="id" size="small" dataSource={rows} columns={cols}
-        pagination={{ current: page, pageSize: 20, total, onChange: load }} />
+        pagination={{ current: page, pageSize: 20, total, onChange: load }}  scroll={{ x: 'max-content' }} />
 
       {/* 布置作业 */}
       <Modal title="布置作业" open={open} confirmLoading={createSubmitting} onOk={submitCreate} onCancel={() => setOpen(false)} okText="布置" cancelText="取消" width={560}>
@@ -162,7 +162,7 @@ export default function HomeworkPage() {
             </Descriptions>
             <Divider orientation="left">提交记录</Divider>
             {detail.submits?.length ? (
-              <Table rowKey="id" size="small" dataSource={detail.submits} columns={submitCols} pagination={false} />
+              <Table rowKey="id" size="small" dataSource={detail.submits} columns={submitCols} pagination={false}  scroll={{ x: 'max-content' }} />
             ) : <Empty description="暂无提交" />}
           </>
         ) : null}
@@ -197,7 +197,7 @@ export default function HomeworkPage() {
       <Modal title="未提交名单" open={pendingOpen} onCancel={() => setPendingOpen(false)} footer={null}>
         {pending.length ? (
           <Table rowKey="id" size="small" pagination={false}
-            dataSource={pending} columns={[{ title: '学员', dataIndex: 'name' }, { title: 'ID', dataIndex: 'id' }]} />
+            dataSource={pending} columns={[{ title: '学员', dataIndex: 'name' }, { title: 'ID', dataIndex: 'id' }]}  scroll={{ x: 'max-content' }} />
         ) : <Empty description="全部已提交" />}
       </Modal>
     </PageContainer>

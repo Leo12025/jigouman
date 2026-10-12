@@ -96,7 +96,7 @@ export default function ApprovalPage() {
         rowKey="id" loading={loading} dataSource={rows} columns={columns}
         pagination={tab === 'todo' ? false : { current: page, total, pageSize: size, onChange: (p, s) => load(p, s || size) }}
         size="small"
-      />
+       scroll={{ x: 'max-content' }} />
       <Modal
         title={acting ? (acting.action === 'approve' ? '通过审批' : '驳回审批') : ''}
         open={!!acting} confirmLoading={submitting}

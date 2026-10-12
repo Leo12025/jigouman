@@ -88,7 +88,7 @@ export default function TeachingPage() {
               <Button icon={<ReloadOutlined />} onClick={loadClasses}>刷新</Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); clsForm.resetFields(); clsForm.setFieldsValue({ status: 'SCHEDULED' }); setClsOpen(true); }}>创建课堂</Button>
             </Space>
-            <Table rowKey="id" size="small" dataSource={classes} columns={clsCols} pagination={{ total: clsTotal }} />
+            <Table rowKey="id" size="small" dataSource={classes} columns={clsCols} pagination={{ total: clsTotal }}  scroll={{ x: 'max-content' }} />
           </>,
         },
         {
@@ -104,7 +104,7 @@ export default function TeachingPage() {
                 出勤统计：共 {stats.total} 人 ｜ 出勤 {stats.byStatus.PRESENT || 0} ｜ 迟到 {stats.byStatus.LATE || 0} ｜ 缺勤 {stats.byStatus.ABSENT || 0}
               </Card>
             )}
-            <Table rowKey="id" size="small" dataSource={study} columns={studyCols} pagination={false} />
+            <Table rowKey="id" size="small" dataSource={study} columns={studyCols} pagination={false}  scroll={{ x: 'max-content' }} />
           </>,
         },
       ]} />

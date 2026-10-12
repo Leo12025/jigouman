@@ -77,7 +77,7 @@ export default function ChannelPage() {
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建渠道</Button>
       </Space>
-      <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+      <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows} pagination={false}  scroll={{ x: 'max-content' }} />
       <Modal title={editing ? '编辑渠道' : '新建渠道'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>

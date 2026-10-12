@@ -77,14 +77,14 @@ export default function ContractPage() {
             key: 'tpl', label: '合同模板',
             children: <>
               <Space style={{ marginBottom: 12 }}><Button icon={<ReloadOutlined />} onClick={loadTpl}>刷新</Button></Space>
-              <Table rowKey="id" size="small" dataSource={tplRows} columns={tplCols} pagination={{ total: tplTotal }} />
+              <Table rowKey="id" size="small" dataSource={tplRows} columns={tplCols} pagination={{ total: tplTotal }}  scroll={{ x: 'max-content' }} />
             </>,
           },
           {
             key: 'contract', label: '合同',
             children: <>
               <Space style={{ marginBottom: 12 }}><Button icon={<ReloadOutlined />} onClick={loadContracts}>刷新</Button></Space>
-              <Table rowKey="id" size="small" dataSource={contractRows} columns={contractCols} pagination={{ total: contractTotal }} />
+              <Table rowKey="id" size="small" dataSource={contractRows} columns={contractCols} pagination={{ total: contractTotal }}  scroll={{ x: 'max-content' }} />
             </>,
           },
         ]}

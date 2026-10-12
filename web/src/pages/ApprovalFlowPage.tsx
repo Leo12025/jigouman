@@ -147,7 +147,7 @@ export default function ApprovalFlowPage() {
         title="审批流模板配置（§4.16 增强）"
         extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建审批流</Button>}
       >
-        <Table rowKey="id" size="small" dataSource={rows} columns={cols} pagination={false} />
+        <Table rowKey="id" size="small" dataSource={rows} columns={cols} pagination={false}  scroll={{ x: 'max-content' }} />
       </Card>
 
       <Modal

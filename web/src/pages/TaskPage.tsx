@@ -149,13 +149,13 @@ export default function TaskPage() {
         <Col span={6}>
           <Card size="small">
             <div style={{ color: 'token.colorTextSecondary' }}>逾期</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa541c' }}>{stats?.overdue ?? '-'}</div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: token.colorWarning }}>{stats?.overdue ?? '-'}</div>
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small">
             <div style={{ color: 'token.colorTextSecondary' }}>严重逾期</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: '#cf1322' }}>{stats?.severeOverdue ?? '-'}</div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: token.colorError }}>{stats?.severeOverdue ?? '-'}</div>
           </Card>
         </Col>
         <Col span={6}>
@@ -191,7 +191,7 @@ export default function TaskPage() {
         <Button type="primary" icon={<AuditOutlined />} onClick={openCreate}>发起审批</Button>
       </Space>
       <Table rowKey="id" size="small" dataSource={rows} columns={cols}
-        pagination={{ current: page, pageSize: 20, total, onChange: load }} />
+        pagination={{ current: page, pageSize: 20, total, onChange: load }}  scroll={{ x: 'max-content' }} />
 
       <Modal title="发起审批" open={createOpen} confirmLoading={createSubmitting} onOk={submitApproval} onCancel={() => setCreateOpen(false)}>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">

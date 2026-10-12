@@ -180,7 +180,7 @@ export default function LessonPage() {
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
-        onChange={(p, s) => load(p.current, p.pageSize || size)} />
+        onChange={(p, s) => load(p.current, p.pageSize || size)}  scroll={{ x: 'max-content' }} />
 
       <Modal title={editing ? '调课' : '单条排课'} open={open} confirmLoading={saveSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">

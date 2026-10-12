@@ -136,7 +136,7 @@ export default function EmployeePage() {
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
-        onChange={(p, s) => load(p.current, p.pageSize || size)} />
+        onChange={(p, s) => load(p.current, p.pageSize || size)}  scroll={{ x: 'max-content' }} />
 
       <Modal title={editing ? '编辑员工' : '新建员工'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
@@ -179,7 +179,7 @@ export default function EmployeePage() {
             { title: '颁发机构', dataIndex: 'issuer', render: (v: string) => v || '-' },
             { title: '到期', dataIndex: 'expireAt', render: (v: string) => v || '-' },
             { title: '操作', render: (_: any, r: any) => <Popconfirm title="删除?" onConfirm={() => delCert(r.id)}><Button type="link" danger size="small">删除</Button></Popconfirm> },
-          ]} />
+          ]}  scroll={{ x: 'max-content' }} />
       </Modal>
     </PageContainer>
   );

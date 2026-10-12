@@ -143,7 +143,7 @@ export default function CoursewarePage() {
             rowKey="id" size="small" pagination={false}
             dataSource={(s.coursewares || []) as any[]}
             columns={coursewareColumns as any}
-          />
+           scroll={{ x: 'max-content' }} />
         </Card>
       ))}
 

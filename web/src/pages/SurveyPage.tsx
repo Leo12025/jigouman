@@ -52,14 +52,14 @@ export default function SurveyPage() {
         items={[
           { key: 'tpl', label: '问卷模板', children: <>
             <Space style={{ marginBottom: 12 }}><Button icon={<ReloadOutlined />} onClick={loadTpl}>刷新</Button></Space>
-            <Table rowKey="id" size="small" dataSource={tpls} columns={tplCols} pagination={{ total }} />
+            <Table rowKey="id" size="small" dataSource={tpls} columns={tplCols} pagination={{ total }}  scroll={{ x: 'max-content' }} />
           </> },
           { key: 'resp', label: '回收', children: <>
             <Space style={{ marginBottom: 12 }}><Button icon={<ReloadOutlined />} onClick={loadResp}>刷新</Button></Space>
             <Table rowKey="id" size="small" dataSource={resps} columns={[
               { title: '模板', dataIndex: 'templateId' }, { title: '学员', dataIndex: 'studentId', render: (v: number) => v || '-' },
               { title: '评分', dataIndex: 'score', render: (v: number) => v ?? '-' },
-            ]} pagination={false} />
+            ]} pagination={false}  scroll={{ x: 'max-content' }} />
             {stats && <div style={{ marginTop: 12 }}>统计：样本 {stats.count} · 平均分 {stats.avgScore} · 分布 {JSON.stringify(stats.distribution)}</div>}
           </> },
         ]}

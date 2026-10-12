@@ -90,13 +90,13 @@ export default function MemberPage() {
         items={[
           { key: 'lv', label: '会员等级', children: <>
             <Space style={{ marginBottom: 12 }}><Button icon={<ReloadOutlined />} onClick={loadLevels}>刷新</Button></Space>
-            <Table rowKey="id" size="small" dataSource={levels} columns={lvCols} pagination={false} />
+            <Table rowKey="id" size="small" dataSource={levels} columns={lvCols} pagination={false}  scroll={{ x: 'max-content' }} />
           </> },
           { key: 'mem', label: '会员', children: <>
             <Space style={{ marginBottom: 12 }}><Button icon={<ReloadOutlined />} onClick={loadMembers}>刷新</Button></Space>
-            <Table rowKey="id" size="small" dataSource={members} columns={memCols} pagination={{ total }} />
+            <Table rowKey="id" size="small" dataSource={members} columns={memCols} pagination={{ total }}  scroll={{ x: 'max-content' }} />
             <Table style={{ marginTop: 12 }} size="small" title={() => '积分流水'} rowKey="id" dataSource={ledger}
-              columns={[{ title: '类型', dataIndex: 'type' }, { title: '分值', dataIndex: 'points' }, { title: '说明', dataIndex: 'remark', render: (v: string) => v || '-' }]} pagination={false} />
+              columns={[{ title: '类型', dataIndex: 'type' }, { title: '分值', dataIndex: 'points' }, { title: '说明', dataIndex: 'remark', render: (v: string) => v || '-' }]} pagination={false}  scroll={{ x: 'max-content' }} />
           </> },
         ]}
       />

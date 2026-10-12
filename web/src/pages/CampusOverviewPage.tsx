@@ -76,11 +76,11 @@ export default function CampusOverviewPage() {
     let tag: JSX.Element | null = null;
     if (r && !r.allEqual) {
       if (v === r.best) {
-        color = '#3f8600';
-        tag = <RiseOutlined style={{ color: '#3f8600', marginLeft: 4 }} />;
+        color = token.colorSuccess;
+        tag = <RiseOutlined style={{ color: token.colorSuccess, marginLeft: 4 }} />;
       } else if (v === r.worst) {
-        color = '#cf1322';
-        tag = <FallOutlined style={{ color: '#cf1322', marginLeft: 4 }} />;
+        color = token.colorError;
+        tag = <FallOutlined style={{ color: token.colorError, marginLeft: 4 }} />;
       }
     }
     return (
@@ -137,45 +137,45 @@ export default function CampusOverviewPage() {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={4}><Card size="small"><Statistic title="校区数" value={s.campusCount} /></Card></Col>
             <Col span={4}><Card size="small"><Statistic title="总已收" value={money(s.received)} /></Card></Col>
-            <Col span={4}><Card size="small"><Statistic title="净现金流" value={money(s.netCashflow)} valueStyle={{ color: (s.netCashflow ?? 0) >= 0 ? '#3f8600' : '#cf1322' }} /></Card></Col>
+            <Col span={4}><Card size="small"><Statistic title="净现金流" value={money(s.netCashflow)} valueStyle={{ color: (s.netCashflow ?? 0) >= 0 ? token.colorSuccess : token.colorError }} /></Card></Col>
             <Col span={4}><Card size="small"><Statistic title="在学学员" value={s.studying} /></Card></Col>
             <Col span={4}><Card size="small"><Statistic title="报名总数" value={s.signed} /></Card></Col>
-            <Col span={4}><Card size="small"><Statistic title="总成本" value={money(s.costTotal)} valueStyle={{ color: '#cf1322' }} /></Card></Col>
+            <Col span={4}><Card size="small"><Statistic title="总成本" value={money(s.costTotal)} valueStyle={{ color: token.colorError }} /></Card></Col>
           </Row>
         )}
 
         {cmp && (
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={4}>
-              <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 营收冠军</span>}>
+              <Card size="small" title={<span><TrophyFilled style={{ color: token.colorWarning }} /> 营收冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.received.top.name}</div>
                 <div>{money(cmp.received.top.value)}</div>
                 <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {money(cmp.received.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
-              <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 转化冠军</span>}>
+              <Card size="small" title={<span><TrophyFilled style={{ color: token.colorWarning }} /> 转化冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.conversion.top.name}</div>
                 <div>{pct(cmp.conversion.top.value)}</div>
                 <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {pct(cmp.conversion.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
-              <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 出勤冠军</span>}>
+              <Card size="small" title={<span><TrophyFilled style={{ color: token.colorWarning }} /> 出勤冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.attendance.top.name}</div>
                 <div>{pct(cmp.attendance.top.value)}</div>
                 <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {pct(cmp.attendance.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
-              <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 课消冠军</span>}>
+              <Card size="small" title={<span><TrophyFilled style={{ color: token.colorWarning }} /> 课消冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.consumeRate.top.name}</div>
                 <div>{pct(cmp.consumeRate.top.value)}</div>
                 <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {pct(cmp.consumeRate.avg)}</div>
               </Card>
             </Col>
             <Col span={4}>
-              <Card size="small" title={<span><TrophyFilled style={{ color: '#faad14' }} /> 报名冠军</span>}>
+              <Card size="small" title={<span><TrophyFilled style={{ color: token.colorWarning }} /> 报名冠军</span>}>
                 <div style={{ fontWeight: 600 }}>{cmp.signed.top.name}</div>
                 <div>{cmp.signed.top.value} 人</div>
                 <div style={{ color: 'token.colorTextSecondary', fontSize: 12 }}>均值 {cmp.signed.avg.toFixed(1)}</div>
@@ -183,7 +183,7 @@ export default function CampusOverviewPage() {
             </Col>
             <Col span={4}>
               <Card size="small" title="营收最弱">
-                <div style={{ fontWeight: 600, color: '#cf1322' }}>{cmp.received.bottom.name}</div>
+                <div style={{ fontWeight: 600, color: token.colorError }}>{cmp.received.bottom.name}</div>
                 <div>{money(cmp.received.bottom.value)}</div>
               </Card>
             </Col>

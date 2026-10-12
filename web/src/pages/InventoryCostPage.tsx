@@ -87,7 +87,7 @@ export default function InventoryCostPage() {
               <Button icon={<ReloadOutlined />} onClick={loadMat}>刷新</Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => { matForm.resetFields(); matForm.setFieldsValue({ stockQty: 0, warningQty: 0 }); setMatOpen(true); }}>新建物料</Button>
             </Space>
-            <Table rowKey="id" size="small" dataSource={matRows} columns={matCols} pagination={{ total: matTotal }} />
+            <Table rowKey="id" size="small" dataSource={matRows} columns={matCols} pagination={{ total: matTotal }}  scroll={{ x: 'max-content' }} />
           </>,
         },
         {
@@ -97,7 +97,7 @@ export default function InventoryCostPage() {
               <Button icon={<ReloadOutlined />} onClick={loadCost}>刷新</Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => { costForm.resetFields(); costForm.setFieldsValue({ category: 'RENT', amount: 0 }); setCostOpen(true); }}>登记成本</Button>
             </Space>
-            <Table rowKey="id" size="small" dataSource={costRows} columns={costCols} pagination={{ total: costTotal }} />
+            <Table rowKey="id" size="small" dataSource={costRows} columns={costCols} pagination={{ total: costTotal }}  scroll={{ x: 'max-content' }} />
           </>,
         },
       ]} />

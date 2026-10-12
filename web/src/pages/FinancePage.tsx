@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Tabs, Table, Button, Tag, Modal, Form, InputNumber, Input, Select, Card, Row, Col, Statistic, Space, App,
@@ -29,6 +30,7 @@ const INVOICE_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function FinancePage() {
+  const { token } = theme.useToken();
   return (
     <PageContainer title="财务对账">
     <Tabs
@@ -44,6 +46,7 @@ export default function FinancePage() {
 }
 
 function SplitTab() {
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const [cfg, setCfg] = useState<any>(null);
   const [splits, setSplits] = useState<any[]>([]);
@@ -127,10 +130,10 @@ function SplitTab() {
       </Space>
       <div>当前提成率：教师 <b>{((cfg?.teacherRate || 0) * 100).toFixed(0)}%</b> · 渠道 <b>{((cfg?.channelRate || 0) * 100).toFixed(0)}%</b> · 工资提成系数 <b>{((cfg?.bonusRate || 0) * 100).toFixed(0)}%</b></div>
       <Table rowKey="id" size="small" style={{ marginTop: 8 }} dataSource={splits} columns={splitCols}
-        pagination={{ current: page, pageSize: 20, total: totalS, onChange: setPage }} />
+        pagination={{ current: page, pageSize: 20, total: totalS, onChange: setPage }}  scroll={{ x: 'max-content' }} />
       <div style={{ marginTop: 16, fontWeight: 600 }}>教师工资单</div>
       <Table rowKey="id" size="small" dataSource={salary} columns={salaryCols}
-        pagination={{ pageSize: 100, total: totalSa }} />
+        pagination={{ pageSize: 100, total: totalSa }}  scroll={{ x: 'max-content' }} />
 
       <Modal title="分账配置" open={cfgOpen} confirmLoading={cfgSubmitting} onOk={submitCfg} onCancel={() => setCfgOpen(false)} okText="保存" cancelText="取消">
         <Form form={cfgForm} layout="vertical">
@@ -150,6 +153,7 @@ function SplitTab() {
 }
 
 function InvoiceTab() {
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -204,7 +208,7 @@ function InvoiceTab() {
         <Button type="primary" onClick={() => { form.resetFields(); setOpen(true); }}>申请发票</Button>
       </Space>
       <Table rowKey="id" size="small" dataSource={rows} columns={cols}
-        pagination={{ current: page, pageSize: 20, total, onChange: setPage }} />
+        pagination={{ current: page, pageSize: 20, total, onChange: setPage }}  scroll={{ x: 'max-content' }} />
 
       <Modal title="申请电子发票" open={open} confirmLoading={invSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="提交" cancelText="取消">
         <Form form={form} layout="vertical">
@@ -228,6 +232,7 @@ function InvoiceTab() {
 }
 
 function ReportTab() {
+  const { token } = theme.useToken();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -248,13 +253,13 @@ function ReportTab() {
       {data && (
         <Row gutter={16}>
           <Col span={6}><Card><Statistic title="已收收入" value={data.paidIncome} precision={2} prefix="¥" /></Card></Col>
-          <Col span={6}><Card><Statistic title="退费" value={data.refunded} precision={2} prefix="¥" valueStyle={{ color: '#cf1322' }} /></Card></Col>
+          <Col span={6}><Card><Statistic title="退费" value={data.refunded} precision={2} prefix="¥" valueStyle={{ color: token.colorError }} /></Card></Col>
           <Col span={6}><Card><Statistic title="净收入" value={data.netIncome} precision={2} prefix="¥" /></Card></Col>
           <Col span={6}><Card><Statistic title="已消课价值" value={data.consumedValue} precision={2} prefix="¥" /></Card></Col>
           <Col span={6}><Card><Statistic title="消课课时" value={data.consumptionHours} /></Card></Col>
-          <Col span={6}><Card><Statistic title="分账支出" value={data.splitExpense} precision={2} prefix="¥" valueStyle={{ color: '#cf1322' }} /></Card></Col>
-          <Col span={6}><Card><Statistic title="工资应付" value={data.salaryPayable} precision={2} prefix="¥" valueStyle={{ color: '#cf1322' }} /></Card></Col>
-          <Col span={6}><Card><Statistic title="利润" value={data.profit} precision={2} prefix="¥" valueStyle={{ color: data.profit >= 0 ? '#3f8600' : '#cf1322' }} /></Card></Col>
+          <Col span={6}><Card><Statistic title="分账支出" value={data.splitExpense} precision={2} prefix="¥" valueStyle={{ color: token.colorError }} /></Card></Col>
+          <Col span={6}><Card><Statistic title="工资应付" value={data.salaryPayable} precision={2} prefix="¥" valueStyle={{ color: token.colorError }} /></Card></Col>
+          <Col span={6}><Card><Statistic title="利润" value={data.profit} precision={2} prefix="¥" valueStyle={{ color: data.profit >= 0 ? token.colorSuccess : token.colorError }} /></Card></Col>
           <Col span={6}><Card><Statistic title="订单数" value={data.orderCount} /></Card></Col>
           <Col span={6}><Card><Statistic title="退费单数" value={data.refundsCount} /></Card></Col>
         </Row>

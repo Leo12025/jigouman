@@ -75,7 +75,7 @@ export default function ScorePage() {
         <Button type="primary" onClick={() => setExamOpen(true)}>创建测评</Button>
       </Space>
 
-      <Table rowKey="id" loading={loading} dataSource={exams} columns={columns} pagination={false} size="small" />
+      <Table rowKey="id" loading={loading} dataSource={exams} columns={columns} pagination={false} size="small"  scroll={{ x: 'max-content' }} />
 
       <Modal title="创建测评" open={examOpen} confirmLoading={examSubmitting} onOk={onCreateExam} onCancel={() => setExamOpen(false)} okText="创建">
         <Form form={examForm} layout="vertical">

@@ -113,7 +113,7 @@ export default function ClassChangePage() {
             </Form.Item>
             <Button type="primary" loading={tSubmitting} onClick={submitTransfer}>提交转班申请</Button>
           </Form>
-          <Table rowKey="id" size="small" loading={loading} columns={transferCols} dataSource={transferRows} pagination={false} />
+          <Table rowKey="id" size="small" loading={loading} columns={transferCols} dataSource={transferRows} pagination={false}  scroll={{ x: 'max-content' }} />
         </>
       )}
 
@@ -139,7 +139,7 @@ export default function ClassChangePage() {
             </Form.Item>
             <Button type="primary" loading={rSubmitting} onClick={submitReschedule}>提交调课申请</Button>
           </Form>
-          <Table rowKey="id" size="small" loading={loading} columns={reschedCols} dataSource={reschedRows} pagination={false} />
+          <Table rowKey="id" size="small" loading={loading} columns={reschedCols} dataSource={reschedRows} pagination={false}  scroll={{ x: 'max-content' }} />
         </>
       )}
     </PageContainer>

@@ -126,7 +126,7 @@ export default function StudentPage() {
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
-        onChange={(p, s) => load(p.current, p.pageSize || size)} />
+        onChange={(p, s) => load(p.current, p.pageSize || size)}  scroll={{ x: 'max-content' }} />
 
       <Modal title={editing ? '编辑学员' : '新建学员'} open={open} confirmLoading={saveSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
@@ -178,7 +178,7 @@ export default function StudentPage() {
                               </Popconfirm>
                             ),
                           },
-                        ]} />
+                        ]}  scroll={{ x: 'max-content' }} />
                     </>
                   ),
                 },
@@ -196,7 +196,7 @@ export default function StudentPage() {
                           { title: '课程', dataIndex: 'courseId', render: (v: number) => courses.find((c) => c.id === v)?.name || v },
                           { title: '班级', dataIndex: 'classGroupId', render: (v: number) => (v ? groups.find((g) => g.id === v)?.name || v : '-') },
                           { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{v}</Tag> },
-                        ]} />
+                        ]}  scroll={{ x: 'max-content' }} />
                     </>
                   ),
                 },

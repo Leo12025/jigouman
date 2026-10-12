@@ -51,7 +51,7 @@ export default function AlertPage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建规则</Button>
         <Button onClick={async () => { setCheckResult(await checkAlert({ ARREARS_AMOUNT: 5000, ATTENDANCE_RATE: 0.6, TRIAL_CONVERSION: 0.2 })); }}>模拟检查(示例指标)</Button>
       </Space>
-      <Table rowKey="id" size="small" loading={loading} dataSource={rows} columns={columns} pagination={{ total }} />
+      <Table rowKey="id" size="small" loading={loading} dataSource={rows} columns={columns} pagination={{ total }}  scroll={{ x: 'max-content' }} />
       {checkResult && (
         <Card size="small" title="触发结果" style={{ marginTop: 12 }}>
           {checkResult.triggered.length ? checkResult.triggered.map((t: any) => <div key={t.rule.id}>规则「{t.rule.name}」触发，当前值={t.value}</div>) : <div>无触发</div>}

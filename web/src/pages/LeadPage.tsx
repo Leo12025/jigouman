@@ -354,7 +354,7 @@ export default function LeadPage() {
           showTotal: (t) => `共 ${t} 条`,
         }}
         onChange={(p, s) => load(p.current, p.pageSize || size)}
-      />
+       scroll={{ x: 'max-content' }} />
 
       {/* 新建线索 */}
       <Modal
@@ -490,7 +490,7 @@ export default function LeadPage() {
                       columns={followColumns}
                       dataSource={follows}
                       pagination={false}
-                    />
+                     scroll={{ x: 'max-content' }} />
                   ),
                 },
                 {
@@ -503,7 +503,7 @@ export default function LeadPage() {
                       columns={trialColumns}
                       dataSource={trials}
                       pagination={false}
-                    />
+                     scroll={{ x: 'max-content' }} />
                   ),
                 },
               ]}

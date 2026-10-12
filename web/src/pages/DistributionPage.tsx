@@ -91,7 +91,7 @@ export default function DistributionPage() {
               <Button icon={<ReloadOutlined />} onClick={loadDists}>刷新</Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); distForm.resetFields(); distForm.setFieldsValue({ status: 'ACTIVE', level: 1 }); setDistOpen(true); }}>新增分销员</Button>
             </Space>
-            <Table rowKey="id" size="small" dataSource={dists} columns={distCols} pagination={{ total: distTotal }} />
+            <Table rowKey="id" size="small" dataSource={dists} columns={distCols} pagination={{ total: distTotal }}  scroll={{ x: 'max-content' }} />
           </>,
         },
         {
@@ -108,7 +108,7 @@ export default function DistributionPage() {
                 佣金汇总：总额 {stats.total} ｜ 待结算 {stats.byStatus.PENDING || 0} ｜ 已结算 {stats.byStatus.SETTLED || 0} ｜ 已作废 {stats.byStatus.CANCELLED || 0}
               </Card>
             )}
-            <Table rowKey="id" size="small" dataSource={comms} columns={commCols} pagination={false} />
+            <Table rowKey="id" size="small" dataSource={comms} columns={commCols} pagination={false}  scroll={{ x: 'max-content' }} />
           </>,
         },
       ]} />

@@ -65,6 +65,7 @@ export default function MainLayout() {
   const selected = seg ? '/' + seg : '/';
 
   const [collapsed, setCollapsed] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [profile, setProfile] = useState<any>(null);
   const [unread, setUnread] = useState(0);
   const [noticeList, setNoticeList] = useState<any[]>([]);
@@ -265,7 +266,7 @@ export default function MainLayout() {
                 const next = v === 'ALL' ? null : Number(v);
                 setCurrentOrg(next);
                 setOrgSel(next);
-                window.location.reload();
+                setRefreshKey((k) => k + 1);
               }}
               options={[
                 { value: 'ALL', label: '全部校区(总校区)' },
@@ -295,7 +296,9 @@ export default function MainLayout() {
           </Space>
         </Header>
         <Content style={{ padding: 16 }}>
-          <Outlet />
+          <div key={refreshKey}>
+            <Outlet />
+          </div>
         </Content>
       </Layout>
     </Layout>

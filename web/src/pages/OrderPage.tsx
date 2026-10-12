@@ -157,7 +157,7 @@ export default function OrderPage() {
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
-        onChange={(p, s) => load(p.current, p.pageSize || size)} />
+        onChange={(p, s) => load(p.current, p.pageSize || size)}  scroll={{ x: 'max-content' }} />
 
       {/* 下单 */}
       <Modal title="新建订单" open={open} width={720} confirmLoading={createSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="创建" cancelText="取消">
@@ -257,7 +257,7 @@ export default function OrderPage() {
                         { title: '单价', dataIndex: 'unitPrice', render: (v: number) => `¥${v}` },
                         { title: '小计', dataIndex: 'amount', render: (v: number) => `¥${v}` },
                         { title: '发放课时', dataIndex: 'hours' },
-                      ]} />
+                      ]}  scroll={{ x: 'max-content' }} />
                   </>
                 ),
               },
@@ -269,7 +269,7 @@ export default function OrderPage() {
                       { title: '金额', dataIndex: 'amount', render: (v: number) => `¥${v}` },
                       { title: '状态', dataIndex: 'status' },
                       { title: '交易号', dataIndex: 'tradeNo', render: (v: string) => v || '-' },
-                    ]} />
+                    ]}  scroll={{ x: 'max-content' }} />
                 ),
               },
               {
@@ -281,7 +281,7 @@ export default function OrderPage() {
                         { title: '状态', dataIndex: 'status' },
                         { title: '原因', dataIndex: 'reason', render: (v: string) => v || '-' },
                         { title: '审批实例', dataIndex: 'approvalInstanceId', render: (v: number) => v ? `#${v}` : '-' },
-                      ]} />
+                      ]}  scroll={{ x: 'max-content' }} />
                     {detail.refunds?.some((r: any) => r.status === 'PENDING') && (
                       <div style={{ marginTop: 12, color: 'token.colorTextSecondary', fontSize: 13 }}>
                         该退费单待审批，请到「审批中心」处理。

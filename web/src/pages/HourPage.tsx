@@ -99,12 +99,12 @@ export default function HourPage() {
         items={[
           {
             key: 'accounts', label: `课时账户(${totalAcc})`, children: (
-              <Table rowKey="id" size="small" loading={loading} columns={accColumns} dataSource={accounts} pagination={{ pageSize: 20 }} />
+              <Table rowKey="id" size="small" loading={loading} columns={accColumns} dataSource={accounts} pagination={{ pageSize: 20 }}  scroll={{ x: 'max-content' }} />
             ),
           },
           {
             key: 'consumptions', label: `课时流水(${totalCon})`, children: (
-              <Table rowKey="id" size="small" loading={loading} columns={conColumns} dataSource={consumptions} pagination={{ pageSize: 20 }} />
+              <Table rowKey="id" size="small" loading={loading} columns={conColumns} dataSource={consumptions} pagination={{ pageSize: 20 }}  scroll={{ x: 'max-content' }} />
             ),
           },
         ]}

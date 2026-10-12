@@ -147,7 +147,7 @@ export default function CoursePackagePage() {
         rowKey="id" loading={loading} dataSource={data} columns={columns}
         pagination={{ current: page, total, pageSize: 20, onChange: setPage }}
         size="small"
-      />
+       scroll={{ x: 'max-content' }} />
 
       <Modal
         title={editing ? `编辑课包 #${editing.id}` : '新建课包'}

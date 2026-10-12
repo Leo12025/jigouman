@@ -111,7 +111,7 @@ export default function ComplaintPage() {
         rowKey="id" loading={loading} dataSource={data} columns={columns}
         pagination={{ current: page, total, pageSize: 20, onChange: setPage }}
         size="small"
-      />
+       scroll={{ x: 'max-content' }} />
 
       <Modal title="登记客诉" open={createOpen} confirmLoading={createSubmitting} onOk={onCreate} onCancel={() => setCreateOpen(false)} okText="提交">
         <Form form={form} layout="vertical">

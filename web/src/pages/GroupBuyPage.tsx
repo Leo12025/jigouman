@@ -100,7 +100,7 @@ export default function GroupBuyPage() {
               <Button icon={<ReloadOutlined />} onClick={loadActs}>刷新</Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); actForm.resetFields(); actForm.setFieldsValue({ price: 0, groupSize: 2, status: 'ACTIVE' }); setActOpen(true); }}>新建活动</Button>
             </Space>
-            <Table rowKey="id" size="small" dataSource={acts} columns={actCols} pagination={{ total: actTotal }} />
+            <Table rowKey="id" size="small" dataSource={acts} columns={actCols} pagination={{ total: actTotal }}  scroll={{ x: 'max-content' }} />
           </>,
         },
         {
@@ -111,7 +111,7 @@ export default function GroupBuyPage() {
               <Select style={{ width: 240 }} placeholder="选择活动查看拼团" value={teamActId} onChange={(id) => { setTeamActId(id); loadTeams(id); }} options={acts.map((a) => ({ value: a.id, label: a.name }))} />
               <Button icon={<ReloadOutlined />} onClick={() => teamActId && loadTeams(teamActId)}>刷新</Button>
             </Space>
-            <Table rowKey="id" size="small" dataSource={teams} columns={teamCols} pagination={false} />
+            <Table rowKey="id" size="small" dataSource={teams} columns={teamCols} pagination={false}  scroll={{ x: 'max-content' }} />
           </>,
         },
       ]} />

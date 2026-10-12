@@ -97,7 +97,7 @@ export default function ResourcePage() {
         rowKey="id" loading={loading} dataSource={data} columns={columns as any}
         pagination={{ current: page, total, pageSize: 20, onChange: setPage }}
         size="small"
-      />
+       scroll={{ x: 'max-content' }} />
     </PageContainer>
   );
 }

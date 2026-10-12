@@ -80,7 +80,7 @@ export default function RolePage() {
         <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建角色</Button>
       </Space>
-      <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows} pagination={false} />
+      <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows} pagination={false}  scroll={{ x: 'max-content' }} />
 
       <Modal title={editing ? `编辑角色 - ${editing.name}` : '新建角色'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消" width={640}>
         <Form form={form} layout="vertical">

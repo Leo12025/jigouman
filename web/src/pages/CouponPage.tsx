@@ -158,7 +158,7 @@ export default function CouponPage() {
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
-        onChange={(p, s) => load(p.current, p.pageSize || size)} />
+        onChange={(p, s) => load(p.current, p.pageSize || size)}  scroll={{ x: 'max-content' }} />
 
       <Modal title={editing ? '编辑促销/券模板' : '新建促销/券模板'} open={open} width={720}
         confirmLoading={submitting} onOk={submitTemplate} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
@@ -246,7 +246,7 @@ export default function CouponPage() {
             <Button type="primary" loading={grantSubmitting} onClick={submitGrant}>发放</Button>
           </Space>
         </Form>
-        <Table rowKey="id" size="small" dataSource={grants} columns={grantColumns} />
+        <Table rowKey="id" size="small" dataSource={grants} columns={grantColumns}  scroll={{ x: 'max-content' }} />
       </Drawer>
 
       <Drawer title="促销试算引擎" open={calcOpen} onClose={() => setCalcOpen(false)} width={560}>

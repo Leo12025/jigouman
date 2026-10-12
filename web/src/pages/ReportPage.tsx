@@ -62,7 +62,7 @@ function MetricTab() {
   return (
     <Card size="small">
       <Button type="primary" style={{ marginBottom: 12 }} onClick={() => { setEditing(null); form.resetFields(); form.setFieldsValue({ enabled: true }); setOpen(true); }}>新建指标</Button>
-      <Table rowKey="id" size="small" dataSource={rows} columns={columns} pagination={false} />
+      <Table rowKey="id" size="small" dataSource={rows} columns={columns} pagination={false}  scroll={{ x: 'max-content' }} />
       <Modal title={editing ? '编辑指标' : '新建指标'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="code" label="编码" rules={[{ required: true, message: '请输入编码' }]}><Input placeholder="revenue_month" /></Form.Item>
@@ -100,7 +100,7 @@ function BenchmarkTab() {
   if (!data) return <Card size="small" loading>加载中…</Card>;
   return (
     <Card size="small" title="多校区成本对标" extra={<Button loading={exporting} onClick={doExport}>导出Excel</Button>}>
-      <Table rowKey="name" size="small" dataSource={data.campuses || []} columns={cols} pagination={false} />
+      <Table rowKey="name" size="small" dataSource={data.campuses || []} columns={cols} pagination={false}  scroll={{ x: 'max-content' }} />
     </Card>
   );
 }
@@ -142,7 +142,7 @@ function ReportTab() {
         <Button loading={exporting} onClick={() => doExport('excel')}>导出Excel</Button>
         <Button loading={exporting} onClick={() => doExport('pdf')}>导出PDF</Button>
       </Space>
-      <Table rowKey="__idx" size="small" dataSource={rows} columns={cols} pagination={false} />
+      <Table rowKey="__idx" size="small" dataSource={rows} columns={cols} pagination={false}  scroll={{ x: 'max-content' }} />
     </Card>
   );
 }

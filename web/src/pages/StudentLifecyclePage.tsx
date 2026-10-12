@@ -68,7 +68,7 @@ export default function StudentLifecyclePage() {
                 { title: '方式', dataIndex: 'type', render: (v: string) => <Tag>{v}</Tag> },
                 { title: '内容', dataIndex: 'content' },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
           <Card size="small" title={`到店试听（${data.lead.trials.length}）`}>
             <Table rowKey="id" size="small" pagination={false} dataSource={data.lead.trials}
@@ -77,7 +77,7 @@ export default function StudentLifecyclePage() {
                 { title: '课次ID', dataIndex: 'lessonId' },
                 { title: '到店', dataIndex: 'attended', render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? '已到店' : '未到店'}</Tag> },
                 { title: '反馈', dataIndex: 'feedback', render: (v: string) => v || '-' },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
         </Space>
       ) : <Tag color="default">暂无关联线索</Tag>,
@@ -101,7 +101,7 @@ export default function StudentLifecyclePage() {
                 { title: '实付', dataIndex: 'paidAmount' },
                 { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={ORDER_COLOR[v] || 'default'}>{v}</Tag> },
                 { title: '下单时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
           <Card size="small" title="退费">
             <Table rowKey="id" size="small" pagination={false} dataSource={purchase.refunds || []}
@@ -110,7 +110,7 @@ export default function StudentLifecyclePage() {
                 { title: '原因', dataIndex: 'reason', render: (v: string) => v || '-' },
                 { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={REFUND_COLOR[v] || 'default'}>{v}</Tag> },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
         </Space>
       ),
@@ -132,7 +132,7 @@ export default function StudentLifecyclePage() {
                 { title: '发放', dataIndex: 'totalGranted' },
                 { title: '余额', dataIndex: 'balance' },
                 { title: '过期', dataIndex: 'expireAt', render: (v: string) => (v || '').slice(0, 10) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
           <Card size="small" title={`消课流水（${cls.consumptions?.length ?? 0}）`}>
             <Table rowKey="id" size="small" pagination={{ pageSize: 8 }} dataSource={cls.consumptions || []}
@@ -141,7 +141,7 @@ export default function StudentLifecyclePage() {
                 { title: '课时', dataIndex: 'hours' },
                 { title: '课次ID', dataIndex: 'lessonId' },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
         </Space>
       ),
@@ -156,7 +156,7 @@ export default function StudentLifecyclePage() {
                 { title: '评分', dataIndex: 'rating' },
                 { title: '内容', dataIndex: 'content', render: (v: string) => v || '-' },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
           <Card size="small" title={`作业提交（${svc.homework?.length ?? 0}）`}>
             <Table rowKey="id" size="small" pagination={{ pageSize: 5 }} dataSource={svc.homework || []}
@@ -165,7 +165,7 @@ export default function StudentLifecyclePage() {
                 { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={HW_COLOR[v] || 'default'}>{v}</Tag> },
                 { title: '是否迟交', dataIndex: 'isLate', render: (v: boolean) => (v ? <Tag color="red">迟交</Tag> : '否') },
                 { title: '时间', dataIndex: 'submitAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
           <Card size="small" title={`客诉（${svc.complaints?.length ?? 0}）`}>
             <Table rowKey="id" size="small" pagination={{ pageSize: 5 }} dataSource={svc.complaints || []}
@@ -174,7 +174,7 @@ export default function StudentLifecyclePage() {
                 { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={COMPLAINT_COLOR[v] || 'default'}>{v}</Tag> },
                 { title: '等级', dataIndex: 'level' },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
           <Card size="small" title={`成绩（${svc.scores?.length ?? 0}）`}>
             <Table rowKey="id" size="small" pagination={{ pageSize: 5 }} dataSource={svc.scores || []}
@@ -184,7 +184,7 @@ export default function StudentLifecyclePage() {
                 { title: '分数', dataIndex: 'score' },
                 { title: '等级', dataIndex: 'level', render: (v: string) => v || '-' },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
         </Space>
       ),
@@ -207,7 +207,7 @@ export default function StudentLifecyclePage() {
                 { title: '积分', dataIndex: 'points' },
                 { title: '说明', dataIndex: 'remark', render: (v: string) => v || '-' },
                 { title: '时间', dataIndex: 'createdAt', render: (v: string) => formatDateTime(v) },
-              ]} />
+              ]}  scroll={{ x: 'max-content' }} />
           </Card>
         </Space>
       ) : <Tag color="default">非会员</Tag>,

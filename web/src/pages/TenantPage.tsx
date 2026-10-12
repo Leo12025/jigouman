@@ -76,7 +76,7 @@ export default function TenantPage() {
       <Table
         rowKey="id" loading={loading} dataSource={rows} columns={columns}
         pagination={false}
-      />
+       scroll={{ x: 'max-content' }} />
       <Modal title={editing ? '编辑租户' : '新建租户'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="机构名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
