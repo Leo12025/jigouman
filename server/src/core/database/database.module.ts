@@ -37,6 +37,12 @@ function buildOptions(cfg: ConfigService): TypeOrmModuleOptions {
     database: cfg.get('DB_DATABASE'),
     charset: 'utf8mb4',
     timezone: '+08:00',
+    // 连接池与超时：避免慢 DB 下连接建立/获取阻塞逼近 15s 客户端超时
+    extra: {
+      connectionLimit: Number(cfg.get('DB_POOL_SIZE')) || 10,
+      connectTimeout: 10_000,
+      acquireTimeout: 10_000,
+    },
     ...base,
   } as TypeOrmModuleOptions;
 }

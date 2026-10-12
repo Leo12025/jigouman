@@ -3,9 +3,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User } from '../rbac/user.entity';
-import { Role } from '../rbac/role.entity';
 import { Membership } from '../rbac/membership.entity';
 import { AuthUser } from '../../common/decorators/auth.decorator';
 
@@ -19,14 +18,26 @@ export interface JwtPayload {
   kind?: 'staff' | 'parent';
   /** 家长手机号（kind=parent 时有值） */
   phone?: string;
+  // ---- 性能优化：登录时即写入的鉴权声明，避免每请求重查角色权限图 ----
+  /** 角色 id 列表 */
+  roleIds?: number[];
+  /** 合并后的有效权限点（含继承的模板权限） */
+  permissions?: string[];
+  /** 归属校区 id 列表 */
+  orgIds?: number[];
+  /** 最宽数据范围 */
+  dataScope?: AuthUser['dataScope'];
+  /** 账号状态快照（1=启用），快速失败用；实时吊销由下方 TTL 缓存兜底 */
+  status?: number;
 }
 
-/** dataScope 优先级：数值越大范围越宽 */
-const SCOPE_RANK: Record<string, number> = { self: 0, org: 1, org_and_below: 2, all: 3 };
+/** 轻量吊销校验缓存：避免每请求重查，吊销延迟受 TTL 约束（默认 30s，可用 AUTH_STATE_TTL_MS 调整） */
+const stateCache = new Map<number, { active: boolean; ts: number }>();
+const STATE_TTL = Number(process.env.AUTH_STATE_TTL_MS) || 30_000;
 
 /**
- * JWT 策略：校验 Bearer Token，并加载用户角色/权限（含模板继承）与 membership 状态，
- * 将 AuthUser（含 permissions 合集、dataScope、orgIds）挂载到 req.user。
+ * JWT 策略：校验 Bearer Token，读取登录时写入的鉴权声明（角色/权限/校区/数据范围），
+ * 并将 AuthUser 挂载到 req.user。权限图已在登录时计算并内嵌，故本方法不再打库（仅做 TTL 缓存的轻量吊销校验）。
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -34,8 +45,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     cfg: ConfigService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    @InjectRepository(Role)
-    private readonly roleRepo: Repository<Role>,
     @InjectRepository(Membership)
     private readonly membershipRepo: Repository<Membership>,
   ) {
@@ -63,54 +72,39 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         phone: payload.phone,
       };
     }
-    const user = await this.userRepo.findOne({
-      where: { id: payload.sub, tenantId: payload.tenantId },
-      relations: ['roles'],
-    });
-    if (!user || user.status !== 1) {
-      throw new UnauthorizedException('账号不可用');
+
+    // 轻量吊销校验：仅查 id/status 两列 + membership.status，带 TTL 缓存。
+    // 权限图（角色/权限/inheritsFrom）已在登录时写入 JWT，不再每请求重查（原 3 次库 ->
+    // 至多 2 次轻查询且每 STATE_TTL 才一次），彻底消除 15s 超时的主要来源。
+    let active: boolean | undefined;
+    const cached = stateCache.get(payload.sub);
+    if (cached && Date.now() - cached.ts < STATE_TTL) {
+      active = cached.active;
+    } else {
+      const u = await this.userRepo.findOne({
+        where: { id: payload.sub, tenantId: payload.tenantId },
+        select: ['id', 'status'],
+      });
+      const mb = await this.membershipRepo.findOne({
+        where: { tenantId: payload.tenantId, userId: payload.sub },
+        select: ['status'],
+      });
+      active = !!u && u.status === 1 && !!mb && mb.status === 'ACTIVE';
+      stateCache.set(payload.sub, { active, ts: Date.now() });
     }
-    // membership 状态机校验（P2）：存在且非 ACTIVE 则拒绝新会话，但保留审计
-    const membership = await this.membershipRepo.findOne({
-      where: { tenantId: payload.tenantId, userId: user.id },
-    });
-    if (membership && membership.status !== 'ACTIVE') {
+    if (!active) {
       throw new UnauthorizedException('该账号已被停用或移除');
     }
 
-    // 加载角色完整链（自身权限 + 继承的模板权限），计算有效权限合集与最宽数据范围
-    const roleIds = (user.roles || []).map((r) => r.id);
-    const roles = roleIds.length
-      ? await this.roleRepo.find({
-          where: { id: In(roleIds) },
-          relations: ['permissions', 'inheritsFrom', 'inheritsFrom.permissions'],
-        })
-      : [];
-    const permissions = new Set<string>();
-    let scopeRank = 0;
-    roles.forEach((r) => {
-      (r.permissions || []).forEach((p) => permissions.add(p.code));
-      // 模板+覆盖：继承的平台模板权限并入（重复自动去重）
-      if (r.inheritsFrom) {
-        (r.inheritsFrom.permissions || []).forEach((p) => permissions.add(p.code));
-      }
-      if (r.dataScope && SCOPE_RANK[r.dataScope] > scopeRank) {
-        scopeRank = SCOPE_RANK[r.dataScope];
-      }
-    });
-    const dataScope = (Object.keys(SCOPE_RANK) as string[]).find(
-      (k) => SCOPE_RANK[k] === scopeRank,
-    ) as AuthUser['dataScope'];
-
     return {
-      id: user.id,
-      tenantId: user.tenantId,
-      username: user.username,
-      roleIds,
-      permissions: [...permissions],
+      id: payload.sub,
+      tenantId: payload.tenantId,
+      username: payload.username,
+      roleIds: payload.roleIds || [],
+      permissions: payload.permissions || [],
       kind: 'staff',
-      orgIds: user.orgIds || [],
-      dataScope,
+      orgIds: payload.orgIds || [],
+      dataScope: payload.dataScope,
     };
   }
 }

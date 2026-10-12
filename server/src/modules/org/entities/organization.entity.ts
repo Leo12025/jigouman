@@ -5,6 +5,7 @@ export type OrgType = 'HQ' | 'BRANCH' | 'CAMPUS';
 
 /** 组织机构（§4.11 多校区连锁）：树形结构，作为按 org_id 隔离的基础 */
 @Entity({ name: 'organizations' })
+@Index(['tenantId', 'ancestors'])
 export class Organization extends BaseEntity {
   @Column({ name: 'name', length: 128 })
   name: string;

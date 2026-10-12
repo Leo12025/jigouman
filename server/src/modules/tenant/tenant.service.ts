@@ -9,8 +9,10 @@ import { orgRepo } from '../../common/org-scope';
 
 @Injectable()
 export class TenantService {
-  /** 域名 -> 租户 解析缓存（60s），避免每请求查库 */
-  private cache = new Map<string, { id: number; ts: number }>();
+  /** 域名 -> 租户 解析缓存（60s），避免每请求查库；命中直接返回整对象 */
+  private cache = new Map<string, { value: Tenant | null; ts: number }>();
+  /** 用户名@品牌域 解析缓存（60s） */
+  private slugCache = new Map<string, { value: Tenant | null; ts: number }>();
 
   private readonly repo: Repository<Tenant>;
   constructor(@InjectRepository(Tenant) repo: Repository<Tenant>) {
@@ -25,16 +27,13 @@ export class TenantService {
     if (!rawHost) return null;
     const host = rawHost.toLowerCase().split(':')[0];
     const cached = this.cache.get(host);
-    if (cached && Date.now() - cached.ts < 60_000) {
-      const t = cached.id ? await this.repo.findOne({ where: { id: cached.id } }) : null;
-      if (t) return t;
-    }
+    if (cached && Date.now() - cached.ts < 60_000) return cached.value;
     let t = host ? await this.repo.findOne({ where: { domain: host } }) : null;
     if (!t) {
       const sub = host.split('.')[0];
       if (sub && sub !== host) t = await this.repo.findOne({ where: { slug: sub } });
     }
-    this.cache.set(host, { id: t?.id ?? 0, ts: Date.now() });
+    this.cache.set(host, { value: t, ts: Date.now() });
     return t;
   }
 
@@ -98,8 +97,11 @@ export class TenantService {
   async findBySlugOrDomain(s: string): Promise<Tenant | null> {
     if (!s) return null;
     const key = s.toLowerCase().trim();
+    const cached = this.slugCache.get(key);
+    if (cached && Date.now() - cached.ts < 60_000) return cached.value;
     let t = await this.repo.findOne({ where: { slug: key } });
     if (!t) t = await this.repo.findOne({ where: { domain: key } });
+    this.slugCache.set(key, { value: t, ts: Date.now() });
     return t;
   }
 
