@@ -1,23 +1,62 @@
-import { useEffect, useState } from 'react';
-import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, message, Tag, Popconfirm } from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Tag, Popconfirm, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listMemberLevels, createMemberLevel, deleteMemberLevel, listMembers, adjustPoints, listPointLedger } from '../api/crm';
 
 export default function MemberPage() {
+  const { message } = App.useApp();
   const [levels, setLevels] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [lvOpen, setLvOpen] = useState(false);
   const [lvForm] = Form.useForm();
+  const [lvSubmitting, setLvSubmitting] = useState(false);
   const [adj, setAdj] = useState<any>(null);
   const [adjForm] = Form.useForm();
+  const [adjSubmitting, setAdjSubmitting] = useState(false);
   const [ledger, setLedger] = useState<any[]>([]);
 
-  const loadLevels = async () => { const r = await listMemberLevels({}).catch(() => []); setLevels(r); };
-  const loadMembers = async () => { const r = await listMembers({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 })); setMembers(r.list); setTotal(r.total); };
+  const loadLevels = useCallback(async () => {
+    const r = await listMemberLevels({}).catch(() => []);
+    setLevels(r);
+  }, []);
+  const loadMembers = useCallback(async () => {
+    const r = await listMembers({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 }));
+    setMembers(r.list);
+    setTotal(r.total);
+  }, []);
   useEffect(() => { loadLevels(); loadMembers(); /* eslint-disable-next-line */ }, []);
 
-  const lvCols = [
+  const submitLv = async () => {
+    const v = await lvForm.validateFields();
+    setLvSubmitting(true);
+    try {
+      await createMemberLevel(v);
+      message.success('创建成功');
+      setLvOpen(false);
+      loadLevels();
+    } catch {
+      // 失败提示由请求层统一处理
+    } finally {
+      setLvSubmitting(false);
+    }
+  };
+  const submitAdj = async () => {
+    const v = await adjForm.validateFields();
+    setAdjSubmitting(true);
+    try {
+      await adjustPoints(adj.studentId, v);
+      message.success('已调整');
+      setAdj(null);
+      loadMembers();
+    } catch {
+      // 失败提示由请求层统一处理
+    } finally {
+      setAdjSubmitting(false);
+    }
+  };
+
+  const lvCols = useMemo(() => [
     { title: '等级名', dataIndex: 'name' },
     { title: '序', dataIndex: 'level' },
     { title: '所需积分', dataIndex: 'minPoints' },
@@ -27,9 +66,9 @@ export default function MemberPage() {
         <Button type="link" danger size="small">删除</Button>
       </Popconfirm>
     ) },
-  ];
+  ], [message, loadLevels]);
 
-  const memCols = [
+  const memCols = useMemo(() => [
     { title: '学员', dataIndex: 'studentId', width: 90 },
     { title: '等级ID', dataIndex: 'levelId' },
     { title: '当前积分', dataIndex: 'points' },
@@ -41,7 +80,7 @@ export default function MemberPage() {
         <Button type="link" size="small" onClick={async () => { setLedger(await listPointLedger(r.studentId)); }}>流水</Button>
       </Space>
     ) },
-  ];
+  ], []);
 
   return (
     <div>
@@ -61,7 +100,7 @@ export default function MemberPage() {
         ]}
       />
 
-      <Modal title="新建会员等级" open={lvOpen} onOk={async () => { const v = await lvForm.validateFields(); await createMemberLevel(v); message.success('创建成功'); setLvOpen(false); loadLevels(); }} onCancel={() => setLvOpen(false)} okText="保存" cancelText="取消">
+      <Modal title="新建会员等级" open={lvOpen} confirmLoading={lvSubmitting} onOk={submitLv} onCancel={() => setLvOpen(false)} okText="保存" cancelText="取消">
         <Form form={lvForm} layout="vertical">
           <Form.Item name="name" label="等级名" rules={[{ required: true, message: '必填' }]}><Input /></Form.Item>
           <Form.Item name="level" label="顺序"><InputNumber min={1} /></Form.Item>
@@ -71,7 +110,7 @@ export default function MemberPage() {
         </Form>
       </Modal>
 
-      <Modal title={`积分调整 - 学员${adj?.studentId}`} open={!!adj} onOk={async () => { const v = await adjForm.validateFields(); await adjustPoints(adj.studentId, v); message.success('已调整'); setAdj(null); loadMembers(); }} onCancel={() => setAdj(null)} okText="提交" cancelText="取消">
+      <Modal title={`积分调整 - 学员${adj?.studentId}`} open={!!adj} confirmLoading={adjSubmitting} onOk={submitAdj} onCancel={() => setAdj(null)} okText="提交" cancelText="取消">
         <Form form={adjForm} layout="vertical">
           <Form.Item name="points" label="分值(正发放/负扣减)" rules={[{ required: true, message: '必填' }]}><InputNumber /></Form.Item>
           <Form.Item name="remark" label="说明"><Input /></Form.Item>

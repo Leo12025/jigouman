@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Modal, Form, Input, InputNumber, Select, Tag, Space, message, Alert,
+  Table, Button, Modal, Form, Input, InputNumber, Select, Tag, Space, Alert, App,
 } from 'antd';
 import { listExams, createExam, createScore } from '../api/crm';
 
@@ -9,6 +9,7 @@ const EXAM_TYPE_LABEL: Record<string, string> = {
 };
 
 export default function ScorePage() {
+  const { message } = App.useApp();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [examOpen, setExamOpen] = useState(false);
@@ -16,6 +17,8 @@ export default function ScorePage() {
   const [cur, setCur] = useState<any>(null);
   const [examForm] = Form.useForm();
   const [scoreForm] = Form.useForm();
+  const [examSubmitting, setExamSubmitting] = useState(false);
+  const [scoreSubmitting, setScoreSubmitting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -29,18 +32,24 @@ export default function ScorePage() {
 
   const onCreateExam = async () => {
     const v = await examForm.validateFields();
-    await createExam(v);
-    message.success('已创建测评（自动生成"成绩录入"待办）');
-    setExamOpen(false); examForm.resetFields(); load();
+    setExamSubmitting(true);
+    try {
+      await createExam(v);
+      message.success('已创建测评（自动生成"成绩录入"待办）');
+      setExamOpen(false); examForm.resetFields(); load();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setExamSubmitting(false); }
   };
   const onScore = async () => {
     const v = await scoreForm.validateFields();
-    await createScore({ ...v, examId: cur.id });
-    message.success('已录入成绩（关闭"成绩录入"待办）');
-    setScoreOpen(false); scoreForm.resetFields();
+    setScoreSubmitting(true);
+    try {
+      await createScore({ ...v, examId: cur.id });
+      message.success('已录入成绩（关闭"成绩录入"待办）');
+      setScoreOpen(false); scoreForm.resetFields();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setScoreSubmitting(false); }
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 70 },
     { title: '测评名称', dataIndex: 'name' },
     { title: '类型', dataIndex: 'type', render: (t: string) => <Tag>{EXAM_TYPE_LABEL[t] || t}</Tag> },
@@ -51,7 +60,7 @@ export default function ScorePage() {
         <Button size="small" type="primary" onClick={() => { setCur(r); setScoreOpen(true); }}>录入成绩</Button>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -65,9 +74,9 @@ export default function ScorePage() {
         <Button type="primary" onClick={() => setExamOpen(true)}>创建测评</Button>
       </Space>
 
-      <Table rowKey="id" loading={loading} dataSource={exams} columns={columns as any} pagination={false} size="small" />
+      <Table rowKey="id" loading={loading} dataSource={exams} columns={columns} pagination={false} size="small" />
 
-      <Modal title="创建测评" open={examOpen} onOk={onCreateExam} onCancel={() => setExamOpen(false)} okText="创建">
+      <Modal title="创建测评" open={examOpen} confirmLoading={examSubmitting} onOk={onCreateExam} onCancel={() => setExamOpen(false)} okText="创建">
         <Form form={examForm} layout="vertical">
           <Form.Item name="name" label="测评名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：期中测验" />
@@ -87,6 +96,7 @@ export default function ScorePage() {
       <Modal
         title={`录入成绩 · ${cur?.name ?? ''}`}
         open={scoreOpen}
+        confirmLoading={scoreSubmitting}
         onOk={onScore}
         onCancel={() => setScoreOpen(false)}
         okText="提交"

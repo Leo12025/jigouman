@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, message, Popconfirm, Tag,
-} from 'antd';
+import { useEffect, useState, useMemo } from 'react';
+import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, Popconfirm, Tag, App } from 'antd';
+import dayjs from 'dayjs';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   listEmployees, createEmployee, updateEmployee, deleteEmployee,
   upsertTeacherProfile, listCertificates, addCertificate, deleteCertificate,
 } from '../api/crm';
+import { useCrud } from '../hooks/useCrud';
 
 const KIND_LABELS: Record<string, { label: string; color: string }> = {
   teacher: { label: '老师', color: 'blue' },
@@ -18,78 +18,95 @@ const KIND_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export default function EmployeePage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [size, setSize] = useState(20);
-  const [loading, setLoading] = useState(false);
+  const { message } = App.useApp();
+  const { rows, total, page, size, loading, submitting, load, save, del } = useCrud({
+    list: listEmployees,
+    create: createEmployee,
+    update: updateEmployee,
+    remove: deleteEmployee,
+  });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form] = Form.useForm();
 
-  // 师资档案
   const [profileEmp, setProfileEmp] = useState<any>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [profileForm] = Form.useForm();
-  // 证书
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+
   const [certEmp, setCertEmp] = useState<any>(null);
   const [certRows, setCertRows] = useState<any[]>([]);
   const [certOpen, setCertOpen] = useState(false);
   const [certForm] = Form.useForm();
+  const [certSubmitting, setCertSubmitting] = useState(false);
 
-  const load = async (p = page, s = size) => {
-    setLoading(true);
-    try {
-      const res = await listEmployees({ page: p, size: s });
-      setRows(res.list); setTotal(res.total); setPage(p); setSize(s);
-    } catch { /* ignore */ } finally { setLoading(false); }
-  };
   useEffect(() => { load(1, size); /* eslint-disable-next-line */ }, []);
 
   const openCreate = () => { setEditing(null); form.resetFields(); setOpen(true); };
+  const openEdit = (r: any) => {
+    setEditing(r);
+    // 修复：编辑员工时正确回填入职日期（之前三元两分支都返回 undefined）
+    form.setFieldsValue({ ...r, hireDate: r.hireDate ? dayjs(r.hireDate) : undefined });
+    setOpen(true);
+  };
   const submit = async () => {
     const v = await form.validateFields();
     const payload: any = { ...v };
     if (v.hireDate) payload.hireDate = v.hireDate.format('YYYY-MM-DD');
-    if (editing) { await updateEmployee(editing.id, payload); message.success('已保存'); }
-    else { await createEmployee(payload); message.success('创建成功'); }
-    setOpen(false); load();
+    const ok = await save(editing, payload);
+    if (ok) setOpen(false);
   };
 
-  const openProfile = async (emp: any) => {
+  const openProfile = (emp: any) => {
     setProfileEmp(emp);
     profileForm.resetFields();
     profileForm.setFieldsValue({
       subjects: emp.subjects || [], ageGroups: emp.ageGroups || [], bio: emp.bio || '',
     });
-    setProfileEmp({ ...emp, _open: true });
+    setProfileOpen(true);
   };
   const submitProfile = async () => {
     const v = await profileForm.validateFields();
-    await upsertTeacherProfile(profileEmp.id, v);
-    message.success('师资档案已保存');
-    setProfileEmp(null);
+    setProfileSubmitting(true);
+    try {
+      await upsertTeacherProfile(profileEmp.id, v);
+      message.success('师资档案已保存');
+      setProfileOpen(false);
+    } catch {
+      // 失败提示由请求层统一处理
+    } finally {
+      setProfileSubmitting(false);
+    }
   };
 
   const openCert = async (emp: any) => {
     setCertEmp(emp);
     const list = await listCertificates(emp.id).catch(() => []);
-    setCertRows(list); setCertOpen(true);
+    setCertRows(list);
+    setCertOpen(true);
   };
   const submitCert = async () => {
     const v = await certForm.validateFields();
-    if (v.issuedAt) v.issuedAt = v.issuedAt.format('YYYY-MM-DD');
-    if (v.expireAt) v.expireAt = v.expireAt.format('YYYY-MM-DD');
-    await addCertificate(certEmp.id, v);
-    message.success('已添加证书');
-    certForm.resetFields();
-    setCertRows(await listCertificates(certEmp.id));
+    setCertSubmitting(true);
+    try {
+      if (v.issuedAt) v.issuedAt = v.issuedAt.format('YYYY-MM-DD');
+      if (v.expireAt) v.expireAt = v.expireAt.format('YYYY-MM-DD');
+      await addCertificate(certEmp.id, v);
+      message.success('已添加证书');
+      certForm.resetFields();
+      setCertRows(await listCertificates(certEmp.id));
+    } catch {
+      // 失败提示由请求层统一处理
+    } finally {
+      setCertSubmitting(false);
+    }
   };
   const delCert = async (cid: number) => {
     await deleteCertificate(cid);
     setCertRows(await listCertificates(certEmp.id));
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '姓名', dataIndex: 'name' },
     { title: '手机', dataIndex: 'phone', render: (v: string) => v || '-' },
@@ -99,16 +116,16 @@ export default function EmployeePage() {
     {
       title: '操作', width: 260, render: (_: any, r: any) => (
         <Space>
-          <Button type="link" size="small" onClick={() => { setEditing(r); form.setFieldsValue({ ...r, hireDate: r.hireDate ? undefined : undefined }); setOpen(true); }}>编辑</Button>
+          <Button type="link" size="small" onClick={() => openEdit(r)}>编辑</Button>
           <Button type="link" size="small" onClick={() => openProfile(r)}>师资档案</Button>
           <Button type="link" size="small" onClick={() => openCert(r)}>证书</Button>
-          <Popconfirm title="确认删除该员工？" okText="删除" cancelText="取消" onConfirm={async () => { await deleteEmployee(r.id); message.success('已删除'); load(); }}>
+          <Popconfirm title="确认删除该员工？" okText="删除" cancelText="取消" onConfirm={() => del(r.id)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -120,7 +137,7 @@ export default function EmployeePage() {
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
         onChange={(p, s) => load(p.current, p.pageSize || size)} />
 
-      <Modal title={editing ? '编辑员工' : '新建员工'} open={open} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑员工' : '新建员工'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item>
           <Form.Item name="phone" label="手机"><Input /></Form.Item>
@@ -134,7 +151,7 @@ export default function EmployeePage() {
         </Form>
       </Modal>
 
-      <Modal title={`师资档案 - ${profileEmp?.name || ''}`} open={!!profileEmp?._open} onOk={submitProfile} onCancel={() => setProfileEmp(null)} okText="保存" cancelText="取消">
+      <Modal title={`师资档案 - ${profileEmp?.name || ''}`} open={profileOpen} confirmLoading={profileSubmitting} onOk={submitProfile} onCancel={() => setProfileOpen(false)} okText="保存" cancelText="取消">
         <Form form={profileForm} layout="vertical">
           <Form.Item name="subjects" label="任教学科"><Select mode="tags" placeholder="输入或选择学科" /></Form.Item>
           <Form.Item name="ageGroups" label="擅长年龄段"><Select mode="tags" placeholder="如 6-8岁" /></Form.Item>
@@ -151,7 +168,7 @@ export default function EmployeePage() {
             <Form.Item name="issuer" label="颁发机构"><Input /></Form.Item>
             <Form.Item name="issuedAt" label="颁发日期"><DatePicker /></Form.Item>
             <Form.Item name="expireAt" label="到期日期"><DatePicker /></Form.Item>
-            <Button type="primary" onClick={submitCert}>添加</Button>
+            <Button type="primary" loading={certSubmitting} onClick={submitCert}>添加</Button>
           </Space>
         </Form>
         <Table rowKey="id" size="small" dataSource={certRows}

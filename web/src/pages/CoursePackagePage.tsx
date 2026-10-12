@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag, message, Popconfirm, List,
+  Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag, Popconfirm, List, App,
 } from 'antd';
 import {
   listCoursePackages, createCoursePackage, updateCoursePackage, deleteCoursePackage,
@@ -8,16 +8,19 @@ import {
 } from '../api/crm';
 
 export default function CoursePackagePage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<number | undefined>();
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<any[]>([]);
+  const [courseOptions, setCourseOptions] = useState<{ value: number; label: string }[]>([]);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form] = Form.useForm();
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const [courseOpen, setCourseOpen] = useState(false);
   const [curPkg, setCurPkg] = useState<any>(null);
@@ -26,6 +29,7 @@ export default function CoursePackagePage() {
 
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyForm] = Form.useForm();
+  const [buySubmitting, setBuySubmitting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -39,7 +43,7 @@ export default function CoursePackagePage() {
   useEffect(() => { load(); }, [page, status]);
   useEffect(() => {
     listCourses({ size: 200 })
-      .then((r: any) => setCourses(r.list || []))
+      .then((r: any) => { const list = r.list || []; setCourses(list); setCourseOptions(list.map((c: any) => ({ value: c.id, label: c.name }))); })
       .catch(() => undefined);
   }, []);
 
@@ -56,11 +60,14 @@ export default function CoursePackagePage() {
   };
   const onSubmit = async () => {
     const v = await form.validateFields();
-    if (editing) await updateCoursePackage(editing.id, v);
-    else await createCoursePackage(v);
-    message.success(editing ? '已保存' : '已创建课包');
-    setEditOpen(false);
-    load();
+    setEditSubmitting(true);
+    try {
+      if (editing) await updateCoursePackage(editing.id, v);
+      else await createCoursePackage(v);
+      message.success(editing ? '已保存' : '已创建课包');
+      setEditOpen(false);
+      load();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setEditSubmitting(false); }
   };
 
   const openCourses = async (r: any) => {
@@ -91,12 +98,15 @@ export default function CoursePackagePage() {
   };
   const onBuy = async () => {
     const v = await buyForm.validateFields();
-    await purchaseCoursePackage(curPkg.id, v);
-    message.success('已发放课包课时');
-    setBuyOpen(false);
+    setBuySubmitting(true);
+    try {
+      await purchaseCoursePackage(curPkg.id, v);
+      message.success('已发放课包课时');
+      setBuyOpen(false);
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setBuySubmitting(false); }
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 70 },
     { title: '套餐名称', dataIndex: 'name' },
     { title: '总课时', dataIndex: 'totalHours', width: 90 },
@@ -119,7 +129,7 @@ export default function CoursePackagePage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -133,14 +143,14 @@ export default function CoursePackagePage() {
       </Space>
 
       <Table
-        rowKey="id" loading={loading} dataSource={data} columns={columns as any}
+        rowKey="id" loading={loading} dataSource={data} columns={columns}
         pagination={{ current: page, total, pageSize: 20, onChange: setPage }}
         size="small"
       />
 
       <Modal
         title={editing ? `编辑课包 #${editing.id}` : '新建课包'}
-        open={editOpen} onOk={onSubmit} onCancel={() => setEditOpen(false)} okText="保存"
+        open={editOpen} confirmLoading={editSubmitting} onOk={onSubmit} onCancel={() => setEditOpen(false)} okText="保存"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="套餐名称" rules={[{ required: true, message: '请输入套餐名称' }]}>
@@ -177,7 +187,7 @@ export default function CoursePackagePage() {
               mode="multiple" allowClear style={{ width: 360 }}
               placeholder="选择要关联的课程"
               value={selectedCourseIds} onChange={setSelectedCourseIds}
-              options={courses.map((c) => ({ value: c.id, label: c.name }))}
+              options={courseOptions}
             />
             <Button type="primary" onClick={onAddCourses}>添加</Button>
           </Space>
@@ -200,7 +210,7 @@ export default function CoursePackagePage() {
 
       <Modal
         title={`购课发放「${curPkg?.name ?? ''}」`}
-        open={buyOpen} onOk={onBuy} onCancel={() => setBuyOpen(false)} okText="发放"
+        open={buyOpen} confirmLoading={buySubmitting} onOk={onBuy} onCancel={() => setBuyOpen(false)} okText="发放"
       >
         <Form form={buyForm} layout="vertical">
           <Form.Item name="studentId" label="学员ID" rules={[{ required: true, message: '请输入学员ID' }]}>
