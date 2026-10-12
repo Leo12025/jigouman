@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, Select, Switch, Tag, Popconfirm, Card, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import {
   listApprovalFlows, createApprovalFlow, updateApprovalFlow, deleteApprovalFlow,
@@ -140,7 +141,7 @@ export default function ApprovalFlowPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="审批流配置">
       <Card
         size="small"
         title="审批流模板配置（§4.16 增强）"
@@ -199,6 +200,6 @@ export default function ApprovalFlowPage() {
           <Button type="dashed" icon={<PlusOutlined />} onClick={addNode} block>添加节点</Button>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

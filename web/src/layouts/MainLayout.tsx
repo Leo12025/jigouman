@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Layout, Menu, Button, Space, Typography, Grid, Dropdown, Avatar, Tag, Badge, Popover, Select } from 'antd';
+import {
+  Layout, Menu, Button, Space, Typography, Grid, Dropdown, Avatar, Tag, Badge, Popover, Select, Drawer, theme,
+} from 'antd';
 import {
   TeamOutlined,
   PartitionOutlined,
@@ -15,7 +17,6 @@ import {
   AuditOutlined,
   SwapOutlined,
   ApiOutlined,
-  TeamOutlined as Team2Outlined,
   HomeOutlined,
   LogoutOutlined,
   DownOutlined,
@@ -31,6 +32,7 @@ import {
   TagsOutlined,
   ShareAltOutlined,
   VideoCameraOutlined,
+  FunnelPlotOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken, getCurrentOrg, setCurrentOrg } from '../api/client';
@@ -56,16 +58,20 @@ const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
 export default function MainLayout() {
+  const { token } = theme.useToken();
+  // 当前选中菜单：取路径第一段；为空（首页 "/"）时指向首页
+  const location = useLocation();
+  const seg = location.pathname.split('/')[1];
+  const selected = seg ? '/' + seg : '/';
+
   const [collapsed, setCollapsed] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [unread, setUnread] = useState(0);
   const [noticeList, setNoticeList] = useState<any[]>([]);
   const [noticeVisible, setNoticeVisible] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const screens = Grid.useBreakpoint();
   const isNarrow = !screens.lg;
-  const selected = '/' + (location.pathname.split('/')[1] || 'leads');
   const [campusOpts, setCampusOpts] = useState<{ value: number; label: string }[]>([]);
   const [orgSel, setOrgSel] = useState<number | null>(getCurrentOrg());
 
@@ -115,7 +121,7 @@ export default function MainLayout() {
         { key: '/course-packages', icon: <AppstoreOutlined />, label: '课包管理' },
         { key: '/coursewares', icon: <ContainerOutlined />, label: '课件管理' },
         { key: '/resources', icon: <FolderOpenOutlined />, label: '资源库' },
-        { key: '/class-groups', icon: <Team2Outlined />, label: '班级管理' },
+        { key: '/class-groups', icon: <TeamOutlined />, label: '班级管理' },
         { key: '/lessons', icon: <CalendarOutlined />, label: '课次排课' },
         { key: '/class-change', icon: <SwapOutlined />, label: '调课/转班' },
         { key: '/students', icon: <SolutionOutlined />, label: '学员档案' },
@@ -134,7 +140,7 @@ export default function MainLayout() {
       label: '招生营销',
       children: [
         { key: '/leads', icon: <TeamOutlined />, label: '线索 CRM' },
-        { key: '/funnel', icon: <FundProjectionScreenOutlined />, label: '转化漏斗' },
+        { key: '/funnel', icon: <FunnelPlotOutlined />, label: '转化漏斗' },
         { key: '/channels', icon: <PartitionOutlined />, label: '渠道管理' },
         { key: '/campaigns', icon: <ThunderboltOutlined />, label: '市场活动' },
         { key: '/complaints', icon: <CustomerServiceOutlined />, label: '客诉管理' },
@@ -166,11 +172,16 @@ export default function MainLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {!isNarrow && (
-        <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="light" width={208}>
-          <div style={{ padding: 16 }}>
-            <Typography.Title level={5} style={{ margin: 0 }}>
-              机构管理系统
-            </Typography.Title>
+        <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="light" width={208}
+          style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}>
+          <div style={{ padding: collapsed ? 12 : 16, textAlign: collapsed ? 'center' : 'left' }}>
+            {collapsed ? (
+              <div style={{ fontWeight: 700, fontSize: 16 }}>机</div>
+            ) : (
+              <Typography.Title level={5} style={{ margin: 0 }}>
+                机构管理系统
+              </Typography.Title>
+            )}
           </div>
           <Menu
             mode="inline"
@@ -180,14 +191,37 @@ export default function MainLayout() {
           />
         </Sider>
       )}
+
+      {/* 移动端抽屉菜单：窄屏下 Sider 不渲染，用 Drawer 承载同一份菜单 */}
+      <Drawer
+        open={isNarrow && collapsed}
+        onClose={() => setCollapsed(false)}
+        placement="left"
+        width={220}
+        title="机构管理系统"
+        styles={{ body: { padding: 0 } }}
+      >
+        <Menu
+          mode="inline"
+          selectedKeys={[selected]}
+          items={menuItems}
+          onClick={(e) => { navigate(e.key); setCollapsed(false); }}
+        />
+      </Drawer>
+
       <Layout>
         <Header
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'transparent',
+            background: token.colorBgContainer,
             padding: '0 16px',
+            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+            boxShadow: '0 1px 4px rgba(0,0,0,.04)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
           }}
         >
           {isNarrow && (
@@ -195,7 +229,7 @@ export default function MainLayout() {
               菜单
             </Button>
           )}
-          <Space>
+          <Space wrap style={{ marginLeft: 'auto' }}>
             <Popover
               open={noticeVisible}
               onOpenChange={onNoticeOpenChange}
@@ -207,12 +241,12 @@ export default function MainLayout() {
                     <Button type="link" size="small" onClick={onReadAll}>全部已读</Button>
                   </div>
                   {noticeList.length === 0 && (
-                    <div style={{ color: 'rgba(0,0,0,.45)' }}>暂无未读通知</div>
+                    <div style={{ color: token.colorTextSecondary }}>暂无未读通知</div>
                   )}
                   {noticeList.map((n) => (
-                    <div key={n.id} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <div key={n.id} style={{ padding: '8px 0', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
                       <div style={{ fontWeight: 600 }}>{n.title}</div>
-                      <div style={{ color: 'rgba(0,0,0,.45)', fontSize: 12 }}>{n.content}</div>
+                      <div style={{ color: token.colorTextSecondary, fontSize: 12 }}>{n.content}</div>
                       <Button type="link" size="small" onClick={() => onRead(n.id)}>标记已读</Button>
                     </div>
                   ))}
@@ -226,7 +260,7 @@ export default function MainLayout() {
             {/* 多校区切换器：切换后下发 X-Org-Id，全页以该校区视角隔离数据 */}
             <Select
               value={orgSel ?? 'ALL'}
-              style={{ width: 180 }}
+              style={{ width: isNarrow ? 130 : 180 }}
               onChange={(v) => {
                 const next = v === 'ALL' ? null : Number(v);
                 setCurrentOrg(next);

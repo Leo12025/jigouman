@@ -3,6 +3,7 @@ import { Tabs, Card, Row, Col, Statistic, Table, Tag, Alert, Spin, DatePicker, S
 import dayjs from 'dayjs';
 import { getDashboard } from '../api/dashboard';
 import { LineChart, BarChart, PieChart, GaugeChart, FunnelChart, GroupedBar } from '../components/Charts';
+import PageContainer from '../components/PageContainer';
 
 type Role = 'principal' | 'admission' | 'teaching';
 
@@ -35,7 +36,7 @@ export default function DashboardPage() {
   }, [role, params]);
 
   return (
-    <div>
+    <PageContainer title="数据看板">
       <Tabs
         activeKey={role}
         onChange={(k) => setRole(k as Role)}
@@ -70,7 +71,7 @@ export default function DashboardPage() {
         {role === 'admission' && data && <Admission data={data} />}
         {role === 'teaching' && data && <Teaching data={data} />}
       </Spin>
-    </div>
+    </PageContainer>
   );
 }
 

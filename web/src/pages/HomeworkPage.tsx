@@ -3,6 +3,7 @@ import {
   Table, Button, Tag, Modal, Form, Input, InputNumber, Select, Space, App,
   Descriptions, Divider, Statistic, Card, Row, Col, Empty,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import {
   createHomework, listHomeworks, getHomework, reviewHomework, homeworkStats, homeworkUnsubmitted,
 } from '../api/crm';
@@ -125,7 +126,7 @@ export default function HomeworkPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="作业管理">
       <Space style={{ marginBottom: 12 }} wrap>
         <Button onClick={() => load(1)}>刷新</Button>
         <Button type="primary" onClick={() => { form.resetFields(); setOpen(true); }}>布置作业</Button>
@@ -199,6 +200,6 @@ export default function HomeworkPage() {
             dataSource={pending} columns={[{ title: '学员', dataIndex: 'name' }, { title: 'ID', dataIndex: 'id' }]} />
         ) : <Empty description="全部已提交" />}
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

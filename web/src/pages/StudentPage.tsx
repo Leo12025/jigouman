@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, Drawer, Descriptions, Tabs, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listStudents, createStudent, updateStudent, deleteStudent, getStudent, bindParent, unbindParent, enrollCourse, listCourses, listClassGroups } from '../api/crm';
 
@@ -116,7 +117,7 @@ export default function StudentPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="学员档案">
       <Space style={{ marginBottom: 16 }} wrap>
         <Input placeholder="姓名" allowClear style={{ width: 180 }} onChange={(e) => setKeyword(e.target.value || undefined)} onPressEnter={() => load(1, size)} />
         <Button type="primary" onClick={() => load(1, size)}>查询</Button>
@@ -226,6 +227,6 @@ export default function StudentPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

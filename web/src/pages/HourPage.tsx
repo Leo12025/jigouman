@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Tabs, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import {
   listHourAccounts, listHourConsumptions, grantHours, listStudents, listCourses,
@@ -86,7 +87,7 @@ export default function HourPage() {
   ], [students, courses]);
 
   return (
-    <div>
+    <PageContainer title="课时管理">
       <Space style={{ marginBottom: 16 }} wrap>
         <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); form.setFieldsValue({ type: 'CLASS', hours: 1 }); setOpen(true); }}>手动发放课时</Button>
@@ -123,6 +124,6 @@ export default function HourPage() {
           <Form.Item name="remark" label="备注"><Input /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

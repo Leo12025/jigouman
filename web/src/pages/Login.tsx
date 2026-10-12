@@ -32,16 +32,16 @@ export default function Login() {
       }}
     >
       <Card title="机构管理系统 · 登录" style={{ width: 380 }}>
-        <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ username: 'admin' }}>
+        <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item
             name="username"
             label="用户名"
             rules={[{ required: true, message: '请输入用户名' }]}
           >
-            <Input prefix={<UserOutlined />} placeholder="admin" />
+            <Input prefix={<UserOutlined />} placeholder="请输入用户名" />
           </Form.Item>
           <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="admin123456" />
+            <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loading}>
             登录

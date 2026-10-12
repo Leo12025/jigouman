@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, TimePicker, Tag, Popconfirm, Alert, Radio, Empty, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { listLessons, createLesson, updateLesson, deleteLesson, generateLessons, listClassGroups, listCourses, listClassGroupStudents, attendLesson, listStudents, scheduleMakeup } from '../api/crm';
@@ -164,7 +165,7 @@ export default function LessonPage() {
   ], [groups]);
 
   return (
-    <div>
+    <PageContainer title="课次排课">
       <Space style={{ marginBottom: 16 }} wrap>
         <Select placeholder="按班级筛选" allowClear style={{ width: 180 }}
           options={groups.map((g) => ({ value: g.id, label: g.name }))}
@@ -272,6 +273,6 @@ export default function LessonPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

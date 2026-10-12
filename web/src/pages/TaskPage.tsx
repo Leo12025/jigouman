@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Tag, Select, Space, Popconfirm, Card, Row, Col, Radio, Modal, Input, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { AuditOutlined } from '@ant-design/icons';
 import {
   listTasks, getMyTodos, getTaskStats, completeTask, removeTask,
@@ -135,7 +136,7 @@ export default function TaskPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="待办中心">
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
           <Card size="small">
@@ -216,6 +217,6 @@ export default function TaskPage() {
           )}
         </Space>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

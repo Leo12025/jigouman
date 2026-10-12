@@ -16,6 +16,7 @@ import {
   App,
   Popconfirm,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -311,7 +312,7 @@ export default function LeadPage() {
   ], []);
 
   return (
-    <div>
+    <PageContainer title="线索 CRM">
       <Space style={{ marginBottom: 16 }} wrap>
         <Input
           placeholder="姓名/手机号"
@@ -510,6 +511,6 @@ export default function LeadPage() {
           </>
         )}
       </Drawer>
-    </div>
+    </PageContainer>
   );
 }

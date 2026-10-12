@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Space } from 'antd';
+import { Card, Row, Col, Space, Typography } from 'antd';
+import PageContainer from '../components/PageContainer';
 import {
   TeamOutlined,
   BookOutlined,
@@ -28,7 +29,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div>
+    <PageContainer title="工作台">
       <Row gutter={16} style={{ marginBottom: 16 }}>
         {[
           { title: '总线索', value: stats?.total ?? '-' },
@@ -54,13 +55,13 @@ export default function HomePage() {
         <Col span={8}>
           <Card size="small" hoverable onClick={() => navigate('/tasks')}>
             <div style={{ color: 'rgba(0,0,0,.45)' }}>逾期</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa541c' }}>{todoStats?.overdue ?? '-'}</div>
+            <div style={{ fontSize: 24, fontWeight: 600 }}><Typography.Text type="warning">{todoStats?.overdue ?? '-'}</Typography.Text></div>
           </Card>
         </Col>
         <Col span={8}>
           <Card size="small" hoverable onClick={() => navigate('/tasks')}>
             <div style={{ color: 'rgba(0,0,0,.45)' }}>严重逾期</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: '#cf1322' }}>{todoStats?.severeOverdue ?? '-'}</div>
+            <div style={{ fontSize: 24, fontWeight: 600 }}><Typography.Text type="danger">{todoStats?.severeOverdue ?? '-'}</Typography.Text></div>
           </Card>
         </Col>
       </Row>
@@ -79,6 +80,6 @@ export default function HomePage() {
           ))}
         </Row>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, Drawer, Descriptions, Tabs, App,
 } from 'antd';
+import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import {
   listOrders, getOrder, createOrder, payOrder, refundOrder,
@@ -144,7 +145,7 @@ export default function OrderPage() {
   ], [students, courses]);
 
   return (
-    <div>
+    <PageContainer title="订单管理">
       <Space style={{ marginBottom: 16 }} wrap>
         <Input placeholder="订单号" allowClear style={{ width: 180 }} onChange={(e) => setKeyword(e.target.value || undefined)} onPressEnter={() => load(1, size)} />
         <Select placeholder="状态" allowClear style={{ width: 120 }} options={Object.entries(STATUS).map(([v, o]) => ({ value: v, label: o.label }))} onChange={(v) => setStatus(v)} />
@@ -291,6 +292,6 @@ export default function OrderPage() {
           />
         )}
       </Drawer>
-    </div>
+    </PageContainer>
   );
 }
