@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, Button, message, Space, Typography, List } from 'antd';
+import { Upload, Button, Space, Typography, List, App } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { uploadResources } from '../api/crm';
 
@@ -24,6 +24,7 @@ interface Props {
 
 /** 统一资源上传（走 /resources/upload，底层本地/OSS 由服务端配置决定） */
 export default function ResourceUpload({ category, refType, refId, onChange, text }: Props) {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [uploaded, setUploaded] = useState<ResourceItem[]>([]);
 
