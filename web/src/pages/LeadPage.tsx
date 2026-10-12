@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Table,
   Button,
   Space,
-  Modal,
   Form,
   Input,
   InputNumber,
@@ -13,7 +12,7 @@ import {
   Descriptions,
   Tabs,
   DatePicker,
-  message,
+  App,
   Popconfirm,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
@@ -32,6 +31,7 @@ import {
 } from '../api/crm';
 import type { Lead, LeadStage, LeadFollow, TrialLesson, Channel } from '../api/types';
 import { LEAD_STAGES, LEAD_STAGE_LABEL } from '../api/types';
+import { formatDateTime } from '../utils/format';
 
 const STAGE_COLOR: Record<LeadStage, string> = {
   NEW: 'default',
@@ -52,6 +52,7 @@ const FOLLOW_LABEL: Record<string, string> = Object.fromEntries(
 );
 
 export default function LeadPage() {
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Lead[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -69,6 +70,11 @@ export default function LeadPage() {
   const [cur, setCur] = useState<Lead | null>(null);
   const [follows, setFollows] = useState<LeadFollow[]>([]);
   const [trials, setTrials] = useState<TrialLesson[]>([]);
+
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [followSubmitting, setFollowSubmitting] = useState(false);
+  const [trialSubmitting, setTrialSubmitting] = useState(false);
 
   const [leadForm] = Form.useForm();
   const [assignForm] = Form.useForm();
@@ -117,10 +123,15 @@ export default function LeadPage() {
   };
   const submitCreate = async () => {
     const v = await leadForm.validateFields();
-    await createLead(v);
-    message.success('线索已创建');
-    setCreateOpen(false);
-    reload();
+    setCreateSubmitting(true);
+    try {
+      await createLead(v);
+      message.success('线索已创建');
+      setCreateOpen(false);
+      reload();
+    } finally {
+      setCreateSubmitting(false);
+    }
   };
 
   const openAssign = (r: Lead) => {
@@ -131,10 +142,15 @@ export default function LeadPage() {
   };
   const submitAssign = async () => {
     const v = await assignForm.validateFields();
-    await assignLead(cur!.id, v.ownerId);
-    message.success('已分配');
-    setAssignOpen(false);
-    reload();
+    setAssignSubmitting(true);
+    try {
+      await assignLead(cur!.id, v.ownerId);
+      message.success('已分配');
+      setAssignOpen(false);
+      reload();
+    } finally {
+      setAssignSubmitting(false);
+    }
   };
 
   const openFollow = (r: Lead) => {
@@ -146,10 +162,15 @@ export default function LeadPage() {
     const v = await followForm.validateFields();
     const payload: any = { ...v };
     if (v.nextFollowAt) payload.nextFollowAt = v.nextFollowAt.toISOString();
-    await followLead(cur!.id, payload);
-    message.success('跟进已记录');
-    setFollowOpen(false);
-    reload();
+    setFollowSubmitting(true);
+    try {
+      await followLead(cur!.id, payload);
+      message.success('跟进已记录');
+      setFollowOpen(false);
+      reload();
+    } finally {
+      setFollowSubmitting(false);
+    }
   };
 
   const openTrial = (r: Lead) => {
@@ -162,14 +183,19 @@ export default function LeadPage() {
     const v = await trialForm.validateFields();
     const payload: any = { ...v };
     if (v.trialAt) payload.trialAt = v.trialAt.toISOString();
-    await createTrial(cur!.id, payload);
-    message.success('试听已记录');
-    setTrialOpen(false);
-    reload();
+    setTrialSubmitting(true);
+    try {
+      await createTrial(cur!.id, payload);
+      message.success('试听已记录');
+      setTrialOpen(false);
+      reload();
+    } finally {
+      setTrialSubmitting(false);
+    }
   };
 
   const onConvert = (r: Lead) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认将该线索转化为学员？',
       content: '转化后会自动创建学员档案并绑定联系人。',
       okText: '确认转化',
@@ -200,7 +226,7 @@ export default function LeadPage() {
     reload();
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '姓名', dataIndex: 'name', width: 100 },
     { title: '手机号', dataIndex: 'phone', width: 130 },
@@ -217,7 +243,7 @@ export default function LeadPage() {
       title: '最近跟进',
       dataIndex: 'lastFollowAt',
       width: 170,
-      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
+      render: (v: string) => formatDateTime(v),
     },
     {
       title: '操作',
@@ -247,14 +273,15 @@ export default function LeadPage() {
         </Space>
       ),
     },
-  ];
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], [channels]);
 
-  const followColumns = [
+  const followColumns = useMemo(() => [
     {
       title: '时间',
       dataIndex: 'createdAt',
       width: 170,
-      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
+      render: (v: string) => formatDateTime(v),
     },
     { title: '方式', dataIndex: 'type', width: 90, render: (v: string) => FOLLOW_LABEL[v] || v },
     { title: '内容', dataIndex: 'content', render: (v: string) => v || '-' },
@@ -262,16 +289,16 @@ export default function LeadPage() {
       title: '下次跟进',
       dataIndex: 'nextFollowAt',
       width: 170,
-      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
+      render: (v: string) => formatDateTime(v),
     },
-  ];
+  ], []);
 
-  const trialColumns = [
+  const trialColumns = useMemo(() => [
     {
       title: '试听时间',
       dataIndex: 'trialAt',
       width: 170,
-      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
+      render: (v: string) => formatDateTime(v),
     },
     {
       title: '到课',
@@ -280,7 +307,7 @@ export default function LeadPage() {
       render: (v: number) => (v === 1 ? <Tag color="green">已到课</Tag> : <Tag>未到课</Tag>),
     },
     { title: '反馈', dataIndex: 'feedback', render: (v: string) => v || '-' },
-  ];
+  ], []);
 
   return (
     <div>
@@ -331,6 +358,7 @@ export default function LeadPage() {
       <Modal
         title="新建线索"
         open={createOpen}
+        confirmLoading={createSubmitting}
         onOk={submitCreate}
         onCancel={() => setCreateOpen(false)}
         okText="保存"
@@ -368,6 +396,7 @@ export default function LeadPage() {
       <Modal
         title={`分配线索${cur ? ` - ${cur.name}` : ''}`}
         open={assignOpen}
+        confirmLoading={assignSubmitting}
         onOk={submitAssign}
         onCancel={() => setAssignOpen(false)}
         okText="确定"
@@ -384,6 +413,7 @@ export default function LeadPage() {
       <Modal
         title={`跟进线索${cur ? ` - ${cur.name}` : ''}`}
         open={followOpen}
+        confirmLoading={followSubmitting}
         onOk={submitFollow}
         onCancel={() => setFollowOpen(false)}
         okText="保存"
@@ -406,6 +436,7 @@ export default function LeadPage() {
       <Modal
         title={`记录试听${cur ? ` - ${cur.name}` : ''}`}
         open={trialOpen}
+        confirmLoading={trialSubmitting}
         onOk={submitTrial}
         onCancel={() => setTrialOpen(false)}
         okText="保存"

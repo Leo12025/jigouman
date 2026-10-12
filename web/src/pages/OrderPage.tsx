@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, message, Popconfirm, Drawer, Descriptions, Tabs,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, Drawer, Descriptions, Tabs, App,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import {
@@ -18,6 +18,7 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function OrderPage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -34,6 +35,9 @@ export default function OrderPage() {
   const [refundPreview, setRefundPreview] = useState<any>(null);
   const [detail, setDetail] = useState<any>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [form] = Form.useForm();
   const [payForm] = Form.useForm();
   const [refundForm] = Form.useForm();
@@ -71,18 +75,24 @@ export default function OrderPage() {
 
   const submit = async () => {
     const v = await form.validateFields();
-    await createOrder(v);
-    message.success('订单已创建');
-    setOpen(false); load();
+    setCreateSubmitting(true);
+    try {
+      await createOrder(v);
+      message.success('订单已创建');
+      setOpen(false); load();
+    } finally { setCreateSubmitting(false); }
   };
 
   const openPay = (r: any) => { payForm.setFieldsValue({ channel: 'OFFLINE', amount: r.payableAmount }); setDetailId(r.id); setPayOpen(true); };
   const submitPay = async () => {
     const v = await payForm.validateFields();
-    await payOrder(detailId!, v);
-    message.success('支付成功，课时已发放');
-    setPayOpen(false); load();
-    if (detail) openDetail(detailId!);
+    setPaySubmitting(true);
+    try {
+      await payOrder(detailId!, v);
+      message.success('支付成功，课时已发放');
+      setPayOpen(false); load();
+      if (detail) openDetail(detailId!);
+    } finally { setPaySubmitting(false); }
   };
 
   const openRefund = async (r: any) => {
@@ -96,10 +106,13 @@ export default function OrderPage() {
   };
   const submitRefund = async () => {
     const v = await refundForm.validateFields();
-    await refundOrder(detailId!, v);
-    message.success('退费申请已提交，待审批');
-    setRefundOpen(false); load();
-    if (detail) openDetail(detailId!);
+    setRefundSubmitting(true);
+    try {
+      await refundOrder(detailId!, v);
+      message.success('退费申请已提交，待审批');
+      setRefundOpen(false); load();
+      if (detail) openDetail(detailId!);
+    } finally { setRefundSubmitting(false); }
   };
 
   const openDetail = async (id: number) => {
@@ -107,7 +120,7 @@ export default function OrderPage() {
     setDetailId(id);
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '订单号', dataIndex: 'orderNo', width: 160 },
     { title: '学员', dataIndex: 'studentId', width: 110, render: (v: number) => studentName(v) },
@@ -127,7 +140,8 @@ export default function OrderPage() {
         </Space>
       ),
     },
-  ];
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], [students, courses]);
 
   return (
     <div>
@@ -143,7 +157,7 @@ export default function OrderPage() {
         onChange={(p, s) => load(p.current, p.pageSize || size)} />
 
       {/* 下单 */}
-      <Modal title="新建订单" open={open} width={720} onOk={submit} onCancel={() => setOpen(false)} okText="创建" cancelText="取消">
+      <Modal title="新建订单" open={open} width={720} confirmLoading={createSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="创建" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="studentId" label="学员" rules={[{ required: true, message: '请选择学员' }]}>
             <Select showSearch optionFilterProp="label" options={students.map((s) => ({ value: s.id, label: s.name }))} />
@@ -184,7 +198,7 @@ export default function OrderPage() {
       </Modal>
 
       {/* 支付 */}
-      <Modal title="订单支付" open={payOpen} onOk={submitPay} onCancel={() => setPayOpen(false)} okText="确认支付" cancelText="取消">
+      <Modal title="订单支付" open={payOpen} confirmLoading={paySubmitting} onOk={submitPay} onCancel={() => setPayOpen(false)} okText="确认支付" cancelText="取消">
         <Form form={payForm} layout="vertical">
           <Form.Item name="channel" label="支付渠道" rules={[{ required: true }]}>
             <Select options={[{ value: 'WECHAT', label: '微信' }, { value: 'ALIPAY', label: '支付宝' }, { value: 'OFFLINE', label: '线下' }, { value: 'CARD', label: '刷卡' }]} />
@@ -197,7 +211,7 @@ export default function OrderPage() {
       </Modal>
 
       {/* 退费 */}
-      <Modal title="申请退费" open={refundOpen} onOk={submitRefund} onCancel={() => setRefundOpen(false)} okText="提交" cancelText="取消">
+      <Modal title="申请退费" open={refundOpen} confirmLoading={refundSubmitting} onOk={submitRefund} onCancel={() => setRefundOpen(false)} okText="提交" cancelText="取消">
         {refundPreview && (
           <div style={{ marginBottom: 12, padding: 12, background: '#fafafa', borderRadius: 6, fontSize: 13 }}>
             <div>已付：¥{refundPreview.paidAmount} · 总课时：{refundPreview.totalHours} · 剩余：{refundPreview.remainingHours} · 已消：{refundPreview.consumedHours}</div>

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, message, Popconfirm, Drawer, Descriptions, Tabs,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, Drawer, Descriptions, Tabs, App,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listStudents, createStudent, updateStudent, deleteStudent, getStudent, bindParent, unbindParent, enrollCourse, listCourses, listClassGroups } from '../api/crm';
@@ -11,6 +11,7 @@ const STATUS: Record<string, string> = {
 };
 
 export default function StudentPage() {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -25,6 +26,9 @@ export default function StudentPage() {
   const [detail, setDetail] = useState<any>(null);
   const [bindOpen, setBindOpen] = useState(false);
   const [enrollOpen, setEnrollOpen] = useState(false);
+  const [saveSubmitting, setSaveSubmitting] = useState(false);
+  const [bindSubmitting, setBindSubmitting] = useState(false);
+  const [enrollSubmitting, setEnrollSubmitting] = useState(false);
   const [form] = Form.useForm();
   const [bindForm] = Form.useForm();
   const [enrollForm] = Form.useForm();
@@ -45,16 +49,50 @@ export default function StudentPage() {
 
   const submit = async () => {
     const v = await form.validateFields();
-    if (editing) { await updateStudent(editing.id, v); message.success('已保存'); }
-    else { await createStudent(v); message.success('创建成功'); }
-    setOpen(false); load();
+    setSaveSubmitting(true);
+    try {
+      if (editing) { await updateStudent(editing.id, v); message.success('已保存'); }
+      else { await createStudent(v); message.success('创建成功'); }
+      setOpen(false); load();
+    } finally { setSaveSubmitting(false); }
   };
 
   const openDetail = async (r: any) => {
     setDetail(await getStudent(r.id));
   };
 
-  const columns = [
+  const remove = async (r: any) => {
+    await deleteStudent(r.id);
+    message.success('已删除');
+    load();
+  };
+  const unbind = async (parentId: number) => {
+    await unbindParent({ studentId: detail.id, parentId });
+    message.success('已解绑');
+    setDetail(await getStudent(detail.id));
+  };
+  const submitBind = async () => {
+    const v = await bindForm.validateFields();
+    setBindSubmitting(true);
+    try {
+      await bindParent(v);
+      message.success('已绑定');
+      setBindOpen(false);
+      setDetail(await getStudent(detail.id));
+    } finally { setBindSubmitting(false); }
+  };
+  const submitEnroll = async () => {
+    const v = await enrollForm.validateFields();
+    setEnrollSubmitting(true);
+    try {
+      await enrollCourse(v);
+      message.success('已报名');
+      setEnrollOpen(false);
+      setDetail(await getStudent(detail.id));
+    } finally { setEnrollSubmitting(false); }
+  };
+
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '姓名', dataIndex: 'name', width: 110 },
     { title: '性别', dataIndex: 'gender', width: 70, render: (v: number) => (v === 2 ? '女' : '男') },
@@ -68,13 +106,14 @@ export default function StudentPage() {
           <Button type="link" size="small" onClick={() => openDetail(r)}>详情</Button>
           <Button type="link" size="small" onClick={() => navigate(`/students/${r.id}/lifecycle`)}>全生命周期</Button>
           <Button type="link" size="small" onClick={() => { setEditing(r); form.setFieldsValue(r); setOpen(true); }}>编辑</Button>
-          <Popconfirm title="确认删除该学员？" okText="删除" cancelText="取消" onConfirm={async () => { await deleteStudent(r.id); message.success('已删除'); load(); }}>
+          <Popconfirm title="确认删除该学员？" okText="删除" cancelText="取消" onConfirm={() => remove(r)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
       ),
     },
-  ];
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], []);
 
   return (
     <div>
@@ -88,7 +127,7 @@ export default function StudentPage() {
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
         onChange={(p, s) => load(p.current, p.pageSize || size)} />
 
-      <Modal title={editing ? '编辑学员' : '新建学员'} open={open} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑学员' : '新建学员'} open={open} confirmLoading={saveSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item>
           <Form.Item name="gender" label="性别">
@@ -133,7 +172,7 @@ export default function StudentPage() {
                           {
                             title: '操作', width: 80, render: (_: any, r: any) => (
                               <Popconfirm title="确认解绑该家长？" okText="解绑" cancelText="取消"
-                                onConfirm={async () => { await unbindParent({ studentId: detail.id, parentId: r.id }); message.success('已解绑'); setDetail(await getStudent(detail.id)); }}>
+                                onConfirm={() => unbind(r.id)}>
                                 <Button type="link" size="small" danger>解绑</Button>
                               </Popconfirm>
                             ),
@@ -166,13 +205,7 @@ export default function StudentPage() {
         )}
       </Drawer>
 
-      <Modal title="绑定家长" open={bindOpen} onOk={async () => {
-        const v = await bindForm.validateFields();
-        await bindParent(v);
-        message.success('已绑定');
-        setBindOpen(false);
-        setDetail(await getStudent(detail.id));
-      }} onCancel={() => setBindOpen(false)} okText="保存" cancelText="取消">
+      <Modal title="绑定家长" open={bindOpen} confirmLoading={bindSubmitting} onOk={submitBind} onCancel={() => setBindOpen(false)} okText="保存" cancelText="取消">
         <Form form={bindForm} layout="vertical">
           <Form.Item name="studentId" label="学员ID" hidden><InputNumber /></Form.Item>
           <Form.Item name="parentName" label="家长姓名" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item>
@@ -182,13 +215,7 @@ export default function StudentPage() {
         </Form>
       </Modal>
 
-      <Modal title="报名课程" open={enrollOpen} onOk={async () => {
-        const v = await enrollForm.validateFields();
-        await enrollCourse(v);
-        message.success('已报名');
-        setEnrollOpen(false);
-        setDetail(await getStudent(detail.id));
-      }} onCancel={() => setEnrollOpen(false)} okText="保存" cancelText="取消">
+      <Modal title="报名课程" open={enrollOpen} confirmLoading={enrollSubmitting} onOk={submitEnroll} onCancel={() => setEnrollOpen(false)} okText="保存" cancelText="取消">
         <Form form={enrollForm} layout="vertical">
           <Form.Item name="studentId" label="学员ID" hidden><InputNumber /></Form.Item>
           <Form.Item name="courseId" label="课程" rules={[{ required: true, message: '请选择课程' }]}>
