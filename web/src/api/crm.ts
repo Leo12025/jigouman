@@ -368,6 +368,10 @@ export const createTenant = (d: any) => apiPost<any>('/platform/tenants', d);
 export const updateTenant = (id: number, d: any) => apiPut<any>(`/platform/tenants/${id}`, d);
 export const deleteTenant = (id: number) => apiDelete(`/platform/tenants/${id}`);
 
+// 租户自助中心（按 JWT 租户，GET 对全员开放以便套用主题，PUT 需 tenant:manage）
+export const getTenantMe = () => apiGet<any>('/tenant/me');
+export const updateTenantMe = (d: any) => apiPut<any>('/tenant/me', d);
+
 // ---------- 教材库存 (§4.20) ----------
 export const listMaterials = (params: any) => apiGet<PageResult<any>>('/materials', params);
 export const createMaterial = (d: any) => apiPost<any>('/materials', d);

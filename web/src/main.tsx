@@ -1,20 +1,21 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ConfigProvider, App as AntApp } from 'antd';
-import zhCN from 'antd/locale/zh_CN';
+import { App as AntApp } from 'antd';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { themeTokens } from './theme';
+import { TenantConfigProvider, ThemedConfigProvider } from './context/TenantConfig';
 import 'antd/dist/reset.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConfigProvider locale={zhCN} theme={{ token: themeTokens }}>
-      <AntApp>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </AntApp>
-    </ConfigProvider>
+    <TenantConfigProvider>
+      <ThemedConfigProvider>
+        <AntApp>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </AntApp>
+      </ThemedConfigProvider>
+    </TenantConfigProvider>
   </React.StrictMode>,
 );

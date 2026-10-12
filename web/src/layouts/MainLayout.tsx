@@ -33,6 +33,7 @@ import {
   ShareAltOutlined,
   VideoCameraOutlined,
   FunnelPlotOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken, getCurrentOrg, setCurrentOrg } from '../api/client';
@@ -44,6 +45,8 @@ import {
   markAllNotificationsRead,
   orgTree,
 } from '../api/crm';
+import { useTenantConfig } from '../context/TenantConfig';
+import { MENU_KEY_TO_FEATURE } from '../features';
 
 /** 将组织树展平为校区下拉选项（HQ/分校/校区均可选） */
 const flattenOrgs = (nodes: any[], out: { value: number; label: string }[] = []): { value: number; label: string }[] => {
@@ -71,6 +74,9 @@ export default function MainLayout() {
   const [noticeList, setNoticeList] = useState<any[]>([]);
   const [noticeVisible, setNoticeVisible] = useState(false);
   const navigate = useNavigate();
+  // 租户自助配置（主题/功能开关）+ 是否有机构设置权限
+  const { config } = useTenantConfig();
+  const canManageTenant = profile?.permissions?.includes('tenant:manage');
   const screens = Grid.useBreakpoint();
   const isNarrow = !screens.lg;
   const [campusOpts, setCampusOpts] = useState<{ value: number; label: string }[]>([]);
@@ -161,9 +167,35 @@ export default function MainLayout() {
         { key: '/notify-channels', icon: <ApiOutlined />, label: '消息渠道配置' },
         { key: '/reports', icon: <BarChartOutlined />, label: '看板配置/报表' },
         { key: '/tenants', icon: <ApiOutlined />, label: '租户中心' },
+        { key: '/tenant-settings', icon: <SettingOutlined />, label: '机构设置' },
       ],
     },
   ];
+
+  // 功能开关：显式为 false 的模块菜单对本机构全员隐藏（默认开启）
+  const filterByFeature = (items: any[]): any[] =>
+    items
+      .filter((it) => {
+        const fk = it.key ? MENU_KEY_TO_FEATURE[it.key] : undefined;
+        if (fk && config?.features?.[fk] === false) return false;
+        return true;
+      })
+      .map((it) => {
+        if (it.children) {
+          const children = filterByFeature(it.children);
+          return { ...it, children: children.length ? children : undefined };
+        }
+        return it;
+      })
+      .filter((it) => !(it.type === 'group' && (!it.children || it.children.length === 0)));
+
+  // 权限：机构设置仅 tenant:manage 可见
+  const filterByPerm = (items: any[]): any[] =>
+    items
+      .filter((it) => !(it.key === '/tenant-settings' && !canManageTenant))
+      .map((it) => (it.children ? { ...it, children: filterByPerm(it.children) } : it));
+
+  const visibleMenu = filterByPerm(filterByFeature(menuItems));
 
   const onLogout = () => {
     clearToken();
@@ -176,7 +208,13 @@ export default function MainLayout() {
         <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="light" width={208}
           style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}>
           <div style={{ padding: collapsed ? 12 : 16, textAlign: collapsed ? 'center' : 'left' }}>
-            {collapsed ? (
+            {config?.brand?.logo ? (
+              <img
+                src={config.brand.logo}
+                alt="机构 Logo"
+                style={{ height: collapsed ? 28 : 32, objectFit: 'contain' }}
+              />
+            ) : collapsed ? (
               <div style={{ fontWeight: 700, fontSize: 16 }}>机</div>
             ) : (
               <Typography.Title level={5} style={{ margin: 0 }}>
@@ -187,7 +225,7 @@ export default function MainLayout() {
           <Menu
             mode="inline"
             selectedKeys={[selected]}
-            items={menuItems}
+            items={visibleMenu}
             onClick={(e) => navigate(e.key)}
           />
         </Sider>

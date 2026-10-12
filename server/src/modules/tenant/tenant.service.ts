@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, UnauthorizedException
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Tenant } from './entities/tenant.entity';
-import { CreateTenantDto, UpdateTenantDto, TenantQueryDto } from './dto/tenant.dto';
+import { CreateTenantDto, UpdateTenantDto, TenantQueryDto, UpdateTenantSelfDto } from './dto/tenant.dto';
 
 /** 租户服务：CRUD + 域名解析（租户中心 & 多租户网关） */
 import { orgRepo } from '../../common/org-scope';
@@ -53,6 +53,45 @@ export class TenantService {
     const t = await this.repo.findOne({ where: { id } });
     if (!t) throw new NotFoundException('租户不存在');
     return t;
+  }
+
+  /** 租户自助：返回当前租户（含只读元数据 + 解析后的结构化 config） */
+  async getSelf(tenantId: number) {
+    const t = await this.get(tenantId);
+    let config: any = {};
+    if (t.config) {
+      try { config = JSON.parse(t.config); } catch { config = {}; }
+    }
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      domain: t.domain || '',
+      status: t.status,
+      maxCampuses: t.maxCampuses ?? null,
+      expiresAt: t.expiresAt || null,
+      config,
+    };
+  }
+
+  /** 租户自助：仅更新 name 与结构化 config（深度合并 brand/theme/features） */
+  async updateSelf(tenantId: number, d: UpdateTenantSelfDto) {
+    const t = await this.get(tenantId);
+    if (d.name !== undefined) t.name = d.name;
+    if (d.config !== undefined) {
+      let existing: any = {};
+      if (t.config) {
+        try { existing = JSON.parse(t.config); } catch { existing = {}; }
+      }
+      const merged: any = { ...existing, ...d.config };
+      if (d.config.brand) merged.brand = { ...(existing.brand || {}), ...d.config.brand };
+      if (d.config.theme) merged.theme = { ...(existing.theme || {}), ...d.config.theme };
+      if (d.config.features) merged.features = { ...(existing.features || {}), ...d.config.features };
+      t.config = JSON.stringify(merged);
+    }
+    await this.repo.save(t);
+    this.invalidate();
+    return this.getSelf(tenantId);
   }
 
   /** 按品牌域标识(slug 或 domain)解析租户（用于 用户名@品牌域 登录） */

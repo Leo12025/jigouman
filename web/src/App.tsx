@@ -49,6 +49,7 @@ const DistributionPage = lazy(() => import('./pages/DistributionPage'));
 const TeachingPage = lazy(() => import('./pages/TeachingPage'));
 const ReportPage = lazy(() => import('./pages/ReportPage'));
 const TenantPage = lazy(() => import('./pages/TenantPage'));
+const TenantSettingsPage = lazy(() => import('./pages/TenantSettingsPage'));
 
 /** 路由级代码分割：每个页面单独成 chunk，首屏只加载当前路由 */
 const L = (Comp: React.ComponentType) => (
@@ -122,6 +123,7 @@ export default function App() {
         <Route path="teaching" element={L(TeachingPage)} />
         <Route path="reports" element={L(ReportPage)} />
         <Route path="tenants" element={L(TenantPage)} />
+        <Route path="tenant-settings" element={L(TenantSettingsPage)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
