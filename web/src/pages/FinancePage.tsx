@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Tabs, Table, Button, Tag, Modal, Form, InputNumber, Input, Select, message,
-  Card, Row, Col, Statistic, Space,
+  Tabs, Table, Button, Tag, Modal, Form, InputNumber, Input, Select, Card, Row, Col, Statistic, Space, App,
 } from 'antd';
 import {
   getSplitConfig, upsertSplitConfig, listSplits, settleSplits,
@@ -42,6 +41,7 @@ export default function FinancePage() {
 }
 
 function SplitTab() {
+  const { message } = App.useApp();
   const [cfg, setCfg] = useState<any>(null);
   const [splits, setSplits] = useState<any[]>([]);
   const [salary, setSalary] = useState<any[]>([]);
@@ -54,6 +54,7 @@ function SplitTab() {
   });
   const [cfgOpen, setCfgOpen] = useState(false);
   const [cfgForm] = Form.useForm();
+  const [cfgSubmitting, setCfgSubmitting] = useState(false);
 
   const load = async () => {
     const [s, sa, c] = await Promise.all([
@@ -73,22 +74,14 @@ function SplitTab() {
   };
   const submitCfg = async () => {
     const v = await cfgForm.validateFields();
-    await upsertSplitConfig(v);
-    message.success('分账配置已更新');
-    setCfgOpen(false); load();
+    setCfgSubmitting(true);
+    try { await upsertSplitConfig(v); message.success('分账配置已更新'); setCfgOpen(false); load(); }
+    catch { /* 失败提示由请求层统一处理 */ } finally { setCfgSubmitting(false); }
   };
-  const onGenerate = async () => {
-    await generateSalary({ period });
-    message.success('工资单已生成');
-    load();
-  };
-  const onSettle = async () => {
-    await settleSplits({ period });
-    message.success('分账已结算');
-    load();
-  };
+  const onGenerate = async () => { await generateSalary({ period }); message.success('工资单已生成'); load(); };
+  const onSettle = async () => { await settleSplits({ period }); message.success('分账已结算'); load(); };
 
-  const splitCols = [
+  const splitCols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '周期', dataIndex: 'period', width: 80 },
     { title: '类型', dataIndex: 'type', width: 100, render: (v: string) => <Tag color={SPLIT_TYPE[v]?.color}>{SPLIT_TYPE[v]?.label}</Tag> },
@@ -97,8 +90,8 @@ function SplitTab() {
     { title: '分成率', dataIndex: 'rate', width: 80, render: (v: number) => `${(v * 100).toFixed(0)}%` },
     { title: '金额', dataIndex: 'amount', width: 100, render: (v: number) => `¥${v}` },
     { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={SPLIT_STATUS[v]?.color}>{SPLIT_STATUS[v]?.label}</Tag> },
-  ];
-  const salaryCols = [
+  ], []);
+  const salaryCols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '周期', dataIndex: 'period', width: 80 },
     { title: '教师', dataIndex: 'teacherId', width: 80 },
@@ -117,7 +110,7 @@ function SplitTab() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -136,7 +129,7 @@ function SplitTab() {
       <Table rowKey="id" size="small" dataSource={salary} columns={salaryCols}
         pagination={{ pageSize: 100, total: totalSa }} />
 
-      <Modal title="分账配置" open={cfgOpen} onOk={submitCfg} onCancel={() => setCfgOpen(false)} okText="保存" cancelText="取消">
+      <Modal title="分账配置" open={cfgOpen} confirmLoading={cfgSubmitting} onOk={submitCfg} onCancel={() => setCfgOpen(false)} okText="保存" cancelText="取消">
         <Form form={cfgForm} layout="vertical">
           <Form.Item name="teacherRate" label="教师课时提成率(0~1)" rules={[{ required: true }]}>
             <InputNumber step={0.05} min={0} max={1} style={{ width: '100%' }} />
@@ -154,6 +147,7 @@ function SplitTab() {
 }
 
 function InvoiceTab() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -161,6 +155,7 @@ function InvoiceTab() {
   const [orders, setOrders] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
+  const [invSubmitting, setInvSubmitting] = useState(false);
 
   const load = async () => {
     const r = await listInvoices({ page, size: 20 });
@@ -169,17 +164,19 @@ function InvoiceTab() {
   useEffect(() => {
     load();
     listStudents({ page: 1, size: 200 }).then((r) => setStudents(r.list)).catch(() => undefined);
+    listOrders?.({})?.catch?.(() => undefined);
     /* eslint-disable-next-line */
   }, [page]);
 
   const submit = async () => {
     const v = await form.validateFields();
-    await applyInvoice(v);
-    message.success('发票申请已提交');
-    setOpen(false); load();
+    setInvSubmitting(true);
+    try { await applyInvoice(v); message.success('发票申请已提交'); setOpen(false); load(); }
+    catch { /* 失败提示由请求层统一处理 */ } finally { setInvSubmitting(false); }
   };
 
-  const cols = [
+  const studentOpts = useMemo(() => students.map((s) => ({ value: s.id, label: s.name })), [students]);
+  const cols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '订单', dataIndex: 'orderId', width: 80 },
     { title: '学员', dataIndex: 'studentId', width: 90, render: (v: number) => students.find((s) => s.id === v)?.name || v },
@@ -196,7 +193,7 @@ function InvoiceTab() {
       ),
     },
     { title: '票号', dataIndex: 'invoiceNo', width: 130, render: (v: string) => v || '-' },
-  ];
+  ], [students]);
 
   return (
     <div>
@@ -207,13 +204,13 @@ function InvoiceTab() {
       <Table rowKey="id" size="small" dataSource={rows} columns={cols}
         pagination={{ current: page, pageSize: 20, total, onChange: setPage }} />
 
-      <Modal title="申请电子发票" open={open} onOk={submit} onCancel={() => setOpen(false)} okText="提交" cancelText="取消">
+      <Modal title="申请电子发票" open={open} confirmLoading={invSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="提交" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="orderId" label="订单ID" rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="studentId" label="学员" rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="label" options={students.map((s) => ({ value: s.id, label: s.name }))} />
+            <Select showSearch optionFilterProp="label" options={studentOpts} />
           </Form.Item>
           <Form.Item name="title" label="发票抬头" rules={[{ required: true }]}>
             <Input />
