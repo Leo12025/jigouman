@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Tag, Popconfirm, App } from 'antd';
 import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons';
-import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listRoles } from '../api/crm';
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listRoles, getTenantMe } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
 
 export default function UserPage() {
@@ -14,6 +14,7 @@ export default function UserPage() {
     remove: deleteUser,
   });
   const [roles, setRoles] = useState<any[]>([]);
+  const [tenantSlug, setTenantSlug] = useState<string>('');
   const [open, setOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -25,6 +26,8 @@ export default function UserPage() {
   useEffect(() => {
     load(1, size);
     listRoles().then(setRoles).catch(() => undefined);
+    // 当前租户短码，用于展示「用户名@域（租户）名」登录身份
+    getTenantMe().then((t) => setTenantSlug(t?.slug || '')).catch(() => undefined);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
 
@@ -44,7 +47,13 @@ export default function UserPage() {
 
   const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
-    { title: '账号', dataIndex: 'username', width: 140 },
+    { title: '账号', dataIndex: 'username', width: 120 },
+    {
+      title: '登录账号(全)',
+      width: 200,
+      render: (_: any, r: any) =>
+        tenantSlug ? `${r.username}@${tenantSlug}` : r.username,
+    },
     { title: '姓名', dataIndex: 'name', width: 120, render: (v: string) => v || '-' },
     { title: '手机号', dataIndex: 'phone', width: 130, render: (v: string) => v || '-' },
     { title: '角色', dataIndex: 'roles', render: (v: any[]) => (v || []).map((r) => <Tag key={r.id}>{r.name}</Tag>) },
@@ -60,7 +69,7 @@ export default function UserPage() {
         </Space>
       ),
     },
-  ], []);
+  ], [tenantSlug]);
 
   const submitPwd = async () => {
     const v = await pwdForm.validateFields();

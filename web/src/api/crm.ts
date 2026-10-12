@@ -20,7 +20,7 @@ export const login = (username: string, password: string) =>
   });
 
 export const fetchProfile = () =>
-  apiGet<{ id: number; username: string; name?: string; tenantId: number; roles: RoleInfo[]; permissions: string[]; orgName: string }>(
+  apiGet<{ id: number; username: string; name?: string; tenantId: number; roles: RoleInfo[]; permissions: string[]; orgName: string; tenantSlug?: string; tenantDomain?: string }>(
     '/auth/profile',
   );
 
@@ -361,6 +361,16 @@ export const orgTree = () => apiGet<any[]>('/orgs/tree');
 export const createOrg = (d: any) => apiPost<any>('/orgs', d);
 export const updateOrg = (id: number, d: any) => apiPut<any>(`/orgs/${id}`, d);
 export const deleteOrg = (id: number) => apiDelete(`/orgs/${id}`);
+
+// 平台钻取：代平台管理员管理某个租户（机构/总校区）的校区
+export const platformOrgTree = (tenantId: number) =>
+  apiGet<any[]>(`/platform/tenants/${tenantId}/orgs/tree`);
+export const platformCreateOrg = (tenantId: number, d: any) =>
+  apiPost<any>(`/platform/tenants/${tenantId}/orgs`, d);
+export const platformUpdateOrg = (tenantId: number, id: number, d: any) =>
+  apiPut<any>(`/platform/tenants/${tenantId}/orgs/${id}`, d);
+export const platformDeleteOrg = (tenantId: number, id: number) =>
+  apiDelete(`/platform/tenants/${tenantId}/orgs/${id}`);
 
 // 平台级租户中心（仅平台管理员）
 export const listTenants = (params: any) => apiGet<any[]>('/platform/tenants', params);

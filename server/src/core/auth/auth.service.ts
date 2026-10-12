@@ -124,10 +124,24 @@ export class AuthService {
     user.roles?.forEach((r) =>
       r.permissions?.forEach((p) => permissions.add(p.code)),
     );
+    // 透出租户域（slug/domain），供前端展示「用户名@域（租户）名」登录身份
+    let tenantSlug = process.env.DEFAULT_TENANT_SLUG || 'default';
+    let tenantDomain = process.env.DEFAULT_TENANT_DOMAIN || 'localhost';
+    try {
+      const t = await this.tenantService.get(tenantId);
+      if (t) {
+        tenantSlug = t.slug;
+        tenantDomain = t.domain || tenantDomain;
+      }
+    } catch {
+      // 租户元数据缺失时回退默认值，不影响主流程
+    }
     return {
       ...this.toUserInfo(user),
       permissions: [...permissions],
       orgName: process.env.DEFAULT_TENANT_NAME || '默认机构',
+      tenantSlug,
+      tenantDomain,
     };
   }
 

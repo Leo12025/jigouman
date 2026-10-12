@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, Popconfirm, Tag, App } from 'antd';
+import { Table, Button, Space, Modal, Form, Input, Select, Popconfirm, Tag, App, Drawer } from 'antd';
 import PageContainer from '../components/PageContainer';
+import OrgPage from './OrgPage';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listTenants, createTenant, updateTenant, deleteTenant } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
@@ -20,6 +21,9 @@ export default function TenantPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form] = Form.useForm();
+  // 平台钻取：代管某租户的校区
+  const [campusOpen, setCampusOpen] = useState(false);
+  const [campusTenant, setCampusTenant] = useState<any>(null);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
@@ -58,6 +62,7 @@ export default function TenantPage() {
     {
       title: '操作', render: (_: any, r: any) => (
         <Space>
+          <Button type="link" onClick={() => { setCampusTenant(r); setCampusOpen(true); }}>管理校区</Button>
           <Button type="link" onClick={() => openEdit(r)}>编辑</Button>
           <Popconfirm title="删除租户?" okText="删除" cancelText="取消" onConfirm={() => del(r.id)}>
             <Button type="link" danger>删除</Button>
@@ -90,6 +95,16 @@ export default function TenantPage() {
           <Form.Item name="config" label="配置(JSON，可选)"><Input.TextArea rows={3} placeholder='{"theme":"blue"}' /></Form.Item>
         </Form>
       </Modal>
+      <Drawer
+        open={campusOpen}
+        onClose={() => setCampusOpen(false)}
+        width={760}
+        title={`管理校区 - ${campusTenant?.name || ''}`}
+      >
+        {campusOpen && campusTenant && (
+          <OrgPage tenantId={campusTenant.id} tenantName={campusTenant.name} />
+        )}
+      </Drawer>
     </PageContainer>
   );
 }

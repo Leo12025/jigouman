@@ -19,6 +19,7 @@ import {
   ApiOutlined,
   HomeOutlined,
   LogoutOutlined,
+  ApartmentOutlined,
   DownOutlined,
   DollarOutlined,
   BellOutlined,
@@ -118,6 +119,7 @@ export default function MainLayout() {
     { key: '/', icon: <HomeOutlined />, label: '首页' },
     { key: '/dashboard', icon: <BarChartOutlined />, label: '数据看板' },
     { key: '/campus-overview', icon: <PartitionOutlined />, label: '跨校区对比' },
+    { key: '/orgs', icon: <ApartmentOutlined />, label: '校区管理' },
     { key: '/big-screen', icon: <FundProjectionScreenOutlined />, label: '数据大屏' },
     {
       key: 'group-course',
@@ -324,6 +326,9 @@ export default function MainLayout() {
                 <Space>
                   <Avatar size={20} icon={<UserOutlined />} />
                   <Text>{profile?.name || profile?.username || '未登录'}</Text>
+                  {profile?.tenantSlug ? (
+                    <Tag color="geekblue">{profile.username}@{profile.tenantSlug}</Tag>
+                  ) : null}
                   {profile?.roles?.length ? (
                     <Tag>{profile.roles.map((r: any) => r.name).join('/')}</Tag>
                   ) : null}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Not, Repository } from 'typeorm';
 import { Organization } from './entities/organization.entity';
@@ -14,7 +14,7 @@ export class OrgService {
   private readonly repo: Repository<Organization>;
   constructor(
     @InjectRepository(Organization) repo: Repository<Organization>,
-    private readonly tenantService: TenantService,
+    @Inject(forwardRef(() => TenantService)) private readonly tenantService: TenantService,
   ) {
     this.repo = orgRepo(repo);
   }
@@ -79,5 +79,22 @@ export class OrgService {
     await this.get(tenantId, id);
     await this.repo.softDelete({ tenantId, id } as any);
     return { id };
+  }
+
+  /**
+   * 确保租户存在「总校区(HQ)」根节点：租户即总校区，建租户时自动建根，幂等。
+   * 平台建租户或钻取管理校区时调用，避免每租户手动建 HQ。
+   */
+  async ensureHq(tenantId: number, name: string) {
+    const exist = await this.repo.findOne({ where: { tenantId, type: 'HQ' } as any });
+    if (exist) return exist;
+    const o = this.repo.create({
+      tenantId,
+      name,
+      type: 'HQ',
+      status: 'ACTIVE',
+      sort: 0,
+    } as Organization);
+    return this.repo.save(o as any);
   }
 }

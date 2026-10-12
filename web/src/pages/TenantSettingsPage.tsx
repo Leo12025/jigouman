@@ -87,7 +87,7 @@ export default function TenantSettingsPage() {
                   <Descriptions.Item label="有效期至">{meta?.expiresAt ? meta.expiresAt : '永久'}</Descriptions.Item>
                 </Descriptions>
                 <Typography.Paragraph type="secondary">
-                  短码、域名、校区额度与有效期由平台在「租户中心」统一配置，如需变更请联系平台运营。
+                  机构设置即本机构（总校区）级全局配置。校区/分校架构请在左侧「校区管理」维护；短码、域名、校区额度与有效期由平台在「租户中心」统一配置，如需变更请联系平台运营。
                 </Typography.Paragraph>
               </Form>
             ),
