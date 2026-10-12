@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Card } from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, Card, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   listClasses, createClass, updateClass, deleteClass, startClass, endClass,
@@ -10,32 +10,52 @@ const CLASS_COLOR: Record<string, string> = { SCHEDULED: 'default', LIVE: 'green
 const STUDY_COLOR: Record<string, string> = { PRESENT: 'green', LATE: 'gold', ABSENT: 'red' };
 
 export default function TeachingPage() {
+  const { message } = App.useApp();
   const [classes, setClasses] = useState<any[]>([]);
   const [clsTotal, setClsTotal] = useState(0);
   const [clsOpen, setClsOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [clsForm] = Form.useForm();
+  const [clsSubmitting, setClsSubmitting] = useState(false);
 
   const [study, setStudy] = useState<any[]>([]);
   const [studyClassId, setStudyClassId] = useState<number | undefined>();
   const [studyOpen, setStudyOpen] = useState(false);
   const [studyForm] = Form.useForm();
+  const [studySubmitting, setStudySubmitting] = useState(false);
   const [stats, setStats] = useState<any>(null);
 
-  const loadClasses = async () => {
+  const loadClasses = useCallback(async () => {
     const r = await listClasses({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 }));
     setClasses(r.list); setClsTotal(r.total);
-  };
-  const loadStudy = async (classId: number) => {
+  }, []);
+  const loadStudy = useCallback(async (classId: number) => {
     setStudyClassId(classId);
     const r = await listStudy(classId).catch(() => []);
     setStudy(r);
     const s = await studyStats(classId).catch(() => null);
     setStats(s);
-  };
+  }, []);
   useEffect(() => { loadClasses(); /* eslint-disable-next-line */ }, []);
 
-  const clsCols = [
+  const submitCls = async () => {
+    const v = await clsForm.validateFields();
+    setClsSubmitting(true);
+    try {
+      if (editing) await updateClass(editing.id, v); else await createClass(v);
+      message.success('已保存'); setClsOpen(false); loadClasses();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setClsSubmitting(false); }
+  };
+  const submitStudy = async () => {
+    const v = await studyForm.validateFields();
+    setStudySubmitting(true);
+    try {
+      await recordStudy(v);
+      message.success('已记录'); setStudyOpen(false); if (v.classId) loadStudy(v.classId);
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setStudySubmitting(false); }
+  };
+
+  const clsCols = useMemo(() => [
     { title: '标题', dataIndex: 'title' },
     { title: '讲师ID', dataIndex: 'teacherId' },
     { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={CLASS_COLOR[v] || 'default'}>{v}</Tag> },
@@ -48,14 +68,14 @@ export default function TeachingPage() {
         <Popconfirm title="删除?" okText="删除" cancelText="取消" onConfirm={async () => { await deleteClass(r.id); message.success('已删除'); loadClasses(); }}><Button type="link" danger size="small">删除</Button></Popconfirm>
       </Space>
     ) },
-  ];
+  ], [message, loadClasses]);
 
-  const studyCols = [
+  const studyCols = useMemo(() => [
     { title: '学员ID', dataIndex: 'studentId' },
     { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={STUDY_COLOR[v] || 'default'}>{v}</Tag> },
     { title: '时长(秒)', dataIndex: 'durationSec' },
     { title: '打卡时间', dataIndex: 'joinedAt', render: (v: string) => v || '-' },
-  ];
+  ], []);
 
   return (
     <div>
@@ -88,11 +108,7 @@ export default function TeachingPage() {
         },
       ]} />
 
-      <Modal title={editing ? '编辑课堂' : '创建课堂'} open={clsOpen} onOk={async () => {
-        const v = await clsForm.validateFields();
-        if (editing) await updateClass(editing.id, v); else await createClass(v);
-        message.success('已保存'); setClsOpen(false); loadClasses();
-      }} onCancel={() => setClsOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑课堂' : '创建课堂'} open={clsOpen} confirmLoading={clsSubmitting} onOk={submitCls} onCancel={() => setClsOpen(false)} okText="保存" cancelText="取消">
         <Form form={clsForm} layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true, message: '必填' }]}><Input /></Form.Item>
           <Form.Item name="teacherId" label="讲师ID" rules={[{ required: true }]}><InputNumber min={1} /></Form.Item>
@@ -104,11 +120,7 @@ export default function TeachingPage() {
         </Form>
       </Modal>
 
-      <Modal title="督学打卡" open={studyOpen} onOk={async () => {
-        const v = await studyForm.validateFields();
-        await recordStudy(v);
-        message.success('已记录'); setStudyOpen(false); if (v.classId) loadStudy(v.classId);
-      }} onCancel={() => setStudyOpen(false)} okText="打卡" cancelText="取消">
+      <Modal title="督学打卡" open={studyOpen} confirmLoading={studySubmitting} onOk={submitStudy} onCancel={() => setStudyOpen(false)} okText="打卡" cancelText="取消">
         <Form form={studyForm} layout="vertical">
           <Form.Item name="classId" label="课堂ID" rules={[{ required: true }]}><InputNumber min={1} /></Form.Item>
           <Form.Item name="studentId" label="学员ID" rules={[{ required: true }]}><InputNumber min={1} /></Form.Item>

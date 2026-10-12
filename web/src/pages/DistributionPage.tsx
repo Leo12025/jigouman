@@ -1,40 +1,59 @@
-import { useEffect, useState } from 'react';
-import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Card } from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, Card, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
-  listDistributors, createDistributor, updateDistributor, deleteDistributor, distributorTree,
-  recordCommission, listCommissions, settleCommission, distributionStats,
+  listDistributors, createDistributor, updateDistributor, deleteDistributor, recordCommission, listCommissions, settleCommission, distributionStats,
 } from '../api/crm';
 
 const STATUS_COLOR: Record<string, string> = { ACTIVE: 'green', INACTIVE: 'default' };
 
 export default function DistributionPage() {
+  const { message } = App.useApp();
   const [dists, setDists] = useState<any[]>([]);
   const [distTotal, setDistTotal] = useState(0);
   const [distOpen, setDistOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [distForm] = Form.useForm();
+  const [distSubmitting, setDistSubmitting] = useState(false);
 
   const [comms, setComms] = useState<any[]>([]);
   const [commDistId, setCommDistId] = useState<number | undefined>();
   const [commOpen, setCommOpen] = useState(false);
   const [commForm] = Form.useForm();
+  const [commSubmitting, setCommSubmitting] = useState(false);
   const [stats, setStats] = useState<any>(null);
 
-  const loadDists = async () => {
+  const loadDists = useCallback(async () => {
     const r = await listDistributors({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 }));
     setDists(r.list); setDistTotal(r.total);
-  };
-  const loadComms = async (distributorId: number) => {
+  }, []);
+  const loadComms = useCallback(async (distributorId: number) => {
     setCommDistId(distributorId);
     const r = await listCommissions(distributorId).catch(() => []);
     setComms(r);
     const s = await distributionStats().catch(() => null);
     setStats(s);
-  };
+  }, []);
   useEffect(() => { loadDists(); /* eslint-disable-next-line */ }, []);
 
-  const distCols = [
+  const submitDist = async () => {
+    const v = await distForm.validateFields();
+    setDistSubmitting(true);
+    try {
+      if (editing) await updateDistributor(editing.id, v); else await createDistributor(v);
+      message.success('已保存'); setDistOpen(false); loadDists();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setDistSubmitting(false); }
+  };
+  const submitComm = async () => {
+    const v = await commForm.validateFields();
+    setCommSubmitting(true);
+    try {
+      await recordCommission({ ...v, distributorId: commDistId });
+      message.success('已登记'); setCommOpen(false); if (commDistId) loadComms(commDistId);
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setCommSubmitting(false); }
+  };
+
+  const distCols = useMemo(() => [
     { title: '姓名', dataIndex: 'name' },
     { title: '邀请码', dataIndex: 'inviteCode' },
     { title: '等级', dataIndex: 'level' },
@@ -46,9 +65,9 @@ export default function DistributionPage() {
         <Popconfirm title="删除?" okText="删除" cancelText="取消" onConfirm={async () => { await deleteDistributor(r.id); message.success('已删除'); loadDists(); }}><Button type="link" danger size="small">删除</Button></Popconfirm>
       </Space>
     ) },
-  ];
+  ], [message, loadDists]);
 
-  const commCols = [
+  const commCols = useMemo(() => [
     { title: 'ID', dataIndex: 'id' },
     { title: '金额', dataIndex: 'amount' },
     { title: '订单ID', dataIndex: 'orderId', render: (v: number) => v || '-' },
@@ -59,7 +78,7 @@ export default function DistributionPage() {
         <Button type="link" size="small" danger disabled={r.status === 'CANCELLED'} onClick={async () => { await settleCommission(r.id, 'CANCELLED'); message.success('已作废'); if (commDistId) loadComms(commDistId); }}>作废</Button>
       </Space>
     ) },
-  ];
+  ], [message, loadComms, commDistId]);
 
   return (
     <div>
@@ -93,11 +112,7 @@ export default function DistributionPage() {
         },
       ]} />
 
-      <Modal title={editing ? '编辑分销员' : '新增分销员'} open={distOpen} onOk={async () => {
-        const v = await distForm.validateFields();
-        if (editing) await updateDistributor(editing.id, v); else await createDistributor(v);
-        message.success('已保存'); setDistOpen(false); loadDists();
-      }} onCancel={() => setDistOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑分销员' : '新增分销员'} open={distOpen} confirmLoading={distSubmitting} onOk={submitDist} onCancel={() => setDistOpen(false)} okText="保存" cancelText="取消">
         <Form form={distForm} layout="vertical">
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '必填' }]}><Input /></Form.Item>
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
@@ -108,11 +123,7 @@ export default function DistributionPage() {
         </Form>
       </Modal>
 
-      <Modal title="登记佣金" open={commOpen} onOk={async () => {
-        const v = await commForm.validateFields();
-        await recordCommission({ ...v, distributorId: commDistId });
-        message.success('已登记'); setCommOpen(false); if (commDistId) loadComms(commDistId);
-      }} onCancel={() => setCommOpen(false)} okText="保存" cancelText="取消">
+      <Modal title="登记佣金" open={commOpen} confirmLoading={commSubmitting} onOk={submitComm} onCancel={() => setCommOpen(false)} okText="保存" cancelText="取消">
         <Form form={commForm} layout="vertical">
           <Form.Item name="amount" label="佣金金额" rules={[{ required: true }]}><InputNumber min={0} /></Form.Item>
           <Form.Item name="orderId" label="关联订单ID"><InputNumber min={1} /></Form.Item>

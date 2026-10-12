@@ -1,27 +1,25 @@
-import { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tag } from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Table, Button, Space, Modal, Form, Input, Select, Popconfirm, Tag, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { listTenants, createTenant, updateTenant, deleteTenant } from '../api/crm';
+import { useCrud } from '../hooks/useCrud';
 
-/** 平台级租户中心（§2.2 多租户）：仅平台管理员可见，管理租户与域名映射 */
 export default function TenantPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { message } = App.useApp();
+  const fetchList = useCallback(async () => {
+    const list = await listTenants({});
+    return { list: list || [], total: (list || []).length };
+  }, []);
+  const { rows, loading, submitting, load, save, del } = useCrud({
+    list: fetchList,
+    create: createTenant,
+    update: updateTenant,
+    remove: deleteTenant,
+  });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form] = Form.useForm();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const r = await listTenants({});
-      setRows(r || []);
-    } catch {
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   const openCreate = () => {
@@ -33,7 +31,10 @@ export default function TenantPage() {
   const openEdit = (r: any) => {
     setEditing(r);
     form.resetFields();
-    form.setFieldsValue({ slug: r.slug, domain: r.domain || '', name: r.name, status: r.status, maxCampuses: r.maxCampuses ?? '', expiresAt: r.expiresAt || '', config: r.config || '' });
+    form.setFieldsValue({
+      slug: r.slug, domain: r.domain || '', name: r.name, status: r.status,
+      maxCampuses: r.maxCampuses ?? '', expiresAt: r.expiresAt || '', config: r.config || '',
+    });
     setOpen(true);
   };
   const submit = async () => {
@@ -41,53 +42,41 @@ export default function TenantPage() {
     const payload: any = { ...v };
     if (payload.maxCampuses === '' || payload.maxCampuses == null) delete payload.maxCampuses;
     if (payload.expiresAt === '') delete payload.expiresAt;
-    if (editing) {
-      await updateTenant(editing.id, payload);
-      message.success('已保存');
-    } else {
-      await createTenant(payload);
-      message.success('创建成功');
-    }
-    setOpen(false);
-    load();
+    const ok = await save(editing, payload);
+    if (ok) setOpen(false);
   };
+
+  const columns = useMemo(() => [
+    { title: 'ID', dataIndex: 'id', width: 90 },
+    { title: '名称', dataIndex: 'name' },
+    { title: '短码(slug)', dataIndex: 'slug' },
+    { title: '域名', dataIndex: 'domain', render: (d: string) => d || <Tag>未绑定</Tag> },
+    { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={s === 'ACTIVE' ? 'green' : 'red'}>{s === 'ACTIVE' ? '启用' : '停用'}</Tag> },
+    { title: '校区额度', dataIndex: 'maxCampuses', render: (v: number) => (v == null ? '不限' : v) },
+    { title: '有效期至', dataIndex: 'expiresAt', render: (v: string) => (v ? v : '永久') },
+    {
+      title: '操作', render: (_: any, r: any) => (
+        <Space>
+          <Button type="link" onClick={() => openEdit(r)}>编辑</Button>
+          <Popconfirm title="删除租户?" okText="删除" cancelText="取消" onConfirm={() => del(r.id)}>
+            <Button type="link" danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ], []);
 
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+        <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建租户</Button>
       </Space>
       <Table
-        rowKey="id"
-        loading={loading}
-        dataSource={rows}
-        columns={[
-          { title: 'ID', dataIndex: 'id', width: 90 },
-          { title: '名称', dataIndex: 'name' },
-          { title: '短码(slug)', dataIndex: 'slug' },
-          { title: '域名', dataIndex: 'domain', render: (d: string) => d || <Tag>未绑定</Tag> },
-          {
-            title: '状态',
-            dataIndex: 'status',
-            render: (s: string) => <Tag color={s === 'ACTIVE' ? 'green' : 'red'}>{s === 'ACTIVE' ? '启用' : '停用'}</Tag>,
-          },
-          { title: '校区额度', dataIndex: 'maxCampuses', render: (v: number) => (v == null ? '不限' : v) },
-          { title: '有效期至', dataIndex: 'expiresAt', render: (v: string) => (v ? v : '永久') },
-          {
-            title: '操作',
-            render: (_: any, r: any) => (
-              <Space>
-                <Button type="link" onClick={() => openEdit(r)}>编辑</Button>
-                <Popconfirm title="删除租户?" okText="删除" cancelText="取消" onConfirm={async () => { await deleteTenant(r.id); message.success('已删除'); load(); }}>
-                  <Button type="link" danger>删除</Button>
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
+        rowKey="id" loading={loading} dataSource={rows} columns={columns}
+        pagination={false}
       />
-      <Modal title={editing ? '编辑租户' : '新建租户'} open={open} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑租户' : '新建租户'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="机构名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
           <Form.Item name="slug" label="短码(slug，子域名用)" rules={[{ required: true, message: '请输入短码' }]}><Input placeholder="如 acme" /></Form.Item>
