@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Tag, Modal, Form, Input, InputNumber, Select, Space, message,
+  Table, Button, Tag, Modal, Form, Input, InputNumber, Select, Space, App,
   Descriptions, Divider, Statistic, Card, Row, Col, Empty,
 } from 'antd';
 import {
   createHomework, listHomeworks, getHomework, reviewHomework, homeworkStats, homeworkUnsubmitted,
 } from '../api/crm';
+import { formatDateTime } from '../utils/format';
 
 const HW_STATUS: Record<string, { label: string; color: string }> = {
   DRAFT: { label: '草稿', color: 'default' },
@@ -14,11 +15,14 @@ const HW_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function HomeworkPage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [classGroupId, setClassGroupId] = useState<number | undefined>();
   const [open, setOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [form] = Form.useForm();
 
   // 详情 / 批改 / 统计 / 未提交
@@ -38,16 +42,19 @@ export default function HomeworkPage() {
 
   const submitCreate = async () => {
     const v = await form.validateFields();
-    await createHomework({
-      classGroupId: v.classGroupId,
-      lessonId: v.lessonId,
-      courseId: v.courseId,
-      title: v.title,
-      content: v.content,
-      deadline: v.deadline || undefined,
-    });
-    message.success('作业已布置');
-    setOpen(false); load(1);
+    setCreateSubmitting(true);
+    try {
+      await createHomework({
+        classGroupId: v.classGroupId,
+        lessonId: v.lessonId,
+        courseId: v.courseId,
+        title: v.title,
+        content: v.content,
+        deadline: v.deadline || undefined,
+      });
+      message.success('作业已布置');
+      setOpen(false); load(1);
+    } finally { setCreateSubmitting(false); }
   };
 
   const openDetail = async (id: number) => {
@@ -57,14 +64,17 @@ export default function HomeworkPage() {
 
   const submitReview = async () => {
     const v = await reviewForm.validateFields();
-    await reviewHomework(reviewFor.id, v);
-    message.success('批改已提交');
-    setReviewFor(null);
-    if (detail) {
-      const d = await getHomework(detail.id);
-      setDetail(d);
-    }
-    load();
+    setReviewSubmitting(true);
+    try {
+      await reviewHomework(reviewFor.id, v);
+      message.success('批改已提交');
+      setReviewFor(null);
+      if (detail) {
+        const d = await getHomework(detail.id);
+        setDetail(d);
+      }
+      load();
+    } finally { setReviewSubmitting(false); }
   };
 
   const showStats = async (id: number) => {
@@ -76,12 +86,12 @@ export default function HomeworkPage() {
     setPending(p); setPendingOpen(true);
   };
 
-  const cols = [
+  const cols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '标题', dataIndex: 'title', width: 180 },
     { title: '班级', dataIndex: 'classGroupId', width: 80 },
     { title: '课次', dataIndex: 'lessonId', width: 80, render: (v: number) => v || '-' },
-    { title: '截止', dataIndex: 'deadline', width: 150, render: (v: string) => (v ? new Date(v).toLocaleString() : '-') },
+    { title: '截止', dataIndex: 'deadline', width: 150, render: (v: string) => formatDateTime(v) },
     { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={HW_STATUS[v]?.color}>{HW_STATUS[v]?.label}</Tag> },
     {
       title: '操作', width: 260,
@@ -93,12 +103,12 @@ export default function HomeworkPage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
-  const submitCols = [
+  const submitCols = useMemo(() => [
     { title: '学员', dataIndex: 'studentId', width: 90 },
     { title: '内容', dataIndex: 'content', width: 160, render: (v: string) => v || '-' },
-    { title: '提交时间', dataIndex: 'submitAt', width: 140, render: (v: string) => (v ? new Date(v).toLocaleString() : '-') },
+    { title: '提交时间', dataIndex: 'submitAt', width: 140, render: (v: string) => formatDateTime(v) },
     { title: '逾期', dataIndex: 'isLate', width: 70, render: (v: number) => (v ? <Tag color="red">逾期</Tag> : <Tag color="green">按时</Tag>) },
     {
       title: '评分', width: 90,
@@ -112,7 +122,7 @@ export default function HomeworkPage() {
         </Button>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -126,7 +136,7 @@ export default function HomeworkPage() {
         pagination={{ current: page, pageSize: 20, total, onChange: load }} />
 
       {/* 布置作业 */}
-      <Modal title="布置作业" open={open} onOk={submitCreate} onCancel={() => setOpen(false)} okText="布置" cancelText="取消" width={560}>
+      <Modal title="布置作业" open={open} confirmLoading={createSubmitting} onOk={submitCreate} onCancel={() => setOpen(false)} okText="布置" cancelText="取消" width={560}>
         <Form form={form} layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
           <Form.Item name="content" label="内容"><Input.TextArea rows={3} /></Form.Item>
@@ -145,7 +155,7 @@ export default function HomeworkPage() {
             <Descriptions size="small" column={2} bordered>
               <Descriptions.Item label="班级">{detail.classGroupId || '-'}</Descriptions.Item>
               <Descriptions.Item label="课次">{detail.lessonId || '-'}</Descriptions.Item>
-              <Descriptions.Item label="截止">{detail.deadline ? new Date(detail.deadline).toLocaleString() : '-'}</Descriptions.Item>
+              <Descriptions.Item label="截止">{formatDateTime(detail.deadline)}</Descriptions.Item>
               <Descriptions.Item label="状态">{detail.status}</Descriptions.Item>
               <Descriptions.Item label="内容" span={2}>{detail.content || '-'}</Descriptions.Item>
             </Descriptions>
@@ -158,7 +168,7 @@ export default function HomeworkPage() {
       </Modal>
 
       {/* 批改 */}
-      <Modal title="批改作业" open={!!reviewFor} onOk={submitReview} onCancel={() => setReviewFor(null)} okText="提交批改" cancelText="取消">
+      <Modal title="批改作业" open={!!reviewFor} confirmLoading={reviewSubmitting} onOk={submitReview} onCancel={() => setReviewFor(null)} okText="提交批改" cancelText="取消">
         <Form form={reviewForm} layout="vertical">
           <Form.Item name="score" label="得分"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
           <Form.Item name="comment" label="评语"><Input.TextArea rows={3} /></Form.Item>

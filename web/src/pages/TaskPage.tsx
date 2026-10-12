@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Tag, Select, Space, message, Popconfirm, Card, Row, Col, Radio, Modal, Input,
+  Table, Button, Tag, Select, Space, Popconfirm, Card, Row, Col, Radio, Modal, Input, App,
 } from 'antd';
 import { AuditOutlined } from '@ant-design/icons';
 import {
@@ -8,6 +8,7 @@ import {
   approveApproval, rejectApproval, createApproval,
   listApprovalFlows, listAllUsers, TASK_TYPE_LABELS,
 } from '../api/crm';
+import { formatDateTime } from '../utils/format';
 
 const STATUS_OPTS = [
   { value: 'TODO', label: '待办' },
@@ -15,6 +16,7 @@ const STATUS_OPTS = [
 ];
 
 export default function TaskPage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -26,6 +28,7 @@ export default function TaskPage() {
 
   // 发起审批
   const [createOpen, setCreateOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
   const [flows, setFlows] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [bizType, setBizType] = useState('REFUND');
@@ -47,6 +50,7 @@ export default function TaskPage() {
   const submitApproval = async () => {
     if (!title.trim()) return message.warning('请填写审批标题');
     if (!flowId && !approverIds.length) return message.warning('请选择审批流或手动指定审批人');
+    setCreateSubmitting(true);
     try {
       await createApproval({
         bizType, title: title.trim(),
@@ -55,7 +59,7 @@ export default function TaskPage() {
       message.success('审批已发起');
       setCreateOpen(false);
       load(1);
-    } catch { /* ignore */ }
+    } finally { setCreateSubmitting(false); }
   };
 
   const load = async (p = page) => {
@@ -88,7 +92,7 @@ export default function TaskPage() {
     return <span style={{ color: 'rgba(0,0,0,.45)' }}>剩 {r.overdueHours}h</span>;
   };
 
-  const cols = [
+  const cols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '类型', dataIndex: 'type', width: 100, render: typeRender },
     { title: '标题', dataIndex: 'title', width: 200 },
@@ -99,7 +103,7 @@ export default function TaskPage() {
     },
     {
       title: '截止', dataIndex: 'dueAt', width: 150,
-      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
+      render: (v: string) => formatDateTime(v),
     },
     { title: '逾期', width: 130, render: overdueRender },
     {
@@ -127,7 +131,8 @@ export default function TaskPage() {
         </Space>
       ),
     },
-  ];
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], []);
 
   return (
     <div>
@@ -185,7 +190,7 @@ export default function TaskPage() {
       <Table rowKey="id" size="small" dataSource={rows} columns={cols}
         pagination={{ current: page, pageSize: 20, total, onChange: load }} />
 
-      <Modal title="发起审批" open={createOpen} onOk={submitApproval} onCancel={() => setCreateOpen(false)}>
+      <Modal title="发起审批" open={createOpen} confirmLoading={createSubmitting} onOk={submitApproval} onCancel={() => setCreateOpen(false)}>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <div>
             <div style={{ marginBottom: 4 }}>业务类型</div>

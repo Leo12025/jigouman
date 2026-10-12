@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, TimePicker, Tag, message, Popconfirm, Alert, Radio, Empty,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, DatePicker, TimePicker, Tag, Popconfirm, Alert, Radio, Empty, App,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { listLessons, createLesson, updateLesson, deleteLesson, generateLessons, listClassGroups, listCourses, listClassGroupStudents, attendLesson, listStudents, scheduleMakeup } from '../api/crm';
+import { formatDateTime } from '../utils/format';
 
 const { RangePicker } = DatePicker;
 
@@ -13,6 +14,7 @@ const LESSON_STATUS: Record<string, string> = {
 };
 
 export default function LessonPage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -30,6 +32,10 @@ export default function LessonPage() {
   const [attendStudents, setAttendStudents] = useState<any[]>([]);
   const [makeupOpen, setMakeupOpen] = useState(false);
   const [makeupStudents, setMakeupStudents] = useState<any[]>([]);
+  const [saveSubmitting, setSaveSubmitting] = useState(false);
+  const [genSubmitting, setGenSubmitting] = useState(false);
+  const [attendSubmitting, setAttendSubmitting] = useState(false);
+  const [makeupSubmitting, setMakeupSubmitting] = useState(false);
   const [form] = Form.useForm();
   const [genForm] = Form.useForm();
   const [makeupForm] = Form.useForm();
@@ -60,24 +66,30 @@ export default function LessonPage() {
       startTime: v.range[0].toISOString(),
       endTime: v.range[1].toISOString(),
     };
-    if (editing) { await updateLesson(editing.id, payload); message.success('已保存'); }
-    else { await createLesson(payload); message.success('排课成功'); }
-    setOpen(false); load();
+    setSaveSubmitting(true);
+    try {
+      if (editing) { await updateLesson(editing.id, payload); message.success('已保存'); }
+      else { await createLesson(payload); message.success('排课成功'); }
+      setOpen(false); load();
+    } finally { setSaveSubmitting(false); }
   };
 
   const submitGen = async () => {
     const v = await genForm.validateFields();
-    const res = await generateLessons({
-      classGroupId: v.classGroupId,
-      startDate: v.range[0].format('YYYY-MM-DD'),
-      endDate: v.range[1].format('YYYY-MM-DD'),
-      teacherId: v.teacherId,
-      roomId: v.roomId,
-      slots: [{ weekday: v.weekday, start: v.time[0].format('HH:mm'), end: v.time[1].format('HH:mm') }],
-    });
-    setGenResult(res);
-    message.success(`生成 ${res.createdCount} 条，跳过 ${res.skippedCount} 条`);
-    load();
+    setGenSubmitting(true);
+    try {
+      const res = await generateLessons({
+        classGroupId: v.classGroupId,
+        startDate: v.range[0].format('YYYY-MM-DD'),
+        endDate: v.range[1].format('YYYY-MM-DD'),
+        teacherId: v.teacherId,
+        roomId: v.roomId,
+        slots: [{ weekday: v.weekday, start: v.time[0].format('HH:mm'), end: v.time[1].format('HH:mm') }],
+      });
+      setGenResult(res);
+      message.success(`生成 ${res.createdCount} 条，跳过 ${res.skippedCount} 条`);
+      load();
+    } finally { setGenSubmitting(false); }
   };
 
   const openAttend = async (r: any) => {
@@ -92,12 +104,15 @@ export default function LessonPage() {
   };
   const submitAttend = async () => {
     if (!attendLessonId) return;
-    const res = await attendLesson(attendLessonId, {
-      records: attendStudents.map((s) => ({ studentId: s.id, status: s.status })),
-    });
-    message.success(`点名完成，已消课 ${res.filter((a: any) => a.hours > 0).length} 人`);
-    setAttendOpen(false);
-    load();
+    setAttendSubmitting(true);
+    try {
+      const res = await attendLesson(attendLessonId, {
+        records: attendStudents.map((s) => ({ studentId: s.id, status: s.status })),
+      });
+      message.success(`点名完成，已消课 ${res.filter((a: any) => a.hours > 0).length} 人`);
+      setAttendOpen(false);
+      load();
+    } finally { setAttendSubmitting(false); }
   };
 
   const openMakeup = async () => {
@@ -110,26 +125,29 @@ export default function LessonPage() {
   };
   const submitMakeup = async () => {
     const v = await makeupForm.validateFields();
-    await scheduleMakeup({
-      studentId: v.studentId,
-      courseId: v.courseId,
-      classGroupId: v.classGroupId,
-      teacherId: v.teacherId,
-      startTime: v.range[0].toISOString(),
-      endTime: v.range[1].toISOString(),
-    });
-    message.success('补课已排课，点名时占用可用课时');
-    setMakeupOpen(false);
-    load();
+    setMakeupSubmitting(true);
+    try {
+      await scheduleMakeup({
+        studentId: v.studentId,
+        courseId: v.courseId,
+        classGroupId: v.classGroupId,
+        teacherId: v.teacherId,
+        startTime: v.range[0].toISOString(),
+        endTime: v.range[1].toISOString(),
+      });
+      message.success('补课已排课，点名时占用可用课时');
+      setMakeupOpen(false);
+      load();
+    } finally { setMakeupSubmitting(false); }
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '班级', dataIndex: 'classGroupId', width: 120, render: (v: number) => groupName(v) },
     { title: '老师', dataIndex: 'teacherId', width: 80, render: (v: number) => v ?? '-' },
     { title: '教室', dataIndex: 'roomId', width: 80, render: (v: number) => v ?? '-' },
-    { title: '开始', dataIndex: 'startTime', width: 170, render: (v: string) => (v ? new Date(v).toLocaleString() : '-') },
-    { title: '结束', dataIndex: 'endTime', width: 170, render: (v: string) => (v ? new Date(v).toLocaleString() : '-') },
+    { title: '开始', dataIndex: 'startTime', width: 170, render: (v: string) => formatDateTime(v) },
+    { title: '结束', dataIndex: 'endTime', width: 170, render: (v: string) => formatDateTime(v) },
     { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag>{LESSON_STATUS[v] || v}</Tag> },
     {
       title: '操作', width: 140, render: (_: any, r: any) => (
@@ -142,7 +160,8 @@ export default function LessonPage() {
         </Space>
       ),
     },
-  ];
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], [groups]);
 
   return (
     <div>
@@ -160,7 +179,7 @@ export default function LessonPage() {
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
         onChange={(p, s) => load(p.current, p.pageSize || size)} />
 
-      <Modal title={editing ? '调课' : '单条排课'} open={open} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '调课' : '单条排课'} open={open} confirmLoading={saveSubmitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="classGroupId" label="班级" rules={[{ required: true, message: '请选择班级' }]}>
             <Select showSearch optionFilterProp="label" options={groups.map((g) => ({ value: g.id, label: g.name }))} />
@@ -176,7 +195,7 @@ export default function LessonPage() {
         </Form>
       </Modal>
 
-      <Modal title="按周批量生成课次" open={genOpen} onOk={submitGen} onCancel={() => setGenOpen(false)} okText="生成" cancelText="取消" width={560}>
+      <Modal title="按周批量生成课次" open={genOpen} confirmLoading={genSubmitting} onOk={submitGen} onCancel={() => setGenOpen(false)} okText="生成" cancelText="取消" width={560}>
         <Alert type="info" showIcon style={{ marginBottom: 12 }}
           message="按指定星期与时间，在日期区间内逐周生成课次；与已有课次冲突的时段会自动跳过。" />
         <Form form={genForm} layout="vertical"
@@ -211,7 +230,7 @@ export default function LessonPage() {
       </Modal>
 
       {/* 点名消课 */}
-      <Modal title="课次点名消课" open={attendOpen} width={560} onOk={submitAttend} onCancel={() => setAttendOpen(false)} okText="确认点名" cancelText="取消">
+      <Modal title="课次点名消课" open={attendOpen} width={560} confirmLoading={attendSubmitting} onOk={submitAttend} onCancel={() => setAttendOpen(false)} okText="确认点名" cancelText="取消">
         {attendStudents.length ? (
           <div>
             {attendStudents.map((s) => (
@@ -238,7 +257,7 @@ export default function LessonPage() {
       </Modal>
 
       {/* 补课排课（§4.6 请假补课） */}
-      <Modal title="补课排课" open={makeupOpen} width={560} onOk={submitMakeup} onCancel={() => setMakeupOpen(false)} okText="排课" cancelText="取消">
+      <Modal title="补课排课" open={makeupOpen} width={560} confirmLoading={makeupSubmitting} onOk={submitMakeup} onCancel={() => setMakeupOpen(false)} okText="排课" cancelText="取消">
         <Form form={makeupForm} layout="vertical">
           <Form.Item name="studentId" label="学员" rules={[{ required: true, message: '请选择学员' }]}>
             <Select showSearch optionFilterProp="label" options={makeupStudents.map((s) => ({ value: s.id, label: s.name }))} />

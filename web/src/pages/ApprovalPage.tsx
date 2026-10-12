@@ -93,7 +93,7 @@ export default function ApprovalPage() {
       </Space>
       <Table
         rowKey="id" loading={loading} dataSource={rows} columns={columns}
-        pagination={tab === 'todo' ? false : { current: page, total, pageSize: size, onChange: (p, s) => load(p, s?.pageSize || size) }}
+        pagination={tab === 'todo' ? false : { current: page, total, pageSize: size, onChange: (p, s) => load(p, s || size) }}
         size="small"
       />
       <Modal

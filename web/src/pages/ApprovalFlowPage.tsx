@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, Select, Switch, Tag, message,
-  Popconfirm, Card,
+  Table, Button, Space, Modal, Form, Input, Select, Switch, Tag, Popconfirm, Card, App,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import {
@@ -17,6 +16,7 @@ interface NodeRow {
 }
 
 export default function ApprovalFlowPage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -111,10 +111,10 @@ export default function ApprovalFlowPage() {
     catch { /* ignore */ }
   };
 
-  const userOpts = users.map((u) => ({ value: u.id, label: u.name || u.username }));
-  const roleOpts = roles.map((r) => ({ value: r.code, label: r.name }));
+  const userOpts = useMemo(() => users.map((u) => ({ value: u.id, label: u.name || u.username })), [users]);
+  const roleOpts = useMemo(() => roles.map((r) => ({ value: r.code, label: r.name })), [roles]);
 
-  const cols = [
+  const cols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '业务类型', dataIndex: 'bizType', width: 120 },
     { title: '名称', dataIndex: 'name', width: 160 },
@@ -137,7 +137,7 @@ export default function ApprovalFlowPage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>

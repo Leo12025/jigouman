@@ -164,7 +164,6 @@ function InvoiceTab() {
   useEffect(() => {
     load();
     listStudents({ page: 1, size: 200 }).then((r) => setStudents(r.list)).catch(() => undefined);
-    listOrders?.({})?.catch?.(() => undefined);
     /* eslint-disable-next-line */
   }, [page]);
 

@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, message, Tabs,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Tabs, App,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import {
   listHourAccounts, listHourConsumptions, grantHours, listStudents, listCourses,
 } from '../api/crm';
+import { formatDateTime } from '../utils/format';
 
 const ACCT_TYPE: Record<string, string> = { ONE_ON_ONE: '一对一', CLASS: '班课', GENERAL: '通用储值' };
 const CONSUME_TYPE: Record<string, { label: string; color: string }> = {
@@ -18,6 +19,7 @@ const CONSUME_TYPE: Record<string, { label: string; color: string }> = {
 const LOW_BALANCE = 2;
 
 export default function HourPage() {
+  const { message } = App.useApp();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [consumptions, setConsumptions] = useState<any[]>([]);
   const [totalAcc, setTotalAcc] = useState(0);
@@ -26,6 +28,7 @@ export default function HourPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [grantSubmitting, setGrantSubmitting] = useState(false);
   const [form] = Form.useForm();
 
   const studentName = (id?: number) => students.find((s) => s.id === id)?.name || id;
@@ -49,12 +52,15 @@ export default function HourPage() {
 
   const submitGrant = async () => {
     const v = await form.validateFields();
-    await grantHours(v);
-    message.success('已发放课时');
-    setOpen(false); load();
+    setGrantSubmitting(true);
+    try {
+      await grantHours(v);
+      message.success('已发放课时');
+      setOpen(false); load();
+    } finally { setGrantSubmitting(false); }
   };
 
-  const accColumns = [
+  const accColumns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '学员', dataIndex: 'studentId', width: 110, render: (v: number) => studentName(v) },
     { title: '课程', dataIndex: 'courseId', width: 140, render: (v: number) => courseName(v) },
@@ -65,17 +71,19 @@ export default function HourPage() {
     },
     { title: '冻结', dataIndex: 'frozen', width: 70 },
     { title: '累计发放', dataIndex: 'totalGranted', width: 90 },
-  ];
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], [students, courses]);
 
-  const conColumns = [
+  const conColumns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '学员', dataIndex: 'studentId', width: 110, render: (v: number) => studentName(v) },
     { title: '课程', dataIndex: 'courseId', width: 140, render: (v: number) => courseName(v) },
     { title: '类型', dataIndex: 'type', width: 90, render: (v: string) => <Tag color={CONSUME_TYPE[v]?.color}>{CONSUME_TYPE[v]?.label}</Tag> },
     { title: '课时', dataIndex: 'hours', width: 80, render: (v: number) => (v > 0 ? `+${v}` : v) },
     { title: '备注', dataIndex: 'remark', render: (v: string) => v || '-' },
-    { title: '时间', dataIndex: 'createdAt', width: 170, render: (v: string) => (v ? new Date(v).toLocaleString() : '-') },
-  ];
+    { title: '时间', dataIndex: 'createdAt', width: 170, render: (v: string) => formatDateTime(v) },
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  ], [students, courses]);
 
   return (
     <div>
@@ -101,7 +109,7 @@ export default function HourPage() {
         ]}
       />
 
-      <Modal title="手动发放课时" open={open} onOk={submitGrant} onCancel={() => setOpen(false)} okText="发放" cancelText="取消">
+      <Modal title="手动发放课时" open={open} confirmLoading={grantSubmitting} onOk={submitGrant} onCancel={() => setOpen(false)} okText="发放" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="studentId" label="学员" rules={[{ required: true, message: '请选择学员' }]}>
             <Select showSearch optionFilterProp="label" options={students.map((s) => ({ value: s.id, label: s.name }))} />
