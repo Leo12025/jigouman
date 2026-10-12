@@ -16,6 +16,10 @@ export interface AuthUser {
   kind?: 'staff' | 'parent';
   /** 家长手机号（kind=parent 时有值） */
   phone?: string;
+  /** 归属校区 id 列表（空/未定义=租户内全部校区可见）；用于校区级作用域校验 */
+  orgIds?: number[];
+  /** 数据范围：all/org/org_and_below/self（取用户角色中最宽的），用于注入查询过滤 */
+  dataScope?: 'all' | 'org' | 'org_and_below' | 'self';
 }
 
 export const CurrentUser = createParamDecorator(

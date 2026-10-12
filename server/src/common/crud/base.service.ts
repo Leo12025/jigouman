@@ -8,6 +8,7 @@ import { PageQueryDto, PageResult } from '../dto/pagination.dto';
 import { BusinessException } from '../exceptions/business.exception';
 import { ResCode } from '../constants/response-code';
 import { getOrgId } from '../org-context';
+import { resolveOrgFilter } from '../org-scope';
 
 /**
  * 多租户 + 多校区 CRUD 基类：
@@ -19,16 +20,11 @@ import { getOrgId } from '../org-context';
 export class BaseService<T extends BaseEntity> {
   constructor(public readonly repo: Repository<T>) {}
 
-  /** 当前实体是否带有 org_id 校区列 */
-  private hasOrgColumn(): boolean {
-    return this.repo.metadata.columns.some((c) => c.propertyName === 'orgId');
-  }
-
-  /** 合并校区上下文：仅在实体有 org_id 列且当前请求携带 orgId 时追加过滤/落章 */
+  /** 合并校区上下文：受 orgScopeAll / orgScopeSet(子树) / 单校区 三层优先级约束 */
   private scopeOrg(extra: Record<string, any> = {}): Record<string, any> {
-    const orgId = getOrgId();
-    if (orgId == null || !this.hasOrgColumn()) return extra;
-    return { ...extra, orgId };
+    const f = resolveOrgFilter(this.repo);
+    if (!f || Object.keys(f).length === 0) return extra;
+    return { ...extra, ...f };
   }
 
   protected withTenant(tenantId: number, extra: FindOptionsWhere<T> = {}) {
@@ -83,7 +79,7 @@ export class BaseService<T extends BaseEntity> {
   async create(tenantId: number, dto: Partial<T>): Promise<T> {
     const entity: any = this.repo.create({ ...(dto as any), tenantId });
     const orgId = getOrgId();
-    if (orgId != null && this.hasOrgColumn()) entity.orgId = orgId;
+    if (orgId != null && resolveOrgFilter(this.repo) != null) entity.orgId = orgId;
     return (await this.repo.save(entity)) as unknown as T;
   }
 
@@ -91,7 +87,7 @@ export class BaseService<T extends BaseEntity> {
     const e = await this.findOne(tenantId, id);
     Object.assign(e, dto);
     const orgId = getOrgId();
-    if (orgId != null && this.hasOrgColumn()) (e as any).orgId = orgId;
+    if (orgId != null && resolveOrgFilter(this.repo) != null) (e as any).orgId = orgId;
     return (await this.repo.save(e)) as unknown as T;
   }
 

@@ -15,6 +15,8 @@ export class CreateUserDto {
   @IsOptional() @IsInt() status?: number;
   /** 角色 ID 列表 */
   @IsOptional() @IsArray() roleIds?: number[];
+  /** 归属校区 id 列表（空/不传=租户内全部校区可见） */
+  @IsOptional() @IsArray() @IsInt({ each: true }) orgIds?: number[];
 }
 
 export class UpdateUserDto {
@@ -23,6 +25,8 @@ export class UpdateUserDto {
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsInt() status?: number;
   @IsOptional() @IsArray() roleIds?: number[];
+  /** 归属校区 id 列表（空/不传=租户内全部校区可见） */
+  @IsOptional() @IsArray() @IsInt({ each: true }) orgIds?: number[];
 }
 
 export class ResetPasswordDto {
@@ -32,12 +36,12 @@ export class ResetPasswordDto {
 export class CreateRoleDto {
   @IsString() @IsNotEmpty() code: string;
   @IsString() @IsNotEmpty() name: string;
-  @IsOptional() @IsString() dataScope?: 'all' | 'org' | 'self';
+  @IsOptional() @IsString() dataScope?: 'all' | 'org' | 'org_and_below' | 'self';
   @IsOptional() @IsArray() permissionIds?: number[];
 }
 
 export class UpdateRoleDto {
   @IsOptional() @IsString() name?: string;
-  @IsOptional() @IsString() dataScope?: 'all' | 'org' | 'self';
+  @IsOptional() @IsString() dataScope?: 'all' | 'org' | 'org_and_below' | 'self';
   @IsOptional() @IsArray() permissionIds?: number[];
 }

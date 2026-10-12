@@ -35,6 +35,14 @@ export class OrgService {
       }
     }
     const o = this.repo.create({ tenantId, ...(d as any) } as Organization);
+    // 计算祖先路径（斜杠包围，如 /5/9/），用于 ORG_AND_BELOW 子树查询
+    if (d.parentId) {
+      const parent = await this.repo.findOne({ where: { tenantId, id: d.parentId } as any });
+      if (!parent) throw new NotFoundException('上级组织不存在');
+      o.ancestors = `${parent.ancestors ?? ''}${parent.id}/`;
+    } else {
+      o.ancestors = '';
+    }
     return this.repo.save(o as any);
   }
 
@@ -67,8 +75,21 @@ export class OrgService {
 
   async update(tenantId: number, id: number, d: UpdateOrgDto) {
     const o = await this.get(tenantId, id);
+    const parentChanged = d.parentId !== undefined && d.parentId !== o.parentId;
     Object.assign(o, d as any);
-    return this.repo.save(o as any);
+    if (parentChanged) {
+      if (d.parentId) {
+        const parent = await this.repo.findOne({ where: { tenantId, id: d.parentId } as any });
+        if (!parent) throw new NotFoundException('上级组织不存在');
+        o.ancestors = `${parent.ancestors ?? ''}${parent.id}/`;
+      } else {
+        o.ancestors = '';
+      }
+    }
+    const saved = await this.repo.save(o as any);
+    // 父级变化：重算该节点及其整棵子树的祖先路径（组织数少，整租户重算成本低）
+    if (parentChanged) await this.rebuildAncestors(tenantId);
+    return saved;
   }
 
   async remove(tenantId: number, id: number) {
@@ -94,7 +115,39 @@ export class OrgService {
       type: 'HQ',
       status: 'ACTIVE',
       sort: 0,
+      ancestors: '',
     } as Organization);
     return this.repo.save(o as any);
+  }
+
+  /**
+   * 按 parentId 重算整租户所有组织的祖先路径（幂等）。
+   * 组织数量级为几十个、层级浅，整租户重算成本可忽略。
+   */
+  async rebuildAncestors(tenantId: number) {
+    const all = await this.repo.find({ where: { tenantId } as any, order: { id: 'ASC' } as any });
+    const byId = new Map<number, any>();
+    all.forEach((o) => byId.set(o.id, o as any));
+    for (const o of all) {
+      const chain: number[] = [];
+      const seen = new Set<number>();
+      let cur = (o as any).parentId != null ? byId.get((o as any).parentId) : undefined;
+      while (cur && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        chain.unshift(cur.id);
+        cur = cur.parentId != null ? byId.get(cur.parentId) : undefined;
+      }
+      (o as any).ancestors = chain.length ? `${chain.join('/')}/` : '';
+    }
+    await this.repo.save(all as any);
+  }
+
+  /** 返回某组织的子树 id 集合（含自身），用于 ORG_AND_BELOW 数据范围 */
+  async subtreeIds(tenantId: number, orgId: number): Promise<number[]> {
+    const rows = await this.repo.query(
+      `SELECT id FROM organizations WHERE tenant_id = ? AND (id = ? OR ancestors LIKE ?)`,
+      [tenantId, orgId, `${orgId}/%`],
+    );
+    return (rows as any[]).map((r) => r.id);
   }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Tag, Popconfirm, App } from 'antd';
 import PageContainer from '../components/PageContainer';
 import { PlusOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons';
-import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listRoles, getTenantMe } from '../api/crm';
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listRoles, getTenantMe, listOrgs } from '../api/crm';
 import { useCrud } from '../hooks/useCrud';
 
 export default function UserPage() {
@@ -14,6 +14,7 @@ export default function UserPage() {
     remove: deleteUser,
   });
   const [roles, setRoles] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<any[]>([]);
   const [tenantSlug, setTenantSlug] = useState<string>('');
   const [open, setOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -26,6 +27,7 @@ export default function UserPage() {
   useEffect(() => {
     load(1, size);
     listRoles().then(setRoles).catch(() => undefined);
+    listOrgs().then(setOrgs).catch(() => undefined);
     // 当前租户短码，用于展示「用户名@域（租户）名」登录身份
     getTenantMe().then((t) => setTenantSlug(t?.slug || '')).catch(() => undefined);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
@@ -44,6 +46,7 @@ export default function UserPage() {
   };
 
   const roleOptions = useMemo(() => roles.map((r) => ({ value: r.id, label: r.name })), [roles]);
+  const orgOptions = useMemo(() => orgs.map((o) => ({ value: o.id, label: o.name })), [orgs]);
 
   const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
@@ -57,6 +60,13 @@ export default function UserPage() {
     { title: '姓名', dataIndex: 'name', width: 120, render: (v: string) => v || '-' },
     { title: '手机号', dataIndex: 'phone', width: 130, render: (v: string) => v || '-' },
     { title: '角色', dataIndex: 'roles', render: (v: any[]) => (v || []).map((r) => <Tag key={r.id}>{r.name}</Tag>) },
+    {
+      title: '归属校区', dataIndex: 'orgIds', width: 200,
+      render: (v: number[]) => {
+        if (!v || v.length === 0) return <Tag color="blue">全部校区</Tag>;
+        return v.map((id) => <Tag key={id}>{orgs.find((o) => o.id === id)?.name || id}</Tag>);
+      },
+    },
     { title: '状态', dataIndex: 'status', width: 90, render: (v: number) => (v === 1 ? <Tag color="green">启用</Tag> : <Tag color="red">禁用</Tag>) },
     {
       title: '操作', width: 220, render: (_: any, r: any) => (
@@ -69,7 +79,7 @@ export default function UserPage() {
         </Space>
       ),
     },
-  ], [tenantSlug]);
+  ], [tenantSlug, orgs]);
 
   const submitPwd = async () => {
     const v = await pwdForm.validateFields();
@@ -109,6 +119,9 @@ export default function UserPage() {
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="roleIds" label="角色">
             <Select mode="multiple" allowClear options={roleOptions} />
+          </Form.Item>
+          <Form.Item name="orgIds" label="归属校区" tooltip="不选=该租户全部校区可见；选择后仅可在所选校区范围内操作数据">
+            <Select mode="multiple" allowClear placeholder="全部校区可见" options={orgOptions} />
           </Form.Item>
           <Form.Item name="status" label="状态">
             <Select options={[{ value: 1, label: '启用' }, { value: 0, label: '禁用' }]} />

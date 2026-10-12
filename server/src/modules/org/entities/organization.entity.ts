@@ -17,6 +17,13 @@ export class Organization extends BaseEntity {
   @Column({ name: 'type', length: 32, default: 'BRANCH' })
   type: OrgType;
 
+  /**
+   * 祖先路径（含父级，斜杠包围，如 /5/9/），用于 ORG_AND_BELOW 子树查询。
+   * 自身 id 不含在内；根节点(HQ)为空串。
+   */
+  @Column({ name: 'ancestors', type: 'varchar', length: 512, nullable: true, comment: '祖先路径，斜杠包围，如 /5/9/' })
+  ancestors?: string;
+
   @Column({ name: 'region', length: 64, nullable: true })
   region?: string;
 

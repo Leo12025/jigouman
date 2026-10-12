@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { User } from './user.entity';
 import { Role } from './role.entity';
 import { Permission } from './permission.entity';
+import { Membership } from './membership.entity';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { PageQueryDto } from '../../common/dto/pagination.dto';
@@ -74,6 +75,8 @@ export class RbacService {
     @InjectRepository(Role) private readonly roleRepo: Repository<Role>,
     @InjectRepository(Permission)
     private readonly permRepo: Repository<Permission>,
+    @InjectRepository(Membership)
+    private readonly membershipRepo: Repository<Membership>,
   ) {}
 
   /** 为某租户初始化默认权限、角色、超级管理员（幂等） */
@@ -112,12 +115,16 @@ export class RbacService {
     }
     const allPerms = [...permMap.values()];
 
+    // 0) 平台角色模板（tenant_id=0）：新增权限点统一演进，租户角色可继承（模板+覆盖模型，P1-3）
+    const tplAdmin = await this.ensureTemplates();
+
     // 2) 角色
     const ensureRole = async (
       code: string,
       name: string,
       perms: Permission[],
-      dataScope: 'all' | 'org' | 'self' = 'org',
+      dataScope: 'all' | 'org' | 'org_and_below' | 'self' = 'org',
+      inheritsFromId?: number,
     ) => {
       let role = await this.roleRepo.findOne({
         where: { tenantId, code },
@@ -131,12 +138,13 @@ export class RbacService {
           dataScope,
           permissions: perms,
         });
+        if (inheritsFromId) (role as any).inheritsFrom = { id: inheritsFromId };
         role = await this.roleRepo.save(role);
       }
       return role;
     };
 
-    const superAdmin = await ensureRole('super_admin', '超级管理员', allPerms, 'all');
+    const superAdmin = await ensureRole('super_admin', '超级管理员', allPerms, 'all', tplAdmin.id);
     // 兼容已有租户：把新增权限点同步进超级管理员（幂等）
     const sa = await this.roleRepo.findOne({ where: { tenantId, code: 'super_admin' }, relations: ['permissions'] });
     if (sa) {
@@ -183,7 +191,56 @@ export class RbacService {
       admin = await this.userRepo.save(admin);
       this.logger.log(`租户 ${tenantId} 初始化超级管理员: ${username} / ${adminPassword}`);
     }
+    // 为租户内全部用户补 membership（状态机 ACTIVE），幂等
+    await this.seedMemberships(tenantId);
     return admin;
+  }
+
+  /** 确保平台角色模板(tenant_id=0)存在：含全部权限点，供租户角色继承（P1-3） */
+  private async ensureTemplates(): Promise<Role> {
+    const T0 = 0;
+    const codes: string[] = [];
+    for (const m of MODULES) for (const a of ACTIONS) codes.push(`${m}:${a}`);
+    for (const c of EXTRA_PERMS) codes.push(c);
+    const perms: Permission[] = [];
+    for (const code of codes) {
+      let p = await this.permRepo.findOne({ where: { tenantId: T0, code } });
+      if (!p) {
+        p = this.permRepo.create({
+          tenantId: T0,
+          code,
+          name: code,
+          group: code.split(':')[0],
+        } as Permission);
+        p = await this.permRepo.save(p);
+      }
+      perms.push(p);
+    }
+    const ensureTpl = async (code: string, name: string): Promise<Role> => {
+      let r = await this.roleRepo.findOne({ where: { tenantId: T0, code }, relations: ['permissions'] });
+      if (!r) {
+        r = this.roleRepo.create({ tenantId: T0, code, name, dataScope: 'all', permissions: perms } as Role);
+        await this.roleRepo.save(r);
+      }
+      return r;
+    };
+    return ensureTpl('tenant_admin', '平台角色模板-租户管理员');
+  }
+
+  /** 为租户内全部用户确保存在 ACTIVE membership（幂等；已 REMOVED 的不复活） */
+  async seedMemberships(tenantId: number) {
+    const users = await this.userRepo.find({ where: { tenantId } });
+    for (const u of users) {
+      const exist = await this.membershipRepo.findOne({
+        where: { tenantId, userId: u.id },
+        withDeleted: true,
+      });
+      if (!exist) {
+        await this.membershipRepo.save(
+          this.membershipRepo.create({ tenantId, userId: u.id, status: 'ACTIVE' } as Membership),
+        );
+      }
+    }
   }
 
   // ==================== 用户管理 ====================
@@ -224,8 +281,14 @@ export class RbacService {
       email: d.email,
       status: d.status ?? 1,
       roles,
+      orgIds: d.orgIds ?? null,
     });
-    return this.safeUser(await this.userRepo.save(user));
+    const saved = await this.userRepo.save(user);
+    // 创建用户同时建立 membership（状态机 ACTIVE），作为跨租户身份与生命周期事实来源
+    await this.membershipRepo.save(
+      this.membershipRepo.create({ tenantId, userId: saved.id, status: 'ACTIVE' } as Membership),
+    );
+    return this.safeUser(saved);
   }
 
   async updateUser(tenantId: number, id: number, d: UpdateUserDto) {
@@ -240,6 +303,9 @@ export class RbacService {
     if (d.status !== undefined) user.status = d.status;
     if (d.roleIds) {
       user.roles = await this.roleRepo.findBy({ id: In(d.roleIds), tenantId });
+    }
+    if (d.orgIds !== undefined) {
+      user.orgIds = d.orgIds ?? null;
     }
     return this.safeUser(await this.userRepo.save(user));
   }

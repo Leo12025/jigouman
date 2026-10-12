@@ -96,6 +96,18 @@ export default function MainLayout() {
     }
   }, []);
 
+  // 受限用户（profile.orgIds 非空）：默认选中首个归属校区，避免停留在「全部校区」视图
+  useEffect(() => {
+    if (profile?.orgIds?.length) {
+      const cur = getCurrentOrg();
+      if (cur == null || !profile.orgIds.includes(cur)) {
+        const first = profile.orgIds[0];
+        setCurrentOrg(first);
+        setOrgSel(first);
+      }
+    }
+  }, [profile]);
+
   const openNotice = async () => {
     const r = await getNotifications({ page: 1, size: 10, unreadOnly: 1 }).catch(() => null);
     if (r) setNoticeList(r.list);
@@ -308,12 +320,11 @@ export default function MainLayout() {
                 setOrgSel(next);
                 setRefreshKey((k) => k + 1);
               }}
-              options={[
-                { value: 'ALL', label: '全部校区(总校区)' },
-                ...(profile?.orgIds?.length
+              options={
+                profile?.orgIds?.length
                   ? campusOpts.filter((o) => profile.orgIds!.includes(o.value))
-                  : campusOpts),
-              ]}
+                  : [{ value: 'ALL', label: '全部校区(总校区)' }, ...campusOpts]
+              }
             />
             <Tag color="blue">{profile?.orgName || '机构'}</Tag>
             <Dropdown
