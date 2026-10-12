@@ -1,34 +1,48 @@
-import { useEffect, useState } from 'react';
-import {
-  Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, message, Popconfirm, Tag,
-} from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Popconfirm, Tag, App } from 'antd';
 import { PlusOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import {
   listContractTemplates, createContractTemplate, deleteContractTemplate,
-  listContracts, createContract, signContract, invalidateContract,
+  listContracts, signContract, invalidateContract,
 } from '../api/crm';
 
 export default function ContractPage() {
+  const { message } = App.useApp();
   const [tplRows, setTplRows] = useState<any[]>([]);
   const [tplTotal, setTplTotal] = useState(0);
   const [contractRows, setContractRows] = useState<any[]>([]);
   const [contractTotal, setContractTotal] = useState(0);
   const [tplOpen, setTplOpen] = useState(false);
   const [tplForm] = Form.useForm();
+  const [tplSubmitting, setTplSubmitting] = useState(false);
   const [signRow, setSignRow] = useState<any>(null);
   const [signForm] = Form.useForm();
+  const [signSubmitting, setSignSubmitting] = useState(false);
 
-  const loadTpl = async () => {
-    const res = await listContractTemplates({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 }));
+  const loadTpl = useCallback(async () => {
+    const res = await listContractTemplates({ page:1, size:50 }).catch(() => ({ list: [], total: 0 }));
     setTplRows(res.list); setTplTotal(res.total);
-  };
-  const loadContracts = async () => {
-    const res = await listContracts({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 }));
+  }, []);
+  const loadContracts = useCallback(async () => {
+    const res = await listContracts({ page:1, size:50 }).catch(() => ({ list: [], total: 0 }));
     setContractRows(res.list); setContractTotal(res.total);
-  };
+  }, []);
   useEffect(() => { loadTpl(); loadContracts(); /* eslint-disable-next-line */ }, []);
 
-  const tplCols = [
+  const submitTpl = async () => {
+    const v = await tplForm.validateFields();
+    setTplSubmitting(true);
+    try { await createContractTemplate(v); message.success('创建成功'); setTplOpen(false); loadTpl(); }
+    catch { /* 失败提示由请求层统一处理 */ } finally { setTplSubmitting(false); }
+  };
+  const submitSign = async () => {
+    const v = await signForm.validateFields();
+    setSignSubmitting(true);
+    try { await signContract(signRow.id, v); message.success('签署完成(已存证)'); setSignRow(null); loadContracts(); }
+    catch { /* 失败提示由请求层统一处理 */ } finally { setSignSubmitting(false); }
+  };
+
+  const tplCols = useMemo(() => [
     { title: '名称', dataIndex: 'name' },
     { title: '类型', dataIndex: 'type' },
     { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={v === 'ACTIVE' ? 'green' : 'default'}>{v}</Tag> },
@@ -37,9 +51,9 @@ export default function ContractPage() {
         <Button type="link" danger size="small">删除</Button>
       </Popconfirm>
     ) },
-  ];
+  ], [message, loadTpl]);
 
-  const contractCols = [
+  const contractCols = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '签约方', dataIndex: 'partyName' },
     { title: '证件号', dataIndex: 'idCard', render: (v: string) => v || '-' },
@@ -51,7 +65,7 @@ export default function ContractPage() {
         {r.status !== 'INVALID' && <Popconfirm title="作废?" okText="作废" cancelText="取消" onConfirm={async () => { await invalidateContract(r.id); message.success('已作废'); loadContracts(); }}><Button type="link" danger size="small">作废</Button></Popconfirm>}
       </Space>
     ) },
-  ];
+  ], [message, loadContracts]);
 
   return (
     <div>
@@ -75,7 +89,7 @@ export default function ContractPage() {
         ]}
       />
 
-      <Modal title="新建合同模板" open={tplOpen} onOk={async () => { const v = await tplForm.validateFields(); await createContractTemplate(v); message.success('创建成功'); setTplOpen(false); loadTpl(); }} onCancel={() => setTplOpen(false)} okText="保存" cancelText="取消">
+      <Modal title="新建合同模板" open={tplOpen} confirmLoading={tplSubmitting} onOk={submitTpl} onCancel={() => setTplOpen(false)} okText="保存" cancelText="取消">
         <Form form={tplForm} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
           <Form.Item name="type" label="类型"><Input placeholder="ENROLL/EMPLOYEE/NDA" /></Form.Item>
@@ -84,7 +98,7 @@ export default function ContractPage() {
         </Form>
       </Modal>
 
-      <Modal title={`电子签署 - ${signRow?.partyName || ''}`} open={!!signRow} onOk={async () => { const v = await signForm.validateFields(); await signContract(signRow.id, v); message.success('签署完成(已存证)'); setSignRow(null); loadContracts(); }} onCancel={() => setSignRow(null)} okText="签署" cancelText="取消">
+      <Modal title={`电子签署 - ${signRow?.partyName || ''}`} open={!!signRow} confirmLoading={signSubmitting} onOk={submitSign} onCancel={() => setSignRow(null)} okText="签署" cancelText="取消">
         <Form form={signForm} layout="vertical">
           <Form.Item name="partyName" label="签约方姓名" rules={[{ required: true, message: '必填' }]}><Input /></Form.Item>
           <Form.Item name="idCard" label="证件号(实名)" rules={[{ required: true, message: '必填' }]}><Input /></Form.Item>

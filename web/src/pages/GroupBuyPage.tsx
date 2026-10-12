@@ -1,48 +1,67 @@
-import { useEffect, useState } from 'react';
-import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag } from 'antd';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Table, Tabs, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, App } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
-  listGroupBuyActivities,
-  createGroupBuyActivity,
-  updateGroupBuyActivity,
-  deleteGroupBuyActivity,
-  createTeam,
-  joinTeam,
-  listTeams,
-  redeemGroupBuy,
+  listGroupBuyActivities, createGroupBuyActivity, updateGroupBuyActivity, deleteGroupBuyActivity,
+  createTeam, joinTeam, listTeams, redeemGroupBuy,
 } from '../api/crm';
 
 const STATUS_COLOR: Record<string, string> = { ACTIVE: 'green', DISABLED: 'default' };
 const TEAM_COLOR: Record<string, string> = { OPEN: 'gold', SUCCESS: 'green', INVALID: 'red' };
 
 export default function GroupBuyPage() {
+  const { message } = App.useApp();
   const [acts, setActs] = useState<any[]>([]);
   const [actTotal, setActTotal] = useState(0);
   const [actOpen, setActOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [actForm] = Form.useForm();
+  const [actSubmitting, setActSubmitting] = useState(false);
 
   const [teams, setTeams] = useState<any[]>([]);
   const [teamActId, setTeamActId] = useState<number | undefined>();
   const [openTeamAct, setOpenTeamAct] = useState(false);
   const [teamForm] = Form.useForm();
+  const [teamSubmitting, setTeamSubmitting] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinForm] = Form.useForm();
+  const [joinSubmitting, setJoinSubmitting] = useState(false);
   const [joinActId, setJoinActId] = useState<number | undefined>();
 
-  const loadActs = async () => {
+  const loadActs = useCallback(async () => {
     const r = await listGroupBuyActivities({ page: 1, size: 50 }).catch(() => ({ list: [], total: 0 }));
-    setActs(r.list);
-    setActTotal(r.total);
-  };
+    setActs(r.list); setActTotal(r.total);
+  }, []);
   useEffect(() => { loadActs(); /* eslint-disable-next-line */ }, []);
 
-  const loadTeams = async (activityId: number) => {
+  const loadTeams = useCallback(async (activityId: number) => {
     const r = await listTeams(activityId).catch(() => []);
     setTeams(r);
+  }, []);
+
+  const submitAct = async () => {
+    const v = await actForm.validateFields();
+    setActSubmitting(true);
+    try {
+      if (editing) await updateGroupBuyActivity(editing.id, v);
+      else await createGroupBuyActivity(v);
+      message.success('已保存'); setActOpen(false); loadActs();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setActSubmitting(false); }
+  };
+  const submitTeam = async () => {
+    const v = await teamForm.validateFields();
+    setTeamSubmitting(true);
+    try { await createTeam({ ...v, activityId: teamActId }); message.success('已开团'); setOpenTeamAct(false); if (teamActId) loadTeams(teamActId); }
+    catch { /* 失败提示由请求层统一处理 */ } finally { setTeamSubmitting(false); }
+  };
+  const submitJoin = async () => {
+    const v = await joinForm.validateFields();
+    setJoinSubmitting(true);
+    try { await joinTeam(v); message.success('已参团'); setJoinOpen(false); if (joinActId) loadTeams(joinActId); }
+    catch { /* 失败提示由请求层统一处理 */ } finally { setJoinSubmitting(false); }
   };
 
-  const actCols = [
+  const actCols = useMemo(() => [
     { title: '活动名', dataIndex: 'name' },
     { title: '团购价', dataIndex: 'price' },
     { title: '成团人数', dataIndex: 'groupSize' },
@@ -56,9 +75,9 @@ export default function GroupBuyPage() {
         <Popconfirm title="删除?" okText="删除" cancelText="取消" onConfirm={async () => { await deleteGroupBuyActivity(r.id); message.success('已删除'); loadActs(); }}><Button type="link" danger size="small">删除</Button></Popconfirm>
       </Space>
     ) },
-  ];
+  ], [message, loadActs, loadTeams]);
 
-  const teamCols = [
+  const teamCols = useMemo(() => [
     { title: '拼团码', dataIndex: 'code' },
     { title: '团长学员', dataIndex: 'leaderStudentId' },
     { title: '当前人数', dataIndex: 'currentSize' },
@@ -68,7 +87,7 @@ export default function GroupBuyPage() {
         <Button type="link" size="small" disabled={r.status === 'SUCCESS'} onClick={async () => { await redeemGroupBuy(r.code).catch(() => undefined); message.success('已核销'); if (teamActId) loadTeams(teamActId); }}>核销</Button>
       </Space>
     ) },
-  ];
+  ], [message, loadTeams, teamActId]);
 
   return (
     <div>
@@ -96,11 +115,7 @@ export default function GroupBuyPage() {
         },
       ]} />
 
-      <Modal title={editing ? '编辑活动' : '新建拼团活动'} open={actOpen} onOk={async () => {
-        const v = await actForm.validateFields();
-        if (editing) await updateGroupBuyActivity(editing.id, v); else await createGroupBuyActivity(v);
-        message.success('已保存'); setActOpen(false); loadActs();
-      }} onCancel={() => setActOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑活动' : '新建拼团活动'} open={actOpen} confirmLoading={actSubmitting} onOk={submitAct} onCancel={() => setActOpen(false)} okText="保存" cancelText="取消">
         <Form form={actForm} layout="vertical">
           <Form.Item name="name" label="活动名" rules={[{ required: true, message: '必填' }]}><Input /></Form.Item>
           <Form.Item name="courseId" label="课程ID"><InputNumber min={1} /></Form.Item>
@@ -111,21 +126,13 @@ export default function GroupBuyPage() {
         </Form>
       </Modal>
 
-      <Modal title="开团（指定团长）" open={openTeamAct} onOk={async () => {
-        const v = await teamForm.validateFields();
-        await createTeam({ ...v, activityId: teamActId });
-        message.success('已开团'); setOpenTeamAct(false); if (teamActId) loadTeams(teamActId);
-      }} onCancel={() => setOpenTeamAct(false)} okText="开团" cancelText="取消">
+      <Modal title="开团（指定团长）" open={openTeamAct} confirmLoading={teamSubmitting} onOk={submitTeam} onCancel={() => setOpenTeamAct(false)} okText="开团" cancelText="取消">
         <Form form={teamForm} layout="vertical">
           <Form.Item name="leaderStudentId" label="团长学员ID" rules={[{ required: true, message: '必填' }]}><InputNumber min={1} /></Form.Item>
         </Form>
       </Modal>
 
-      <Modal title="参团（输入拼团码）" open={joinOpen} onOk={async () => {
-        const v = await joinForm.validateFields();
-        await joinTeam(v);
-        message.success('已参团'); setJoinOpen(false); if (joinActId) loadTeams(joinActId);
-      }} onCancel={() => setJoinOpen(false)} okText="参团" cancelText="取消">
+      <Modal title="参团（输入拼团码）" open={joinOpen} confirmLoading={joinSubmitting} onOk={submitJoin} onCancel={() => setJoinOpen(false)} okText="参团" cancelText="取消">
         <Form form={joinForm} layout="vertical">
           <Form.Item name="code" label="拼团码" rules={[{ required: true, message: '必填' }]}><Input placeholder="如 GB123456" /></Form.Item>
           <Form.Item name="studentId" label="学员ID" rules={[{ required: true, message: '必填' }]}><InputNumber min={1} /></Form.Item>
