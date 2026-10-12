@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Select, Button, Modal, Form, Input, InputNumber, Space, Card, Table, Tag, message, Empty, Popconfirm,
-  Typography,
+  Select, Button, Modal, Form, Input, InputNumber, Space, Card, Table, Tag, Empty, Popconfirm,
+  Typography, App,
 } from 'antd';
 import {
   listCourses, listStages, createStage, updateStage, deleteStage,
-  listStageCoursewares, createCourseware, deleteCourseware,
+  createCourseware, deleteCourseware,
 } from '../api/crm';
 import ResourceUpload, { ResourceItem } from '../components/ResourceUpload';
 
@@ -14,94 +14,67 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function CoursewarePage() {
+  const { message } = App.useApp();
   const [courses, setCourses] = useState<any[]>([]);
   const [courseId, setCourseId] = useState<number | undefined>();
   const [stages, setStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-
   const [stageOpen, setStageOpen] = useState(false);
   const [stageForm] = Form.useForm();
   const [stageFiles, setStageFiles] = useState<ResourceItem[]>([]);
-
   const [cwOpen, setCwOpen] = useState(false);
   const [cwForm] = Form.useForm();
   const [curStage, setCurStage] = useState<any>(null);
   const [cwFiles, setCwFiles] = useState<ResourceItem[]>([]);
-
-  useEffect(() => {
-    listCourses({ size: 200 })
-      .then((r: any) => {
-        const list = r.list || [];
-        setCourses(list);
-        if (list.length) setCourseId(list[0].id);
-      })
-      .catch(() => undefined);
-  }, []);
+  const [stageSubmitting, setStageSubmitting] = useState(false);
+  const [cwSubmitting, setCwSubmitting] = useState(false);
 
   const loadStages = async () => {
     if (!courseId) { setStages([]); return; }
     setLoading(true);
-    try {
-      const list = await listStages(courseId);
-      setStages(list || []);
-    } catch { /* ignore */ } finally { setLoading(false); }
+    try { const list = await listStages(courseId); setStages(list || []); }
+    catch { /* ignore */ } finally { setLoading(false); }
   };
 
+  useEffect(() => {
+    listCourses({ size: 200 })
+      .then((r: any) => { const list = r.list || []; setCourses(list); if (list.length) setCourseId(list[0].id); })
+      .catch(() => undefined);
+    // eslint-disable-next-line
+  }, []);
   useEffect(() => { loadStages(); }, [courseId]);
 
   const onCreateStage = async () => {
     const v = await stageForm.validateFields();
-    await createStage(courseId as number, {
-      name: v.name,
-      sortOrder: v.sortOrder ?? 0,
-      outlineResourceId: stageFiles[0]?.id,
-      outlineUrl: stageFiles[0]?.url,
-      remark: v.remark,
-    });
-    message.success('已创建阶段');
-    setStageOpen(false);
-    stageForm.resetFields();
-    setStageFiles([]);
-    loadStages();
+    setStageSubmitting(true);
+    try {
+      await createStage(courseId as number, {
+        name: v.name, sortOrder: v.sortOrder ?? 0,
+        outlineResourceId: stageFiles[0]?.id, outlineUrl: stageFiles[0]?.url, remark: v.remark,
+      });
+      message.success('已创建阶段'); setStageOpen(false); stageForm.resetFields(); setStageFiles([]); loadStages();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setStageSubmitting(false); }
   };
-
   const openCourseware = (s: any) => {
-    setCurStage(s);
-    cwForm.resetFields();
-    cwForm.setFieldsValue({ type: 'PPT', sortOrder: 0 });
-    setCwFiles([]);
-    setCwOpen(true);
+    setCurStage(s); cwForm.resetFields(); cwForm.setFieldsValue({ type: 'PPT', sortOrder: 0 }); setCwFiles([]); setCwOpen(true);
   };
-
   const onCreateCourseware = async () => {
     const v = await cwForm.validateFields();
-    await createCourseware(curStage.id, {
-      title: v.title,
-      type: v.type || 'PPT',
-      sortOrder: v.sortOrder ?? 0,
-      durationMinutes: v.durationMinutes,
-      resourceId: cwFiles[0]?.id,
-      url: cwFiles[0]?.url,
-      resources: cwFiles.map((f) => ({ resourceId: f.id, name: f.originalName, url: f.url })),
-      remark: v.remark,
-    });
-    message.success('已创建课件');
-    setCwOpen(false);
-    loadStages();
+    setCwSubmitting(true);
+    try {
+      await createCourseware(curStage.id, {
+        title: v.title, type: v.type || 'PPT', sortOrder: v.sortOrder ?? 0, durationMinutes: v.durationMinutes,
+        resourceId: cwFiles[0]?.id, url: cwFiles[0]?.url,
+        resources: cwFiles.map((f) => ({ resourceId: f.id, name: f.originalName, url: f.url })), remark: v.remark,
+      });
+      message.success('已创建课件'); setCwOpen(false); loadStages();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setCwSubmitting(false); }
   };
+  const onRemoveStage = async (id: number) => { await deleteStage(id); message.success('已删除阶段(含课件)'); loadStages(); };
+  const onRemoveCourseware = async (id: number) => { await deleteCourseware(id); message.success('已删除课件'); loadStages(); };
 
-  const onRemoveStage = async (id: number) => {
-    await deleteStage(id);
-    message.success('已删除阶段(含课件)');
-    loadStages();
-  };
-  const onRemoveCourseware = async (id: number) => {
-    await deleteCourseware(id);
-    message.success('已删除课件');
-    loadStages();
-  };
-
-  const coursewareColumns = [
+  const courseOptions = useMemo(() => courses.map((c) => ({ value: c.id, label: c.name })), [courses]);
+  const coursewareColumns = useMemo(() => [
     { title: '标题', dataIndex: 'title' },
     { title: '类型', dataIndex: 'type', width: 90, render: (t: string) => <Tag>{TYPE_LABEL[t] || t}</Tag> },
     { title: '时长(分)', dataIndex: 'durationMinutes', width: 90, render: (v: number) => v ?? '-' },
@@ -113,15 +86,13 @@ export default function CoursewarePage() {
       ),
     },
     {
-      title: '操作',
-      width: 90,
-      render: (_: any, r: any) => (
+      title: '操作', width: 90, render: (_: any, r: any) => (
         <Popconfirm title="确认删除该课件？" onConfirm={() => onRemoveCourseware(r.id)}>
           <Button size="small" danger>删除</Button>
         </Popconfirm>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -131,7 +102,7 @@ export default function CoursewarePage() {
           <Select
             style={{ width: 260 }} value={courseId} onChange={setCourseId}
             placeholder="选择课程" showSearch optionFilterProp="label"
-            options={courses.map((c) => ({ value: c.id, label: c.name }))}
+            options={courseOptions}
           />
         </Space>
         <Button
@@ -173,7 +144,7 @@ export default function CoursewarePage() {
         </Card>
       ))}
 
-      <Modal title="新建阶段" open={stageOpen} onOk={onCreateStage} onCancel={() => setStageOpen(false)} okText="创建">
+      <Modal title="新建阶段" open={stageOpen} confirmLoading={stageSubmitting} onOk={onCreateStage} onCancel={() => setStageOpen(false)} okText="创建">
         <Form form={stageForm} layout="vertical">
           <Form.Item name="name" label="阶段名称" rules={[{ required: true, message: '请输入阶段名称' }]}>
             <Input placeholder="如：第一阶段" />
@@ -182,11 +153,7 @@ export default function CoursewarePage() {
             <InputNumber min={0} style={{ width: 160 }} />
           </Form.Item>
           <Form.Item label="阶段大纲文件">
-            <ResourceUpload
-              category="stage"
-              onChange={setStageFiles}
-              text="上传大纲"
-            />
+            <ResourceUpload category="stage" onChange={setStageFiles} text="上传大纲" />
           </Form.Item>
           <Form.Item name="remark" label="说明">
             <Input.TextArea rows={2} />
@@ -196,7 +163,7 @@ export default function CoursewarePage() {
 
       <Modal
         title={`为「${curStage?.name ?? ''}」添加课件`}
-        open={cwOpen} onOk={onCreateCourseware} onCancel={() => setCwOpen(false)} okText="创建"
+        open={cwOpen} confirmLoading={cwSubmitting} onOk={onCreateCourseware} onCancel={() => setCwOpen(false)} okText="创建"
       >
         <Form form={cwForm} layout="vertical">
           <Form.Item name="title" label="课件标题" rules={[{ required: true, message: '请输入课件标题' }]}>
@@ -217,11 +184,7 @@ export default function CoursewarePage() {
             </Form.Item>
           </Space>
           <Form.Item label="课件资源(PPT/资源包，可多文件)">
-            <ResourceUpload
-              category="courseware"
-              onChange={setCwFiles}
-              text="上传课件"
-            />
+            <ResourceUpload category="courseware" onChange={setCwFiles} text="上传课件" />
           </Form.Item>
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={2} />

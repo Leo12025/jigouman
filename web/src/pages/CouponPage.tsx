@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Drawer,
-  Switch, Divider, Card,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm, Tag, Drawer,
+  Switch, Divider, Card, App,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, GiftOutlined, CalculatorOutlined } from '@ant-design/icons';
 import {
@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
 const TAG_OPTIONS = ['NEW', 'OLD', 'VIP', 'TRIAL', 'CHURN'].map((t) => ({ value: t, label: t }));
 
 export default function CouponPage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -42,6 +43,9 @@ export default function CouponPage() {
 
   const [courses, setCourses] = useState<any[]>([]);
   const [classGroups, setClassGroups] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [grantSubmitting, setGrantSubmitting] = useState(false);
+  const [calcSubmitting, setCalcSubmitting] = useState(false);
 
   const load = async (p = page, s = size) => {
     setLoading(true);
@@ -62,11 +66,14 @@ export default function CouponPage() {
     form.setFieldsValue({ type: 'AMOUNT', value: 0, minSpend: 0, perLimit: 1, validDays: 30, status: 'ACTIVE', stackable: 1, maxStack: 3, priority: 0, autoApply: 0 });
     setType('AMOUNT'); setOpen(true);
   };
-  const submit = async () => {
+  const submitTemplate = async () => {
     const v = await form.validateFields();
-    if (editing) { await updateCouponTemplate(editing.id, v); message.success('已保存'); }
-    else { await createCouponTemplate(v); message.success('创建成功'); }
-    setOpen(false); load();
+    setSubmitting(true);
+    try {
+      if (editing) { await updateCouponTemplate(editing.id, v); message.success('已保存'); }
+      else { await createCouponTemplate(v); message.success('创建成功'); }
+      setOpen(false); load();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setSubmitting(false); }
   };
 
   const openGrant = async (tpl: any) => {
@@ -78,24 +85,30 @@ export default function CouponPage() {
   };
   const submitGrant = async () => {
     const v = await grantForm.validateFields();
-    await grantCoupon(v);
-    message.success('已发放');
-    const list = await listCoupons({ templateId: v.templateId, size: 200 });
-    setGrants(list.list);
+    setGrantSubmitting(true);
+    try {
+      await grantCoupon(v);
+      message.success('已发放');
+      const list = await listCoupons({ templateId: v.templateId, size: 200 });
+      setGrants(list.list);
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setGrantSubmitting(false); }
   };
 
   const doCalc = async () => {
     const v = await calcForm.validateFields();
-    const res = await calcPromotion({
-      amount: v.amount,
-      studentTags: v.studentTags || [],
-      codes: (v.codes || '').split(/[\s,]+/).filter(Boolean),
-      items: (v.items || []).map((it: any) => ({ courseId: it.courseId, qty: it.qty, unitPrice: it.unitPrice })),
-    }).catch(() => null); // 失败提示已由请求层统一弹出
-    if (res) setCalcRes(res);
+    setCalcSubmitting(true);
+    try {
+      const res = await calcPromotion({
+        amount: v.amount,
+        studentTags: v.studentTags || [],
+        codes: (v.codes || '').split(/[\s,]+/).filter(Boolean),
+        items: (v.items || []).map((it: any) => ({ courseId: it.courseId, qty: it.qty, unitPrice: it.unitPrice })),
+      }).catch(() => null); // 失败提示已由请求层统一弹出
+      if (res) setCalcRes(res);
+    } finally { setCalcSubmitting(false); }
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '名称', dataIndex: 'name' },
     { title: '类型', dataIndex: 'type', render: (v: string) => <Tag color={TYPE_LABELS[v]?.color}>{TYPE_LABELS[v]?.label}</Tag> },
@@ -123,31 +136,31 @@ export default function CouponPage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
-  const grantColumns = [
+  const grantColumns = useMemo(() => [
     { title: '券码', dataIndex: 'code' },
     { title: '学员', dataIndex: 'studentId' },
     { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={v === 'UNUSED' ? 'green' : v === 'USED' ? 'red' : 'default'}>{v}</Tag> },
     { title: '到期', dataIndex: 'expireAt', render: (v: string) => v || '-' },
-  ];
+  ], []);
 
-  const courseOpts = courses.map((c) => ({ value: c.id, label: c.name }));
-  const cgOpts = classGroups.map((c) => ({ value: c.id, label: c.name }));
+  const courseOpts = useMemo(() => courses.map((c) => ({ value: c.id, label: c.name })), [courses]);
+  const cgOpts = useMemo(() => classGroups.map((c) => ({ value: c.id, label: c.name })), [classGroups]);
 
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建促销/券模板</Button>
-        <Button icon={<CalculatorOutlined />} onClick={() => { calcForm.resetFields(); setCalcRes(null); setCalcOpen(true); }}>促销试算</Button>
+        <Button icon={<CalculatorOutlined />} loading={calcSubmitting} onClick={() => { calcForm.resetFields(); setCalcRes(null); setCalcOpen(true); }}>促销试算</Button>
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
         onChange={(p, s) => load(p.current, p.pageSize || size)} />
 
       <Modal title={editing ? '编辑促销/券模板' : '新建促销/券模板'} open={open} width={720}
-        onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+        confirmLoading={submitting} onOk={submitTemplate} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Space size="large" style={{ display: 'flex' }}>
             <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}><Input style={{ width: 220 }} /></Form.Item>
@@ -213,12 +226,8 @@ export default function CouponPage() {
 
           <Divider orientation="left">叠加与投放</Divider>
           <Space size="large" style={{ display: 'flex', flexWrap: 'wrap' }} align="center">
-            <Form.Item name="autoApply" label="全场自动活动(下单自动叠加)" valuePropName="checked">
-              <Switch />
-            </Form.Item>
-            <Form.Item name="stackable" label="可叠加(关=互斥独占)" valuePropName="checked">
-              <Switch />
-            </Form.Item>
+            <Form.Item name="autoApply" label="全场自动活动(下单自动叠加)" valuePropName="checked"><Switch /></Form.Item>
+            <Form.Item name="stackable" label="可叠加(关=互斥独占)" valuePropName="checked"><Switch /></Form.Item>
             <Form.Item name="stackGroup" label="互斥组(同组仅生效最优)"><Input placeholder="如 DISCOUNT_GROUP" /></Form.Item>
             <Form.Item name="maxStack" label="单笔最多叠加数"><InputNumber min={1} max={5} /></Form.Item>
             <Form.Item name="priority" label="叠加优先级"><InputNumber min={0} /></Form.Item>
@@ -233,7 +242,7 @@ export default function CouponPage() {
             <Form.Item name="templateId" hidden><InputNumber /></Form.Item>
             <Form.Item name="studentId" label="学员ID" rules={[{ required: true, message: '必填' }]}><InputNumber min={1} /></Form.Item>
             <Form.Item name="count" label="数量"><InputNumber min={1} max={50} /></Form.Item>
-            <Button type="primary" onClick={submitGrant}>发放</Button>
+            <Button type="primary" loading={grantSubmitting} onClick={submitGrant}>发放</Button>
           </Space>
         </Form>
         <Table rowKey="id" size="small" dataSource={grants} columns={grantColumns} />
@@ -261,7 +270,7 @@ export default function CouponPage() {
           </Form.Item>
           <Form.Item name="studentTags" label="学员人群标签"><Select mode="multiple" style={{ width: '100%' }} options={TAG_OPTIONS} allowClear /></Form.Item>
           <Form.Item name="codes" label="券码(逗号分隔)"><Input.TextArea rows={2} placeholder="CP1000001... 留空仅试算全场活动" /></Form.Item>
-          <Button type="primary" onClick={doCalc}>试算</Button>
+          <Button type="primary" loading={calcSubmitting} onClick={doCalc}>试算</Button>
         </Form>
         {calcRes && (
           <Card size="small" style={{ marginTop: 12 }} title={`总减免 ¥${calcRes.totalDiscount}`}>

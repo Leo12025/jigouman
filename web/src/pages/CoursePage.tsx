@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, Tag, message, Popconfirm, Tabs, Drawer, Descriptions,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, Tag, Popconfirm, Tabs, App,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
@@ -19,6 +19,7 @@ const COURSE_TYPES = [
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(COURSE_TYPES.map((t) => [t.value, t.label]));
 
 export default function CoursePage() {
+  const { message } = App.useApp();
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -32,15 +33,14 @@ export default function CoursePage() {
   const [catEditing, setCatEditing] = useState<any>(null);
   const [form] = Form.useForm();
   const [catForm] = Form.useForm();
+  const [courseSubmitting, setCourseSubmitting] = useState(false);
+  const [catSubmitting, setCatSubmitting] = useState(false);
 
   const load = async (p = page, s = size) => {
     setLoading(true);
     try {
       const res = await listCourses({ page: p, size: s, keyword });
-      setRows(res.list);
-      setTotal(res.total);
-      setPage(p);
-      setSize(s);
+      setRows(res.list); setTotal(res.total); setPage(p); setSize(s);
     } catch { /* ignore */ } finally { setLoading(false); }
   };
   const loadCats = async () => { try { setCats(await listCourseCategories()); } catch { /* ignore */ } };
@@ -49,16 +49,29 @@ export default function CoursePage() {
 
   const openCreate = () => { setEditing(null); form.resetFields(); form.setFieldsValue({ type: 'ONE_ON_ONE', status: 1 }); setOpen(true); };
   const openEdit = (r: any) => { setEditing(r); form.setFieldsValue(r); setOpen(true); };
-  const submit = async () => {
+  const submitCourse = async () => {
     const v = await form.validateFields();
     const payload = { ...v, status: v.status ? 1 : 0 };
-    if (editing) { await updateCourse(editing.id, payload); message.success('已保存'); }
-    else { await createCourse(payload); message.success('创建成功'); }
-    setOpen(false); load();
+    setCourseSubmitting(true);
+    try {
+      if (editing) { await updateCourse(editing.id, payload); message.success('已保存'); }
+      else { await createCourse(payload); message.success('创建成功'); }
+      setOpen(false); load();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setCourseSubmitting(false); }
   };
   const remove = async (id: number) => { await deleteCourse(id); message.success('已删除'); load(); };
 
-  const columns = [
+  const submitCat = async () => {
+    const v = await catForm.validateFields();
+    setCatSubmitting(true);
+    try {
+      if (catEditing) { await updateCourseCategory(catEditing.id, v); message.success('已保存'); }
+      else { await createCourseCategory(v); message.success('创建成功'); }
+      setCatOpen(false); loadCats();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setCatSubmitting(false); }
+  };
+
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '课程名称', dataIndex: 'name' },
     { title: '类型', dataIndex: 'type', width: 120, render: (v: string) => <Tag>{TYPE_LABEL[v] || v}</Tag> },
@@ -78,9 +91,9 @@ export default function CoursePage() {
         </Space>
       ),
     },
-  ];
+  ], []);
 
-  const catColumns = [
+  const catColumns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '分类名称', dataIndex: 'name' },
     { title: '父级', dataIndex: 'parentId', width: 80, render: (v: number) => v ?? '-' },
@@ -95,7 +108,9 @@ export default function CoursePage() {
         </Space>
       ),
     },
-  ];
+  ], []);
+
+  const catOptions = useMemo(() => cats.map((c) => ({ value: c.id, label: c.name })), [cats]);
 
   const courseTab = (
     <div>
@@ -124,11 +139,11 @@ export default function CoursePage() {
     <div>
       <Tabs items={[{ key: 'course', label: '课程列表', children: courseTab }, { key: 'cat', label: '课程分类', children: catTab }]} />
 
-      <Modal title={editing ? '编辑课程' : '新建课程'} open={open} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑课程' : '新建课程'} open={open} confirmLoading={courseSubmitting} onOk={submitCourse} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="课程名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
           <Form.Item name="categoryId" label="课程分类">
-            <Select allowClear options={cats.map((c) => ({ value: c.id, label: c.name }))} />
+            <Select allowClear options={catOptions} />
           </Form.Item>
           <Form.Item name="type" label="课程类型" rules={[{ required: true }]}><Select options={COURSE_TYPES} /></Form.Item>
           <Form.Item name="subject" label="科目"><Input /></Form.Item>
@@ -142,16 +157,11 @@ export default function CoursePage() {
         </Form>
       </Modal>
 
-      <Modal title={catEditing ? '编辑分类' : '新建分类'} open={catOpen} onOk={async () => {
-        const v = await catForm.validateFields();
-        if (catEditing) { await updateCourseCategory(catEditing.id, v); message.success('已保存'); }
-        else { await createCourseCategory(v); message.success('创建成功'); }
-        setCatOpen(false); loadCats();
-      }} onCancel={() => setCatOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={catEditing ? '编辑分类' : '新建分类'} open={catOpen} confirmLoading={catSubmitting} onOk={submitCat} onCancel={() => setCatOpen(false)} okText="保存" cancelText="取消">
         <Form form={catForm} layout="vertical">
           <Form.Item name="name" label="分类名称" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
           <Form.Item name="parentId" label="父级分类">
-            <Select allowClear options={cats.map((c) => ({ value: c.id, label: c.name }))} />
+            <Select allowClear options={catOptions} />
           </Form.Item>
           <Form.Item name="sort" label="排序"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
         </Form>

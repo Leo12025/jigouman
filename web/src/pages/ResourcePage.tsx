@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Table, Select, Space, Tag, Button, Popconfirm, message, Typography } from 'antd';
+import { useEffect, useState, useMemo } from 'react';
+import { Table, Select, Space, Tag, Button, Popconfirm, Typography, App } from 'antd';
 import { listResources, deleteResource } from '../api/crm';
 import ResourceUpload from '../components/ResourceUpload';
 
@@ -15,6 +15,7 @@ const fmtSize = (n: number) => {
 };
 
 export default function ResourcePage() {
+  const { message } = App.useApp();
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -33,7 +34,11 @@ export default function ResourcePage() {
 
   useEffect(() => { load(); }, [page, category]);
 
-  const columns = [
+  const categoryOptions = useMemo(
+    () => Object.entries(CATEGORY_LABEL).map(([k, v]) => ({ value: k, label: v })),
+    [],
+  );
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 70 },
     { title: '文件名', dataIndex: 'originalName' },
     {
@@ -64,7 +69,7 @@ export default function ResourcePage() {
         </Popconfirm>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div>
@@ -73,7 +78,7 @@ export default function ResourcePage() {
           <Select
             placeholder="筛选分类" allowClear style={{ width: 150 }}
             value={category} onChange={setCategory}
-            options={Object.entries(CATEGORY_LABEL).map(([k, v]) => ({ value: k, label: v }))}
+            options={categoryOptions}
           />
           <Button onClick={load}>刷新</Button>
         </Space>
@@ -81,7 +86,7 @@ export default function ResourcePage() {
           <span>上传分类：</span>
           <Select
             style={{ width: 150 }} value={uploadCategory} onChange={setUploadCategory}
-            options={Object.entries(CATEGORY_LABEL).map(([k, v]) => ({ value: k, label: v }))}
+            options={categoryOptions}
           />
           <ResourceUpload category={uploadCategory} text="上传文件" />
         </Space>
