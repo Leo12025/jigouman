@@ -91,7 +91,7 @@ export default function CouponPage() {
       studentTags: v.studentTags || [],
       codes: (v.codes || '').split(/[\s,]+/).filter(Boolean),
       items: (v.items || []).map((it: any) => ({ courseId: it.courseId, qty: it.qty, unitPrice: it.unitPrice })),
-    }).catch((e: any) => { message.error(e?.message || '试算失败'); return null; });
+    }).catch(() => null); // 失败提示已由请求层统一弹出
     if (res) setCalcRes(res);
   };
 

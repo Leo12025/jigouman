@@ -1,43 +1,47 @@
-import { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Select, Tag, message, Popconfirm } from 'antd';
+import { useEffect, useState, useMemo } from 'react';
+import { Table, Button, Space, Modal, Form, Input, Select, Tag, Popconfirm, App } from 'antd';
 import { PlusOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons';
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listRoles } from '../api/crm';
+import { useCrud } from '../hooks/useCrud';
 
 export default function UserPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [size, setSize] = useState(20);
-  const [loading, setLoading] = useState(false);
+  const { message } = App.useApp();
+  const { rows, total, page, size, loading, submitting, load, save, del } = useCrud({
+    list: listUsers,
+    create: createUser,
+    update: updateUser,
+    remove: deleteUser,
+  });
   const [roles, setRoles] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [pwdTarget, setPwdTarget] = useState<any>(null);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
   const [form] = Form.useForm();
   const [pwdForm] = Form.useForm();
 
-  const load = async (p = page, s = size) => {
-    setLoading(true);
-    try {
-      const res = await listUsers({ page: p, size: s });
-      setRows(res.list); setTotal(res.total); setPage(p); setSize(s);
-    } catch { /* ignore */ } finally { setLoading(false); }
-  };
   useEffect(() => {
     load(1, size);
     listRoles().then(setRoles).catch(() => undefined);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
 
+  const openCreate = () => { setEditing(null); form.resetFields(); form.setFieldsValue({ status: 1 }); setOpen(true); };
+  const openEdit = (r: any) => {
+    setEditing(r);
+    form.setFieldsValue({ ...r, roleIds: (r.roles || []).map((x: any) => x.id) });
+    setOpen(true);
+  };
   const submit = async () => {
     const v = await form.validateFields();
-    if (editing) { await updateUser(editing.id, v); message.success('已保存'); }
-    else { await createUser(v); message.success('创建成功'); }
-    setOpen(false); load();
+    const ok = await save(editing, v);
+    if (ok) setOpen(false);
   };
 
-  const columns = [
+  const roleOptions = useMemo(() => roles.map((r) => ({ value: r.id, label: r.name })), [roles]);
+
+  const columns = useMemo(() => [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '账号', dataIndex: 'username', width: 140 },
     { title: '姓名', dataIndex: 'name', width: 120, render: (v: string) => v || '-' },
@@ -47,27 +51,41 @@ export default function UserPage() {
     {
       title: '操作', width: 220, render: (_: any, r: any) => (
         <Space size={4} wrap>
-          <Button type="link" size="small" onClick={() => { setEditing(r); form.setFieldsValue({ ...r, roleIds: (r.roles || []).map((x: any) => x.id) }); setOpen(true); }}>编辑</Button>
+          <Button type="link" size="small" onClick={() => openEdit(r)}>编辑</Button>
           <Button type="link" size="small" icon={<KeyOutlined />} onClick={() => { setPwdTarget(r); pwdForm.resetFields(); setPwdOpen(true); }}>重置密码</Button>
-          <Popconfirm title="确认删除该用户？" okText="删除" cancelText="取消" onConfirm={async () => { await deleteUser(r.id); message.success('已删除'); load(); }}>
+          <Popconfirm title="确认删除该用户？" okText="删除" cancelText="取消" onConfirm={() => del(r.id)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
       ),
     },
-  ];
+  ], []);
+
+  const submitPwd = async () => {
+    const v = await pwdForm.validateFields();
+    setPwdSubmitting(true);
+    try {
+      await resetUserPassword(pwdTarget.id, v.password);
+      message.success('已重置');
+      setPwdOpen(false);
+    } catch {
+      // 失败提示由请求层统一处理
+    } finally {
+      setPwdSubmitting(false);
+    }
+  };
 
   return (
     <div>
       <Space style={{ marginBottom: 16 }}>
         <Button icon={<ReloadOutlined />} onClick={() => load()}>刷新</Button>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); form.setFieldsValue({ status: 1 }); setOpen(true); }}>新建用户</Button>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建用户</Button>
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
         onChange={(p, s) => load(p.current, p.pageSize || size)} />
 
-      <Modal title={editing ? '编辑用户' : '新建用户'} open={open} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
+      <Modal title={editing ? '编辑用户' : '新建用户'} open={open} confirmLoading={submitting} onOk={submit} onCancel={() => setOpen(false)} okText="保存" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="username" label="登录账号" rules={[{ required: true, message: '请输入账号' }]}>
             <Input disabled={!!editing} />
@@ -80,7 +98,7 @@ export default function UserPage() {
           <Form.Item name="name" label="姓名"><Input /></Form.Item>
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="roleIds" label="角色">
-            <Select mode="multiple" allowClear options={roles.map((r) => ({ value: r.id, label: r.name }))} />
+            <Select mode="multiple" allowClear options={roleOptions} />
           </Form.Item>
           <Form.Item name="status" label="状态">
             <Select options={[{ value: 1, label: '启用' }, { value: 0, label: '禁用' }]} />
@@ -88,12 +106,7 @@ export default function UserPage() {
         </Form>
       </Modal>
 
-      <Modal title={`重置密码 - ${pwdTarget?.username || ''}`} open={pwdOpen} onOk={async () => {
-        const v = await pwdForm.validateFields();
-        await resetUserPassword(pwdTarget.id, v.password);
-        message.success('已重置');
-        setPwdOpen(false);
-      }} onCancel={() => setPwdOpen(false)} okText="确定" cancelText="取消">
+      <Modal title={`重置密码 - ${pwdTarget?.username || ''}`} open={pwdOpen} confirmLoading={pwdSubmitting} onOk={submitPwd} onCancel={() => setPwdOpen(false)} okText="确定" cancelText="取消">
         <Form form={pwdForm} layout="vertical">
           <Form.Item name="password" label="新密码" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password />

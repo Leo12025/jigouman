@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, message, Popconfirm, Tabs, Drawer, Descriptions,
+  Table, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, Tag, message, Popconfirm, Tabs, Drawer, Descriptions,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
@@ -51,8 +51,9 @@ export default function CoursePage() {
   const openEdit = (r: any) => { setEditing(r); form.setFieldsValue(r); setOpen(true); };
   const submit = async () => {
     const v = await form.validateFields();
-    if (editing) { await updateCourse(editing.id, v); message.success('已保存'); }
-    else { await createCourse(v); message.success('创建成功'); }
+    const payload = { ...v, status: v.status ? 1 : 0 };
+    if (editing) { await updateCourse(editing.id, payload); message.success('已保存'); }
+    else { await createCourse(payload); message.success('创建成功'); }
     setOpen(false); load();
   };
   const remove = async (id: number) => { await deleteCourse(id); message.success('已删除'); load(); };
@@ -135,8 +136,8 @@ export default function CoursePage() {
           <Form.Item name="price" label="标价"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
           <Form.Item name="totalHours" label="课时数"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
           <Form.Item name="validDays" label="有效期(天)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item>
-          <Form.Item name="status" label="上架" valuePropName="checked" getValueProps={(v) => ({ checked: v === 1 })}>
-            <Select options={[{ value: true, label: '上架' }, { value: false, label: '下架' }]} />
+          <Form.Item name="status" label="上架" valuePropName="checked" getValueProps={(v) => ({ checked: v === 1 || v === true })}>
+            <Switch checkedChildren="上架" unCheckedChildren="下架" />
           </Form.Item>
         </Form>
       </Modal>

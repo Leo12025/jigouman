@@ -1,59 +1,76 @@
+import { lazy, Suspense } from 'react';
+import type { ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Spin } from 'antd';
 import { getToken } from './api/client';
 import MainLayout from './layouts/MainLayout';
-import Login from './pages/Login';
-import HomePage from './pages/HomePage';
-import LeadPage from './pages/LeadPage';
-import ChannelPage from './pages/ChannelPage';
-import CampaignPage from './pages/CampaignPage';
-import FunnelPage from './pages/FunnelPage';
-import CoursePage from './pages/CoursePage';
-import ClassGroupPage from './pages/ClassGroupPage';
-import LessonPage from './pages/LessonPage';
-import StudentPage from './pages/StudentPage';
-import StudentLifecyclePage from './pages/StudentLifecyclePage';
-import OrderPage from './pages/OrderPage';
-import HourPage from './pages/HourPage';
-import FinancePage from './pages/FinancePage';
-import TaskPage from './pages/TaskPage';
-import HomeworkPage from './pages/HomeworkPage';
-import UserPage from './pages/UserPage';
-import RolePage from './pages/RolePage';
-import DashboardPage from './pages/DashboardPage';
-import CampusOverviewPage from './pages/CampusOverviewPage';
-import BigScreenPage from './pages/BigScreenPage';
-import ApprovalFlowPage from './pages/ApprovalFlowPage';
-import ApprovalPage from './pages/ApprovalPage';
-import ClassChangePage from './pages/ClassChangePage';
-import ChannelConfigPage from './pages/ChannelConfigPage';
-import ComplaintPage from './pages/ComplaintPage';
-import ScorePage from './pages/ScorePage';
-import CoursePackagePage from './pages/CoursePackagePage';
-import CoursewarePage from './pages/CoursewarePage';
-import ResourcePage from './pages/ResourcePage';
-import EmployeePage from './pages/EmployeePage';
-import VenuePage from './pages/VenuePage';
-import CouponPage from './pages/CouponPage';
-import ContractPage from './pages/ContractPage';
-import MemberPage from './pages/MemberPage';
-import SurveyPage from './pages/SurveyPage';
-import AlertPage from './pages/AlertPage';
-import OrgPage from './pages/OrgPage';
-import InventoryCostPage from './pages/InventoryCostPage';
-import GroupBuyPage from './pages/GroupBuyPage';
-import DistributionPage from './pages/DistributionPage';
-import TeachingPage from './pages/TeachingPage';
-import ReportPage from './pages/ReportPage';
-import TenantPage from './pages/TenantPage';
 
-function RequireAuth({ children }: { children: JSX.Element }) {
-  return getToken() ? children : <Navigate to="/login" replace />;
+const Login = lazy(() => import('./pages/Login'));
+const HomePage = lazy(() => import('./pages/HomePage'));
+const LeadPage = lazy(() => import('./pages/LeadPage'));
+const ChannelPage = lazy(() => import('./pages/ChannelPage'));
+const CampaignPage = lazy(() => import('./pages/CampaignPage'));
+const FunnelPage = lazy(() => import('./pages/FunnelPage'));
+const CoursePage = lazy(() => import('./pages/CoursePage'));
+const ClassGroupPage = lazy(() => import('./pages/ClassGroupPage'));
+const LessonPage = lazy(() => import('./pages/LessonPage'));
+const StudentPage = lazy(() => import('./pages/StudentPage'));
+const StudentLifecyclePage = lazy(() => import('./pages/StudentLifecyclePage'));
+const OrderPage = lazy(() => import('./pages/OrderPage'));
+const HourPage = lazy(() => import('./pages/HourPage'));
+const FinancePage = lazy(() => import('./pages/FinancePage'));
+const TaskPage = lazy(() => import('./pages/TaskPage'));
+const HomeworkPage = lazy(() => import('./pages/HomeworkPage'));
+const UserPage = lazy(() => import('./pages/UserPage'));
+const RolePage = lazy(() => import('./pages/RolePage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const CampusOverviewPage = lazy(() => import('./pages/CampusOverviewPage'));
+const BigScreenPage = lazy(() => import('./pages/BigScreenPage'));
+const ApprovalFlowPage = lazy(() => import('./pages/ApprovalFlowPage'));
+const ApprovalPage = lazy(() => import('./pages/ApprovalPage'));
+const ClassChangePage = lazy(() => import('./pages/ClassChangePage'));
+const ChannelConfigPage = lazy(() => import('./pages/ChannelConfigPage'));
+const ComplaintPage = lazy(() => import('./pages/ComplaintPage'));
+const ScorePage = lazy(() => import('./pages/ScorePage'));
+const CoursePackagePage = lazy(() => import('./pages/CoursePackagePage'));
+const CoursewarePage = lazy(() => import('./pages/CoursewarePage'));
+const ResourcePage = lazy(() => import('./pages/ResourcePage'));
+const EmployeePage = lazy(() => import('./pages/EmployeePage'));
+const VenuePage = lazy(() => import('./pages/VenuePage'));
+const CouponPage = lazy(() => import('./pages/CouponPage'));
+const ContractPage = lazy(() => import('./pages/ContractPage'));
+const MemberPage = lazy(() => import('./pages/MemberPage'));
+const SurveyPage = lazy(() => import('./pages/SurveyPage'));
+const AlertPage = lazy(() => import('./pages/AlertPage'));
+const OrgPage = lazy(() => import('./pages/OrgPage'));
+const InventoryCostPage = lazy(() => import('./pages/InventoryCostPage'));
+const GroupBuyPage = lazy(() => import('./pages/GroupBuyPage'));
+const DistributionPage = lazy(() => import('./pages/DistributionPage'));
+const TeachingPage = lazy(() => import('./pages/TeachingPage'));
+const ReportPage = lazy(() => import('./pages/ReportPage'));
+const TenantPage = lazy(() => import('./pages/TenantPage'));
+
+/** 路由级代码分割：每个页面单独成 chunk，首屏只加载当前路由 */
+const L = (Comp: React.ComponentType) => (
+  <Suspense
+    fallback={
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
+    }
+  >
+    <Comp />
+  </Suspense>
+);
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  return getToken() ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={L(Login)} />
       <Route
         path="/"
         element={
@@ -62,49 +79,49 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<HomePage />} />
-        <Route path="courses" element={<CoursePage />} />
-        <Route path="class-groups" element={<ClassGroupPage />} />
-        <Route path="lessons" element={<LessonPage />} />
-        <Route path="students" element={<StudentPage />} />
-        <Route path="students/:id/lifecycle" element={<StudentLifecyclePage />} />
-        <Route path="orders" element={<OrderPage />} />
-        <Route path="hours" element={<HourPage />} />
-        <Route path="finance" element={<FinancePage />} />
-        <Route path="tasks" element={<TaskPage />} />
-        <Route path="homework" element={<HomeworkPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="campus-overview" element={<CampusOverviewPage />} />
-        <Route path="big-screen" element={<BigScreenPage />} />
-        <Route path="leads" element={<LeadPage />} />
-        <Route path="channels" element={<ChannelPage />} />
-        <Route path="campaigns" element={<CampaignPage />} />
-        <Route path="funnel" element={<FunnelPage />} />
-        <Route path="users" element={<UserPage />} />
-        <Route path="roles" element={<RolePage />} />
-        <Route path="approval-flows" element={<ApprovalFlowPage />} />
-        <Route path="approvals" element={<ApprovalPage />} />
-        <Route path="class-change" element={<ClassChangePage />} />
-        <Route path="notify-channels" element={<ChannelConfigPage />} />
-        <Route path="complaints" element={<ComplaintPage />} />
-        <Route path="scores" element={<ScorePage />} />
-        <Route path="course-packages" element={<CoursePackagePage />} />
-        <Route path="coursewares" element={<CoursewarePage />} />
-        <Route path="resources" element={<ResourcePage />} />
-        <Route path="employees" element={<EmployeePage />} />
-        <Route path="classrooms" element={<VenuePage />} />
-        <Route path="coupons" element={<CouponPage />} />
-        <Route path="contracts" element={<ContractPage />} />
-        <Route path="members" element={<MemberPage />} />
-        <Route path="surveys" element={<SurveyPage />} />
-        <Route path="alerts" element={<AlertPage />} />
-        <Route path="orgs" element={<OrgPage />} />
-        <Route path="inventory" element={<InventoryCostPage />} />
-        <Route path="group-buy" element={<GroupBuyPage />} />
-        <Route path="distribution" element={<DistributionPage />} />
-        <Route path="teaching" element={<TeachingPage />} />
-        <Route path="reports" element={<ReportPage />} />
-        <Route path="tenants" element={<TenantPage />} />
+        <Route index element={L(HomePage)} />
+        <Route path="courses" element={L(CoursePage)} />
+        <Route path="class-groups" element={L(ClassGroupPage)} />
+        <Route path="lessons" element={L(LessonPage)} />
+        <Route path="students" element={L(StudentPage)} />
+        <Route path="students/:id/lifecycle" element={L(StudentLifecyclePage)} />
+        <Route path="orders" element={L(OrderPage)} />
+        <Route path="hours" element={L(HourPage)} />
+        <Route path="finance" element={L(FinancePage)} />
+        <Route path="tasks" element={L(TaskPage)} />
+        <Route path="homework" element={L(HomeworkPage)} />
+        <Route path="dashboard" element={L(DashboardPage)} />
+        <Route path="campus-overview" element={L(CampusOverviewPage)} />
+        <Route path="big-screen" element={L(BigScreenPage)} />
+        <Route path="leads" element={L(LeadPage)} />
+        <Route path="channels" element={L(ChannelPage)} />
+        <Route path="campaigns" element={L(CampaignPage)} />
+        <Route path="funnel" element={L(FunnelPage)} />
+        <Route path="users" element={L(UserPage)} />
+        <Route path="roles" element={L(RolePage)} />
+        <Route path="approval-flows" element={L(ApprovalFlowPage)} />
+        <Route path="approvals" element={L(ApprovalPage)} />
+        <Route path="class-change" element={L(ClassChangePage)} />
+        <Route path="notify-channels" element={L(ChannelConfigPage)} />
+        <Route path="complaints" element={L(ComplaintPage)} />
+        <Route path="scores" element={L(ScorePage)} />
+        <Route path="course-packages" element={L(CoursePackagePage)} />
+        <Route path="coursewares" element={L(CoursewarePage)} />
+        <Route path="resources" element={L(ResourcePage)} />
+        <Route path="employees" element={L(EmployeePage)} />
+        <Route path="classrooms" element={L(VenuePage)} />
+        <Route path="coupons" element={L(CouponPage)} />
+        <Route path="contracts" element={L(ContractPage)} />
+        <Route path="members" element={L(MemberPage)} />
+        <Route path="surveys" element={L(SurveyPage)} />
+        <Route path="alerts" element={L(AlertPage)} />
+        <Route path="orgs" element={L(OrgPage)} />
+        <Route path="inventory" element={L(InventoryCostPage)} />
+        <Route path="group-buy" element={L(GroupBuyPage)} />
+        <Route path="distribution" element={L(DistributionPage)} />
+        <Route path="teaching" element={L(TeachingPage)} />
+        <Route path="reports" element={L(ReportPage)} />
+        <Route path="tenants" element={L(TenantPage)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
