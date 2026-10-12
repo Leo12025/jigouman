@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, Row, Col, Statistic, Select, Button, Space, Progress, theme } from 'antd';
 import { listChannels, listCampaigns, getFunnel } from '../api/crm';
 import type { Funnel, Channel, Campaign, LeadStage } from '../api/types';
@@ -34,6 +34,9 @@ export default function FunnelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const channelOptions = useMemo(() => channels.map((c) => ({ value: c.id, label: c.name })), [channels]);
+  const campaignOptions = useMemo(() => campaigns.map((c) => ({ value: c.id, label: c.name })), [campaigns]);
+
   const stageColor = (s: LeadStage) => {
     switch (s) {
       case 'NEW':
@@ -58,14 +61,14 @@ export default function FunnelPage() {
           placeholder="渠道"
           allowClear
           style={{ width: 160 }}
-          options={channels.map((c) => ({ value: c.id, label: c.name }))}
+          options={channelOptions}
           onChange={setChannelId}
         />
         <Select
           placeholder="活动"
           allowClear
           style={{ width: 180 }}
-          options={campaigns.map((c) => ({ value: c.id, label: c.name }))}
+          options={campaignOptions}
           onChange={setCampaignId}
         />
         <Button type="primary" onClick={load} loading={loading}>

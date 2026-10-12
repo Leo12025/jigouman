@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Card, Switch, Button, Input, Typography, Space, Tag, message, Popconfirm, Alert,
+  Card, Switch, Button, Input, Typography, Space, Tag, Popconfirm, Alert, App,
 } from 'antd';
 import { listNotifyChannels, upsertNotifyChannel, deleteNotifyChannel } from '../api/crm';
 
@@ -45,6 +45,7 @@ const CHANNEL_META: Record<string, { label: string; desc: string; fields: FieldM
 type ChannelState = { enabled: boolean; fields: Record<string, string> };
 
 export default function ChannelConfigPage() {
+  const { message } = App.useApp();
   const [state, setState] = useState<Record<string, ChannelState>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
