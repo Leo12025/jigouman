@@ -8,7 +8,9 @@ import { PlusOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import {
   listOrders, getOrder, createOrder, payOrder, refundOrder,
   listStudents, listCourses, listUsers, previewRefund,
+  createDepositOrder, previewDepositConvert, convertDeposit, payOrderByStoredValue,
 } from '../api/crm';
+import { withComplianceConfirm } from '../api/client';
 
 const STATUS: Record<string, { label: string; color: string }> = {
   PENDING: { label: '待支付', color: 'default' },
@@ -44,6 +46,13 @@ export default function OrderPage() {
   const [form] = Form.useForm();
   const [payForm] = Form.useForm();
   const [refundForm] = Form.useForm();
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositForm] = Form.useForm();
+  const [depositSubmitting, setDepositSubmitting] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertForm] = Form.useForm();
+  const [convertSubmitting, setConvertSubmitting] = useState(false);
+  const [convertQuote, setConvertQuote] = useState<any>(null);
 
   const studentName = (id?: number) => students.find((s) => s.id === id)?.name || id;
   const courseName = (id?: number) => courses.find((c) => c.id === id)?.name || id;
@@ -80,10 +89,59 @@ export default function OrderPage() {
     const v = await form.validateFields();
     setCreateSubmitting(true);
     try {
-      await createOrder(v);
+      // 合规二次确认：学员累计未消课时超上限时弹窗，确认后继续
+      await withComplianceConfirm((extra) => createOrder({ ...v, ...extra }));
       message.success('订单已创建');
       setOpen(false); load();
-    } finally { setCreateSubmitting(false); }
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setCreateSubmitting(false); }
+  };
+
+  // ---------- 定金单（§2.4 #15） ----------
+  const openDeposit = () => {
+    depositForm.resetFields();
+    depositForm.setFieldsValue({ amount: 0 });
+    setDepositOpen(true);
+  };
+  const submitDeposit = async () => {
+    const v = await depositForm.validateFields();
+    setDepositSubmitting(true);
+    try {
+      await withComplianceConfirm((extra) => createDepositOrder({ ...v, ...extra }));
+      message.success('定金单已创建');
+      setDepositOpen(false); load();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setDepositSubmitting(false); }
+  };
+
+  /** 储值支付：用学员储值余额付尾款，付清即发放课时（§2.4 #14） */
+  const onPayStoredValue = async (r: any) => {
+    try {
+      await payOrderByStoredValue(r.id);
+      message.success('储值支付成功，课时已发放');
+      load();
+    } catch { /* 失败提示由请求层统一处理 */ }
+  };
+
+  /** 定金转正式订单：抵扣定金后生成正式购课订单（§2.4 #15） */
+  const openConvert = (r: any) => {
+    setDetailId(r.id);
+    convertForm.resetFields();
+    convertForm.setFieldsValue({ items: [{ qty: 1, unitPrice: 0, hours: 0 }] });
+    setConvertQuote(null);
+    setConvertOpen(true);
+  };
+  const onConvertQuote = async () => {
+    const v = await convertForm.validateFields(['items']);
+    const q = await previewDepositConvert(detailId!, { items: v.items }).catch(() => null);
+    setConvertQuote(q);
+  };
+  const submitConvert = async () => {
+    const v = await convertForm.validateFields();
+    setConvertSubmitting(true);
+    try {
+      await withComplianceConfirm((extra) => convertDeposit(detailId!, { ...v, ...extra }));
+      message.success('已生成正式订单并抵扣定金');
+      setConvertOpen(false); load();
+    } catch { /* 失败提示由请求层统一处理 */ } finally { setConvertSubmitting(false); }
   };
 
   const openPay = (r: any) => { payForm.setFieldsValue({ channel: 'OFFLINE', amount: r.payableAmount }); setDetailId(r.id); setPayOpen(true); };
@@ -137,6 +195,12 @@ export default function OrderPage() {
         <Space size={4} wrap>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => { openDetail(r.id); }}>详情</Button>
           {r.status === 'PENDING' && <Button type="link" size="small" onClick={() => openPay(r)}>支付</Button>}
+          {(r.status === 'PENDING' || r.status === 'PAID') && Number(r.paidAmount) < Number(r.payableAmount) && (
+            <Button type="link" size="small" onClick={() => onPayStoredValue(r)}>储值支付</Button>
+          )}
+          {r.orderType === 'DEPOSIT' && r.status === 'PAID' && (
+            <Button type="link" size="small" onClick={() => openConvert(r)}>转正式单</Button>
+          )}
           {(r.status === 'PAID' || r.status === 'COMPLETED') && (
             <Button type="link" size="small" danger onClick={() => openRefund(r)}>退费</Button>
           )}
@@ -154,6 +218,7 @@ export default function OrderPage() {
         <Button type="primary" onClick={() => load(1, size)}>查询</Button>
         <Button icon={<ReloadOutlined />} onClick={() => { setKeyword(undefined); setStatus(undefined); load(1, size); }}>重置</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建订单</Button>
+        <Button onClick={openDeposit}>建定金单</Button>
       </Space>
       <Table rowKey="id" size="small" loading={loading} columns={columns} dataSource={rows}
         pagination={{ current: page, pageSize: size, total, showSizeChanger: true }}
@@ -231,6 +296,72 @@ export default function OrderPage() {
             <Select showSearch optionFilterProp="label" placeholder="提交后进入审批中心"
               options={users.map((u) => ({ value: u.id, label: u.name || u.username }))} />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 建定金单 */}
+      <Modal title="创建定金单" open={depositOpen} confirmLoading={depositSubmitting}
+        onOk={submitDeposit} onCancel={() => setDepositOpen(false)} okText="创建" cancelText="取消">
+        <Form form={depositForm} layout="vertical">
+          <Form.Item name="studentId" label="学员" rules={[{ required: true, message: '请选择学员' }]}>
+            <Select showSearch optionFilterProp="label" options={students.map((s) => ({ value: s.id, label: s.name }))} />
+          </Form.Item>
+          <Form.Item name="amount" label="定金金额" rules={[{ required: true, message: '请输入定金金额' }]}>
+            <InputNumber min={0} style={{ width: '100%' }} addonBefore="¥" />
+          </Form.Item>
+          <Form.Item name="deductAmount" label="可抵扣金额" tooltip="转正式订单时的抵扣额：如「付 200 抵 800」填 800；留空则等于定金金额">
+            <InputNumber min={0} style={{ width: '100%' }} addonBefore="¥" />
+          </Form.Item>
+          <Form.Item name="courseId" label="预定课程(选填)">
+            <Select allowClear showSearch optionFilterProp="label"
+              options={courses.map((c) => ({ value: c.id, label: c.name }))} />
+          </Form.Item>
+          <Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 定金转正式订单 */}
+      <Modal title="定金转正式订单" open={convertOpen} width={720} confirmLoading={convertSubmitting}
+        onOk={submitConvert} onCancel={() => setConvertOpen(false)} okText="生成正式订单" cancelText="取消">
+        <Form form={convertForm} layout="vertical">
+          <Form.List name="items">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((f) => (
+                  <Space key={f.key} align="baseline" wrap style={{ display: 'flex', marginBottom: 8 }}>
+                    <Form.Item {...f} name={[f.name, 'courseId']} rules={[{ required: true, message: '课程' }]} style={{ marginBottom: 0 }}>
+                      <Select showSearch optionFilterProp="label" placeholder="课程" style={{ width: 180 }}
+                        options={courses.map((c) => ({ value: c.id, label: c.name }))}
+                        onChange={(cid) => convertForm.setFieldValue(['items', f.name, 'name'], courseName(cid))} />
+                    </Form.Item>
+                    <Form.Item {...f} name={[f.name, 'qty']} rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                      <InputNumber min={1} placeholder="数量" />
+                    </Form.Item>
+                    <Form.Item {...f} name={[f.name, 'unitPrice']} rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                      <InputNumber min={0} placeholder="单价" />
+                    </Form.Item>
+                    <Form.Item {...f} name={[f.name, 'hours']} rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                      <InputNumber min={0} placeholder="发放课时" />
+                    </Form.Item>
+                    <Popconfirm title="删除该项?" onConfirm={() => remove(f.name)}>
+                      <Button danger size="small">删</Button>
+                    </Popconfirm>
+                  </Space>
+                ))}
+                <Button type="dashed" onClick={() => add({ qty: 1, unitPrice: 0, hours: 0 })} block>添加订单项</Button>
+              </>
+            )}
+          </Form.List>
+          <Space style={{ marginTop: 12 }}>
+            <Button onClick={onConvertQuote}>试算抵扣</Button>
+            {convertQuote && (
+              <span>
+                抵扣 <b>¥{Number(convertQuote.deductAmount || 0).toFixed(2)}</b> ·
+                应付 <b>¥{Number(convertQuote.payableAmount || 0).toFixed(2)}</b> ·
+                抵扣后还需补 <b style={{ color: '#cf1322' }}>¥{Number(convertQuote.afterDepositPayable || 0).toFixed(2)}</b>
+              </span>
+            )}
+          </Space>
         </Form>
       </Modal>
 

@@ -275,6 +275,76 @@ export const removePackageCourse = (id: number, courseId: number) =>
 export const purchaseCoursePackage = (id: number, d: { studentId: number; hours?: number }) =>
   apiPost<any>(`/course-packages/${id}/purchase`, d);
 
+// ---------- 套餐扩展：阶梯规格 / 组合子项 / 差异定价 / 人群（§2） ----------
+export const listPackageTiers = (id: number) => apiGet<any[]>(`/course-packages/${id}/tiers`);
+export const setPackageTiers = (
+  id: number, tiers: { hours: number; price: number; sort?: number }[], extra?: { confirmCompliance?: boolean },
+) => apiPost<any[]>(`/course-packages/${id}/tiers`, { tiers, ...(extra || {}) });
+export const listPackageItems = (id: number) => apiGet<any[]>(`/course-packages/${id}/items`);
+export const setPackageItems = (
+  id: number, items: { courseId: number; hours?: number; seq?: number }[], extra?: { confirmCompliance?: boolean },
+) => apiPost<any[]>(`/course-packages/${id}/items`, { items, ...(extra || {}) });
+export const listPackagePriceRules = (id: number) =>
+  apiGet<any[]>(`/course-packages/${id}/price-rules`);
+export const setPackagePriceRules = (
+  id: number, rules: { dimension: string; dimValue: string; price: number }[], extra?: { confirmCompliance?: boolean },
+) => apiPost<any[]>(`/course-packages/${id}/price-rules`, { rules, ...(extra || {}) });
+export const resolvePackagePrice = (id: number, params: any) =>
+  apiGet<number>(`/course-packages/${id}/price`, params);
+/** 老生判定：存在有效订单（已支付/已完成）即为老生 */
+export const isReturningStudent = (studentId: number) =>
+  apiGet<boolean>(`/course-packages/students/${studentId}/returning`);
+
+// ---------- 定金 / 订金（§2.4 #15） ----------
+export const createDepositOrder = (d: any) => apiPost<any>('/orders/deposit', d);
+export const listDepositOrders = (studentId?: number) =>
+  apiGet<any[]>('/orders/deposits', { studentId });
+export const previewDepositConvert = (id: number, d: any) =>
+  apiPost<any>(`/orders/deposit/${id}/convert-preview`, d);
+export const convertDeposit = (id: number, d: any) =>
+  apiPost<any>(`/orders/deposit/${id}/convert`, d);
+
+// ---------- 套餐升级补差价（§2.4 #18） ----------
+export const previewUpgrade = (d: any) => apiPost<any>('/package-upgrades/preview', d);
+export const createUpgrade = (d: any) => apiPost<any>('/package-upgrades', d);
+export const listUpgrades = (params: any) => apiGet<any>('/package-upgrades', params);
+export const getUpgrade = (id: number) => apiGet<any>(`/package-upgrades/${id}`);
+
+// ---------- 储值卡（§2.4 #14） ----------
+export const rechargeStoredValue = (d: any) => apiPost<any>('/stored-value/recharge', d);
+export const consumeStoredValue = (d: any) => apiPost<any>('/stored-value/consume', d);
+export const refundStoredValue = (d: any) => apiPost<any>('/stored-value/refund', d);
+export const listStoredValueAccounts = (params: any) =>
+  apiGet<any>('/stored-value/accounts', params);
+export const listStoredValueLedgers = (params: any) =>
+  apiGet<any>('/stored-value/ledgers', params);
+export const getStoredValueBalance = (studentId: number) =>
+  apiGet<any>(`/stored-value/balance/${studentId}`);
+export const payOrderByStoredValue = (orderId: number) =>
+  apiPost<any>(`/orders/${orderId}/pay-stored-value`);
+
+// ---------- 期课报名 / 插班折减（§2.3 #12）/ 时间型权益 ----------
+export const lateJoinPreview = (d: { totalLessons: number; finishedLessons: number; tuition: number }) =>
+  apiPost<any>('/enrollments/late-preview', d);
+export const createEnrollment = (d: any) => apiPost<any>('/enrollments', d);
+export const listEnrollments = (studentId?: number) => apiGet<any[]>('/enrollments', { studentId });
+export const grantEntitlement = (d: any) => apiPost<any>('/entitlements', d);
+export const listEntitlements = (studentId?: number) => apiGet<any[]>('/entitlements', { studentId });
+
+// ---------- 课时账户生命周期 / 一课一消 ----------
+export const freezeHourAccount = (accountId: number) =>
+  apiPost<any>('/hour-accounts/freeze', { accountId });
+export const unfreezeHourAccount = (accountId: number) =>
+  apiPost<any>('/hour-accounts/unfreeze', { accountId });
+export const closeHourAccount = (accountId: number) =>
+  apiPost<any>('/hour-accounts/close', { accountId });
+export const extendHourAccount = (accountId: number, days: number) =>
+  apiPost<any>('/hour-accounts/extend', { accountId, days });
+export const confirmConsumption = (id: number, status: string) =>
+  apiPost<any>(`/hour-consumptions/${id}/confirm`, { status });
+export const listExpiringAccounts = (days?: number) =>
+  apiGet<any[]>('/hour-accounts/expiring', { days });
+
 // ---------- 课件（课程→阶段→课时课件） ----------
 export const listStages = (courseId: number) => apiGet<any[]>(`/courses/${courseId}/stages`);
 export const createStage = (courseId: number, d: any) =>

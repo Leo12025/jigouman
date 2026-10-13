@@ -27,7 +27,7 @@ export default function UserPage() {
   useEffect(() => {
     load(1, size);
     listRoles().then(setRoles).catch(() => undefined);
-    listOrgs().then(setOrgs).catch(() => undefined);
+    listOrgs({}).then(setOrgs).catch(() => undefined);
     // 当前租户短码，用于展示「用户名@域（租户）名」登录身份
     getTenantMe().then((t) => setTenantSlug(t?.slug || '')).catch(() => undefined);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */

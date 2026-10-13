@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import { message } from 'antd';
+import { createElement } from 'react';
+import { Modal, message } from 'antd';
 
 export const TOKEN_KEY = 'jm_token';
 export const REFRESH_KEY = 'jm_refresh';
@@ -98,11 +99,77 @@ http.interceptors.response.use(
       redirectToLogin();
     }
     const body = error.response?.data;
+    // 合规二次确认：由调用方弹窗处理，此处不再重复 toast
+    if ((body as any)?.data?.needConfirm === true) return Promise.reject(error);
     if (body?.message) message.error(body.message);
     else message.error(error.message || '网络异常');
     return Promise.reject(error);
   },
 );
+
+// ---------- 合规二次确认（预收费监管上限） ----------
+
+export interface ComplianceConfirmPayload {
+  needConfirm: true;
+  violations: string[];
+  hint?: string;
+}
+
+/** 从异常中取出合规确认信息；非合规拦截返回 null */
+export function getComplianceConfirm(e: any): ComplianceConfirmPayload | null {
+  const d = e?.response?.data?.data ?? e?.data;
+  return d && d.needConfirm === true ? (d as ComplianceConfirmPayload) : null;
+}
+
+function confirmModal(ce: ComplianceConfirmPayload): Promise<boolean> {
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title: '超出预收费监管上限',
+      width: 480,
+      okText: '继续',
+      cancelText: '取消',
+      content: createElement(
+        'div',
+        null,
+        createElement('div', { style: { marginBottom: 8 } }, '该操作存在以下合规风险：'),
+        createElement(
+          'ul',
+          { style: { paddingLeft: 20, margin: 0 } },
+          ce.violations.map((v, i) => createElement('li', { key: i }, v)),
+        ),
+        createElement(
+          'div',
+          { style: { marginTop: 8, color: '#888' } },
+          '确认继续将由本机构承担相应责任。',
+        ),
+      ),
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    });
+  });
+}
+
+/**
+ * 合规二次确认包裹器：
+ * 先按原参数请求一次；若命中 needConfirm，弹窗展示全部违规项，
+ * 用户点「继续」后自动携带 confirmCompliance=true 重发。
+ *
+ * 用法：
+ *   await withComplianceConfirm((extra) => createCoursePackage({ ...values, ...extra }));
+ */
+export async function withComplianceConfirm<T>(
+  run: (extra: { confirmCompliance?: boolean }) => Promise<T>,
+): Promise<T> {
+  try {
+    return await run({});
+  } catch (e: any) {
+    const ce = getComplianceConfirm(e);
+    if (!ce) throw e;
+    const ok = await confirmModal(ce);
+    if (!ok) throw e;
+    return await run({ confirmCompliance: true });
+  }
+}
 
 async function unwrap<T>(p: Promise<{ data: ApiBody<T> }>): Promise<T> {
   const res = await p;

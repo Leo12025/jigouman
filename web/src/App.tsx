@@ -33,6 +33,8 @@ const ChannelConfigPage = lazy(() => import('./pages/ChannelConfigPage'));
 const ComplaintPage = lazy(() => import('./pages/ComplaintPage'));
 const ScorePage = lazy(() => import('./pages/ScorePage'));
 const CoursePackagePage = lazy(() => import('./pages/CoursePackagePage'));
+const PackageUpgradePage = lazy(() => import('./pages/PackageUpgradePage'));
+const StoredValuePage = lazy(() => import('./pages/StoredValuePage'));
 const CoursewarePage = lazy(() => import('./pages/CoursewarePage'));
 const ResourcePage = lazy(() => import('./pages/ResourcePage'));
 const EmployeePage = lazy(() => import('./pages/EmployeePage'));
@@ -107,6 +109,8 @@ export default function App() {
         <Route path="complaints" element={L(ComplaintPage)} />
         <Route path="scores" element={L(ScorePage)} />
         <Route path="course-packages" element={L(CoursePackagePage)} />
+        <Route path="package-upgrades" element={L(PackageUpgradePage)} />
+        <Route path="stored-value" element={L(StoredValuePage)} />
         <Route path="coursewares" element={L(CoursewarePage)} />
         <Route path="resources" element={L(ResourcePage)} />
         <Route path="employees" element={L(EmployeePage)} />
