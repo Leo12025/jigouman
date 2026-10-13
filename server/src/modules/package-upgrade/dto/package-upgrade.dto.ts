@@ -14,6 +14,11 @@ export class PreviewUpgradeDto {
    * false=与退费口径一致，赠课不退不折现。
    */
   @IsOptional() @Type(() => Boolean) @IsBoolean() includeGift?: boolean;
+  /**
+   * 合规二次确认：课时/金额超出预收费监管上限时不硬阻断，
+   * 前端提示后携带 confirmCompliance=true 重新提交即可继续。
+   */
+  @IsOptional() @Type(() => Boolean) @IsBoolean() confirmCompliance?: boolean;
 }
 
 export class CreateUpgradeDto extends PreviewUpgradeDto {

@@ -4,7 +4,7 @@ import { Repository, In } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { orgRepo } from '../../common/org-scope';
-import { parseTenantConfig } from '../../common/compliance';
+import { parseTenantConfig, resolveLimits, assertComplianceConfirmable } from '../../common/compliance';
 import { isReturningStudent } from '../../common/student-audience';
 import { CoursePackage } from '../course-package/entities/course-package.entity';
 import { PackageItem } from '../course-package/entities/package-item.entity';
@@ -112,6 +112,23 @@ export class OrderService implements OnModuleInit {
             `套餐「${p.name}」仅限新签学员，当前学员为老生`,
           );
         }
+      }
+    }
+
+    // 反拆单：学员累计未消课时（赠课不计入）——超出上限时二次确认可继续
+    const orderHours = d.items.reduce((s, it) => s + (Number((it as any).hours) || 0), 0);
+    if (orderHours > 0) {
+      const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } as any });
+      const limits = resolveLimits(tenant?.config);
+      const pending = await this.studentPendingHours(tenantId, d.studentId);
+      if (pending + orderHours > limits.cumulativeHours) {
+        assertComplianceConfirmable(
+          [
+            `学员累计未消课时 ${pending + orderHours} 超出监管上限 ${limits.cumulativeHours} 课时（含本次 ${orderHours} 课时）`,
+          ],
+          d.confirmCompliance,
+          '超出预收费监管上限',
+        );
       }
     }
 
@@ -558,6 +575,14 @@ export class OrderService implements OnModuleInit {
       order.status = OrderStatus.PAID;
       await this.orderRepo.save(order as any);
     }
+  }
+
+  /** 学员当前未消课时（赠课不计入）：用于反"拆单绕过"的累计校验 */
+  private async studentPendingHours(tenantId: number, studentId: number): Promise<number> {
+    const accs = (await this.hourSvc.balance(tenantId, studentId)) as any[];
+    return accs
+      .filter((a) => a.status === 'ACTIVE' && !a.isGranted)
+      .reduce((s, a) => s + (Number(a.balance) || 0), 0);
   }
 
   // ---------------- 定金 / 订金（§2.4 #15） ----------------

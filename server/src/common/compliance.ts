@@ -1,3 +1,6 @@
+import { BusinessException } from './exceptions/business.exception';
+import { ResCode } from './constants/response-code';
+
 /**
  * 预收费合规阈值（文档 §0 / §4.4）。
  * 红线：不得一次性收取（含充值、次卡等变相形式）时间跨度超过 3 个月或 60 课时的费用，
@@ -60,10 +63,16 @@ export interface ComplianceSubject {
 }
 
 /** 返回违规项描述（空数组=合规） */
-export function checkCompliance(
-  limits: ComplianceLimits,
-  s: ComplianceSubject,
-): string[] {
+export function checkCompliance(limits: ComplianceLimits, s: ComplianceSubject): string[] {
+  return [...checkHoursAmount(limits, s), ...checkValidDays(limits, s)];
+}
+
+/**
+ * 课时 / 金额违规（**可二次确认后继续**）。
+ * 业务上允许机构在知情前提下超配（如属地口径更宽松、或大额定制单），
+ * 因此这类校验返回违规项由调用方决定是否要求"点击继续"。
+ */
+export function checkHoursAmount(limits: ComplianceLimits, s: ComplianceSubject): string[] {
   const errs: string[] = [];
   if (s.hours != null && s.hours > limits.maxHours) {
     errs.push(`课时数 ${s.hours} 超出预收费监管上限 ${limits.maxHours} 课时`);
@@ -71,8 +80,45 @@ export function checkCompliance(
   if (s.amount != null && s.amount > limits.maxAmount) {
     errs.push(`金额 ${s.amount} 元超出预收费监管上限 ${limits.maxAmount} 元`);
   }
+  return errs;
+}
+
+/** 时长跨度(3个月)违规（同属可二次确认项） */
+export function checkValidDays(limits: ComplianceLimits, s: ComplianceSubject): string[] {
+  const errs: string[] = [];
   if (s.validDays != null && s.validDays > limits.maxValidDays) {
     errs.push(`有效期 ${s.validDays} 天超出预收费监管上限 ${limits.maxValidDays} 天(3个月)`);
   }
   return errs;
+}
+
+export const COMPLIANCE_CONFIRM_HINT =
+  '超出预收费监管上限，如确认继续请携带 confirmCompliance=true 重新提交';
+
+/**
+ * 可二次确认的合规校验：
+ * - 无违规 → 直接通过
+ * - confirm=true → 放行（视为机构已知情确认）
+ * - 否则 → 抛 400，payload 带 needConfirm/violations，前端弹窗提示后重新提交
+ */
+export function assertComplianceConfirmable(
+  errs: string[],
+  confirm?: boolean,
+  prefix?: string,
+): void {
+  if (!errs.length) return;
+  if (confirm === true) return;
+  const message = prefix ? `${prefix}：${errs.join('；')}` : errs.join('；');
+  throw new BusinessException(ResCode.BAD_REQUEST, message, {
+    needConfirm: true,
+    violations: errs,
+    hint: COMPLIANCE_CONFIRM_HINT,
+  });
+}
+
+/** 硬阻断校验（无"继续"入口） */
+export function assertComplianceHard(errs: string[], prefix?: string): void {
+  if (!errs.length) return;
+  const message = prefix ? `${prefix}：${errs.join('；')}` : errs.join('；');
+  throw new BusinessException(ResCode.BAD_REQUEST, message);
 }

@@ -4,7 +4,9 @@ import { Repository } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { orgRepo } from '../../common/org-scope';
-import { checkCompliance, parseTenantConfig } from '../../common/compliance';
+import {
+  parseTenantConfig, checkCompliance, checkHoursAmount, assertComplianceConfirmable,
+} from '../../common/compliance';
 import { approvalEvents, ApprovalEventPayload } from '../../common/approval-events';
 import { orderEvents, OrderPaidPayload } from '../../common/order-events';
 import { AuthUser } from '../../common/decorators/auth.decorator';
@@ -114,15 +116,16 @@ export class PackageUpgradeService implements OnModuleInit {
     const targetAmount = tier ? Number(tier.price) : Number(pkg.price);
 
     const limits = await this.pkgSvc.limits(tenantId);
-    // 目标套餐本身合规
-    const pkgErrs = checkCompliance(limits, {
-      hours: targetHours,
-      amount: targetAmount,
-      validDays: pkg.validDays ?? undefined,
-    });
-    if (pkgErrs.length) {
-      throw new BusinessException(ResCode.BAD_REQUEST, `目标套餐超出预收费监管上限：${pkgErrs.join('；')}`);
-    }
+    // 目标套餐合规：课时/金额/时长跨度均为二次确认可继续
+    assertComplianceConfirmable(
+      checkCompliance(limits, {
+        hours: targetHours,
+        amount: targetAmount,
+        validDays: pkg.validDays ?? undefined,
+      }),
+      d.confirmCompliance,
+      '目标套餐超出预收费监管上限',
+    );
 
     // 折价课时：原账户剩余付费课时（+可选赠课）
     const carryHours = Number(acc.balance) || 0;
@@ -141,11 +144,12 @@ export class PackageUpgradeService implements OnModuleInit {
     const deductAmount = r2((carryHours + giftHours) * unitValue);
     const payableAmount = Math.max(0, r2(targetAmount - deductAmount));
 
-    // 补差价金额合规（一次性收取同样受 5000 元约束）
-    const amountErrs = checkCompliance(limits, { amount: payableAmount });
-    if (amountErrs.length) {
-      throw new BusinessException(ResCode.BAD_REQUEST, `补差价超出预收费监管上限：${amountErrs.join('；')}`);
-    }
+    // 补差价金额合规（一次性收取同样受 5000 元约束）——二次确认可继续
+    assertComplianceConfirmable(
+      checkHoursAmount(limits, { amount: payableAmount }),
+      d.confirmCompliance,
+      '补差价超出预收费监管上限',
+    );
 
     // 升级后累计未消课时（排除即将折价清零的账户）
     const writeOffIds = new Set<number>([Number(acc.id)]);
@@ -158,9 +162,12 @@ export class PackageUpgradeService implements OnModuleInit {
       .filter((a) => !writeOffIds.has(Number(a.id)))
       .reduce((s, a) => s + (Number(a.balance) || 0), 0);
     if (restHours + targetHours > limits.cumulativeHours) {
-      throw new BusinessException(
-        ResCode.BAD_REQUEST,
-        `升级后累计未消课时 ${restHours + targetHours} 超出监管上限 ${limits.cumulativeHours} 课时`,
+      assertComplianceConfirmable(
+        [
+          `升级后累计未消课时 ${restHours + targetHours} 超出监管上限 ${limits.cumulativeHours} 课时`,
+        ],
+        d.confirmCompliance,
+        '超出预收费监管上限',
       );
     }
 

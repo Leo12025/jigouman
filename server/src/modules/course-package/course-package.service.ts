@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
-import { resolveLimits, checkCompliance, ComplianceLimits } from '../../common/compliance';
+import {
+  resolveLimits, ComplianceLimits,
+  checkCompliance, checkHoursAmount, assertComplianceConfirmable,
+} from '../../common/compliance';
 import { CoursePackage } from './entities/course-package.entity';
 import { PackageCourse } from './entities/package-course.entity';
 import { PackageItem } from './entities/package-item.entity';
@@ -70,16 +73,22 @@ export class CoursePackageService {
     return resolveLimits(t?.config);
   }
 
-  /** 超额阻断并提示（60 课时 / 5000 元 / 3 个月） */
+  /**
+   * 合规校验：课时 / 金额 / 时长跨度 **均为二次确认**，confirm=true 放行（机构已知情确认）。
+   * 不硬阻断——业务上存在属地口径更宽松、大额定制单等合理超配场景。
+   */
   private async assertCompliance(
     tenantId: number,
     s: { hours?: number; amount?: number; validDays?: number },
+    confirm?: boolean,
+    prefix?: string,
   ) {
     const limits = await this.limits(tenantId);
-    const errs = checkCompliance(limits, s);
-    if (errs.length) {
-      throw new BusinessException(ResCode.BAD_REQUEST, `超出预收费监管上限：${errs.join('；')}`);
-    }
+    assertComplianceConfirmable(
+      checkCompliance(limits, s),
+      confirm,
+      prefix || '超出预收费监管上限',
+    );
   }
 
   /** 学员维度累计未消课时（反"拆单绕过"：不能靠买两个 3000 的 30 课时包凑 60+） */
@@ -97,7 +106,7 @@ export class CoursePackageService {
       hours: d.totalHours,
       amount: d.price ?? d.listPrice,
       validDays: d.validDays,
-    });
+    }, d.confirmCompliance);
     const p = this.pkgRepo.create({
       tenantId,
       name: d.name,
@@ -128,7 +137,7 @@ export class CoursePackageService {
       hours: nextHours,
       amount: nextPrice,
       validDays: nextDays ?? undefined,
-    });
+    }, d.confirmCompliance);
     Object.assign(p, {
       name: d.name ?? p.name,
       description: d.description ?? p.description,
@@ -217,10 +226,11 @@ export class CoursePackageService {
     const saved: PackageTier[] = [];
     let i = 0;
     for (const t of d.tiers) {
-      const errs = checkCompliance(limits, { hours: t.hours, amount: t.price });
-      if (errs.length) {
-        throw new BusinessException(ResCode.BAD_REQUEST, `阶梯档位(${t.hours}课时)超出监管上限：${errs.join('；')}`);
-      }
+      assertComplianceConfirmable(
+        checkHoursAmount(limits, { hours: t.hours, amount: t.price }),
+        d.confirmCompliance,
+        `阶梯档位(${t.hours}课时)超出监管上限`,
+      );
       saved.push(
         (await this.tierRepo.save(
           this.tierRepo.create({
@@ -265,10 +275,11 @@ export class CoursePackageService {
       }
     }
     if (total > 0) {
-      const errs = checkCompliance(limits, { hours: total });
-      if (errs.length) {
-        throw new BusinessException(ResCode.BAD_REQUEST, `组合套餐总课时超出监管上限：${errs.join('；')}`);
-      }
+      assertComplianceConfirmable(
+        checkHoursAmount(limits, { hours: total }),
+        d.confirmCompliance,
+        '组合套餐总课时超出监管上限',
+      );
     }
     await this.itemRepo.delete({ tenantId, packageId } as any);
     const saved: PackageItem[] = [];
@@ -419,22 +430,25 @@ export class CoursePackageService {
       amount = await this.resolvePrice(tenantId, p.id, { audience: 'RETURNING' });
     }
 
-    // 合规硬校验：单笔（课时 / 金额 / 时长）
+    // 合规校验：时长硬阻断；课时/金额二次确认可继续
     await this.assertCompliance(tenantId, {
       hours,
       amount,
       validDays: p.validDays ?? undefined,
-    });
+    }, d.confirmCompliance);
 
-    // 反拆单：学员维度累计未消课时校验（赠课不计入）
+    // 反拆单：学员维度累计未消课时（赠课不计入）——同样可二次确认继续
     const isGift = d.grantType === 'GIFT';
     if (!isGift) {
       const limits = await this.limits(tenantId);
       const pending = await this.studentPendingHours(tenantId, d.studentId);
       if (pending + hours > limits.cumulativeHours) {
-        throw new BusinessException(
-          ResCode.BAD_REQUEST,
-          `学员累计未消课时 ${pending + hours} 超出监管上限 ${limits.cumulativeHours} 课时（含本次 ${hours} 课时）`,
+        assertComplianceConfirmable(
+          [
+            `学员累计未消课时 ${pending + hours} 超出监管上限 ${limits.cumulativeHours} 课时（含本次 ${hours} 课时）`,
+          ],
+          d.confirmCompliance,
+          '超出预收费监管上限',
         );
       }
     }

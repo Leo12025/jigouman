@@ -1,11 +1,21 @@
 import { Type } from 'class-transformer';
 import {
-  IsArray, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested,
+  IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/dto/pagination.dto';
 import { HourGrantType } from '../../hour/entities/hour-account.entity';
 
-export class CreateCoursePackageDto {
+/**
+ * 合规二次确认基类：
+ * 课时/金额超出预收费监管上限时**不硬阻断**——服务端返回 needConfirm + violations，
+ * 前端弹窗提示后携带 confirmCompliance=true 重新提交即可继续（机构已知情确认）。
+ * 适用于课时、金额、时长跨度三类红线，均不硬阻断。
+ */
+export class ComplianceConfirmDto {
+  @IsOptional() @Type(() => Boolean) @IsBoolean() confirmCompliance?: boolean;
+}
+
+export class CreateCoursePackageDto extends ComplianceConfirmDto {
   @IsString() @IsNotEmpty() name: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() code?: string;
@@ -37,7 +47,7 @@ export class CreateCoursePackageDto {
   @IsOptional() @IsString() remark?: string;
 }
 
-export class UpdateCoursePackageDto {
+export class UpdateCoursePackageDto extends ComplianceConfirmDto {
   @IsOptional() @IsString() @IsNotEmpty() name?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() code?: string;
@@ -71,7 +81,7 @@ export class PackageTierDto {
   @IsOptional() @IsInt() sort?: number;
 }
 
-export class SetPackageTiersDto {
+export class SetPackageTiersDto extends ComplianceConfirmDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => PackageTierDto) tiers: PackageTierDto[];
 }
 
@@ -83,7 +93,7 @@ export class PackageItemDto {
   @IsOptional() @IsInt() seq?: number;
 }
 
-export class SetPackageItemsDto {
+export class SetPackageItemsDto extends ComplianceConfirmDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => PackageItemDto) items: PackageItemDto[];
 }
 
@@ -99,7 +109,7 @@ export class SetPackagePriceRulesDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => PackagePriceRuleDto) rules: PackagePriceRuleDto[];
 }
 
-export class PurchasePackageDto {
+export class PurchasePackageDto extends ComplianceConfirmDto {
   @IsInt() @IsNotEmpty() studentId: number;
   /** 发放课时，默认取套餐 totalHours（或所选阶梯档位） */
   @IsOptional() @IsInt() @Min(1) hours?: number;

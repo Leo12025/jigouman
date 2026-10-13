@@ -1,5 +1,5 @@
 import {
-  IsArray, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsIn, ValidateNested, Min,
+  IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsIn, ValidateNested, Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PageQueryDto } from '../../../common/dto/pagination.dto';
@@ -29,6 +29,11 @@ export class CreateOrderDto {
   @IsOptional() @IsArray() @IsString({ each: true }) couponCodes?: string[];
   @IsOptional() @IsString() remark?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => CreateOrderItemDto) items: CreateOrderItemDto[];
+  /**
+   * 合规二次确认：课时/累计未消课时超出预收费监管上限时不硬阻断，
+   * 前端提示后携带 confirmCompliance=true 重新提交即可继续。
+   */
+  @IsOptional() @Type(() => Boolean) @IsBoolean() confirmCompliance?: boolean;
 }
 
 export class PayOrderDto {
