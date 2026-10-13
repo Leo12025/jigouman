@@ -6,6 +6,7 @@ import { ResCode } from '../../common/constants/response-code';
 import { orgRepo } from '../../common/org-scope';
 import { parseTenantConfig, resolveLimits, assertComplianceConfirmable } from '../../common/compliance';
 import { isReturningStudent } from '../../common/student-audience';
+import { StoredValueService } from '../stored-value/stored-value.service';
 import { CoursePackage } from '../course-package/entities/course-package.entity';
 import { PackageItem } from '../course-package/entities/package-item.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
@@ -70,6 +71,7 @@ export class OrderService implements OnModuleInit {
     private readonly couponSvc: CouponService,
     private readonly studentSvc: StudentService,
     private readonly approvalSvc: ApprovalService,
+    private readonly storedValueSvc: StoredValueService,
   ) {
     // 套用校区隔离：读自动过滤 org_id、写自动落 org_id 章
     this.orderRepo = orgRepo(orderRepo);
@@ -583,6 +585,60 @@ export class OrderService implements OnModuleInit {
     return accs
       .filter((a) => a.status === 'ACTIVE' && !a.isGranted)
       .reduce((s, a) => s + (Number(a.balance) || 0), 0);
+  }
+
+  /** 储值支付：用学员储值余额支付订单尾款，付清即发放课时（§2.4 #14） */
+  async payOrderByStoredValue(tenantId: number, id: number, operatorId?: number) {
+    const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
+    if (!order) throw new NotFoundException('订单不存在');
+    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PAID) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '仅待支付/部分支付订单可用储值支付');
+    }
+    const remain = Math.max(0, r2(Number(order.payableAmount) - Number(order.paidAmount)));
+    if (remain <= 0) throw new BusinessException(ResCode.BAD_REQUEST, '订单已付清，无需储值支付');
+
+    // 先扣储值（余额不足会抛错，事务不会写支付流水）
+    await this.storedValueSvc.consume(
+      tenantId,
+      {
+        studentId: order.studentId,
+        amount: remain,
+        refOrderId: id,
+        remark: `订单 ${order.orderNo} 储值支付`,
+      },
+      operatorId,
+    );
+
+    await this.payRepo.save(
+      this.payRepo.create({
+        tenantId,
+        orderId: id,
+        channel: 'OTHER' as PayChannel,
+        amount: remain,
+        tradeNo: `SV-${order.orderNo}`,
+        status: 'SUCCESS',
+        operatorId,
+        paidAt: new Date(),
+      } as any),
+    );
+
+    order.paidAmount = r2(Number(order.paidAmount) + remain);
+    if (order.paidAmount >= order.payableAmount) order.status = OrderStatus.PAID;
+    order.payType = 'CARD';
+    await this.orderRepo.save(order as any);
+
+    const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
+    if (order.orderType !== 'DEPOSIT') {
+      await this.grantItems(tenantId, order, items, operatorId);
+    }
+
+    orderEvents.emit('order.paid', {
+      tenantId,
+      orderId: id,
+      orderType: order.orderType,
+    } as OrderPaidPayload);
+
+    return this.getOrder(tenantId, id);
   }
 
   // ---------------- 定金 / 订金（§2.4 #15） ----------------

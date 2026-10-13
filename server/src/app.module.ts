@@ -52,6 +52,7 @@ import { TeachingModule } from './modules/teaching/teaching.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { ClassChangeModule } from './modules/class-change/class-change.module';
 import { PackageUpgradeModule } from './modules/package-upgrade/package-upgrade.module';
+import { StoredValueModule } from './modules/stored-value/stored-value.module';
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { PackageUpgradeModule } from './modules/package-upgrade/package-upgrade.
     AttendanceModule,
     ClassChangeModule,
     PackageUpgradeModule,
+    StoredValueModule,
     TenantModule,
   ],
   providers: [

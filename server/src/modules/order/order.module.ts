@@ -10,6 +10,7 @@ import { HourModule } from '../../modules/hour/hour.module';
 import { CouponModule } from '../../modules/coupon/coupon.module';
 import { ApprovalModule } from '../../modules/approval/approval.module';
 import { StudentModule } from '../../modules/student/student.module';
+import { StoredValueModule } from '../stored-value/stored-value.module';
 import { CoursePackage } from '../course-package/entities/course-package.entity';
 import { PackageItem } from '../course-package/entities/package-item.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
@@ -27,6 +28,8 @@ import { Tenant } from '../tenant/entities/tenant.entity';
     CouponModule,
     ApprovalModule,
     StudentModule,
+    // 储值支付：用学员储值余额抵扣订单
+    StoredValueModule,
   ],
   providers: [OrderService],
   controllers: [OrderController],

@@ -81,6 +81,14 @@ export class OrderController {
     return this.svc.payOrder(t, id, d, u.id);
   }
 
+  @Post(':id/pay-stored-value')
+  @RequirePermissions('order:update')
+  @OperationLog({ action: 'order:pay-stored-value', target: 'orders' })
+  @ApiOperation({ summary: '储值支付(用学员储值余额付尾款,付清即发课时)' })
+  payStoredValue(@TenantId() t: number, @Param('id') id: number, @CurrentUser() u: AuthUser) {
+    return this.svc.payOrderByStoredValue(t, Number(id), u.id);
+  }
+
   @Post(':id/refund')
   @RequirePermissions('order:update')
   @OperationLog({ action: 'order:refund', target: 'orders' })
