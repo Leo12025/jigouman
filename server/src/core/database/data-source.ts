@@ -39,5 +39,5 @@ if (dbType === 'sqlite') {
   } as DataSourceOptions;
 }
 
+/** 仅导出一个 DataSource 实例：TypeORM CLI 要求数据源文件必须且只能有一个导出 */
 export const AppDataSource = new DataSource(options);
-export default AppDataSource;

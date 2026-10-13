@@ -1,4 +1,5 @@
-import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableColumn } from 'typeorm';
+import { addColumnIfMissing, baseColumns, createTableIfMissing, ensureIndex } from '../migration-utils';
 
 /**
  * 套餐形态与消耗模式迁移（文档 §2/§3）：
@@ -9,182 +10,160 @@ import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
  *  - 一课一消：hour_consumption 增 confirm_status / confirm_at / attendance_id
  *  - 时间型权益 entitlement（BY_TIME）、期课报名 enrollment（BY_PERIOD）
  *  - attendance 唯一约束(tenant_id, lesson_id, student_id)：杜绝重复点名重复消课
- * 幂等：按 information_schema 判重，重复执行安全。
+ * 幂等：列/表/索引均按存在性判重；跨驱动（MySQL 与 sqlite 均可执行）。
  */
 export class PackageConsumeModes20261013000002 implements MigrationInterface {
   name = 'PackageConsumeModes20261013000002';
 
-  private async hasColumn(qr: QueryRunner, table: string, column: string): Promise<boolean> {
-    const rows = await qr.query(
-      `SELECT 1 FROM information_schema.columns
-       WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1`,
-      [table, column],
-    );
-    return Array.isArray(rows) && rows.length > 0;
-  }
-
-  private async addColumn(qr: QueryRunner, table: string, column: string, ddl: string): Promise<void> {
-    if (await this.hasColumn(qr, table, column)) return;
-    await qr.query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
-  }
-
-  private async hasIndex(qr: QueryRunner, table: string, indexName: string): Promise<boolean> {
-    const rows = await qr.query(
-      `SELECT 1 FROM information_schema.statistics
-       WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1`,
-      [table, indexName],
-    );
-    return Array.isArray(rows) && rows.length > 0;
-  }
-
-  private async ensureIndex(
-    qr: QueryRunner,
-    table: string,
-    indexName: string,
-    columnNames: string[],
-    unique = false,
-  ): Promise<void> {
-    if (await this.hasIndex(qr, table, indexName)) return;
-    await qr.createIndex(table, new TableIndex({ name: indexName, columnNames, isUnique: unique }));
-  }
-
-  private async createTable(qr: QueryRunner, table: string, body: string): Promise<void> {
-    await qr.query(`CREATE TABLE IF NOT EXISTS \`${table}\` (${body}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  }
-
-  private baseCols(): string {
-    return `
-      \`id\` bigint NOT NULL AUTO_INCREMENT,
-      \`tenant_id\` bigint NOT NULL DEFAULT 0,
-      \`org_id\` bigint NULL,
-      \`created_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-      \`updated_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-      \`deleted_at\` datetime(6) NULL`;
-  }
-
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ---------- 商品定义层 ----------
-    await this.addColumn(queryRunner, 'course_package', 'code', '`code` varchar(64) NULL');
-    await this.addColumn(
-      queryRunner, 'course_package', 'sell_type',
-      "`sell_type` varchar(16) NOT NULL DEFAULT 'HOUR_PACK' COMMENT 'SINGLE/HOUR_PACK/COMBO/PERIOD_COURSE/TIME_CARD/DEPOSIT'",
-    );
-    await this.addColumn(
-      queryRunner, 'course_package', 'consume_mode',
-      "`consume_mode` varchar(16) NOT NULL DEFAULT 'BY_HOUR' COMMENT 'BY_HOUR/BY_TIME/BY_PERIOD'",
-    );
-    await this.addColumn(
-      queryRunner, 'course_package', 'scope_type',
-      "`scope_type` varchar(16) NOT NULL DEFAULT 'SPECIFIED_COURSE' COMMENT 'ALL_COURSE/SPECIFIED_COURSE'",
-    );
-    await this.addColumn(queryRunner, 'course_package', 'class_group_id', '`class_group_id` bigint NULL');
-    await this.addColumn(queryRunner, 'course_package', 'list_price', '`list_price` decimal(10,2) NOT NULL DEFAULT 0');
+    await addColumnIfMissing(queryRunner, 'course_package',
+      new TableColumn({ name: 'code', type: 'varchar', length: '64', isNullable: true }));
+    await addColumnIfMissing(queryRunner, 'course_package',
+      new TableColumn({
+        name: 'sell_type', type: 'varchar', length: '16', default: "'HOUR_PACK'",
+        comment: 'SINGLE/HOUR_PACK/COMBO/PERIOD_COURSE/TIME_CARD/DEPOSIT',
+      }));
+    await addColumnIfMissing(queryRunner, 'course_package',
+      new TableColumn({
+        name: 'consume_mode', type: 'varchar', length: '16', default: "'BY_HOUR'",
+        comment: 'BY_HOUR/BY_TIME/BY_PERIOD',
+      }));
+    await addColumnIfMissing(queryRunner, 'course_package',
+      new TableColumn({
+        name: 'scope_type', type: 'varchar', length: '16', default: "'SPECIFIED_COURSE'",
+        comment: 'ALL_COURSE/SPECIFIED_COURSE',
+      }));
+    await addColumnIfMissing(queryRunner, 'course_package',
+      new TableColumn({ name: 'class_group_id', type: 'bigint', isNullable: true }));
+    await addColumnIfMissing(queryRunner, 'course_package',
+      new TableColumn({ name: 'list_price', type: 'decimal', precision: 10, scale: 2, default: '0' }));
 
     // ---------- 组合套餐子项 / 阶梯规格 / 差异定价 ----------
-    await this.createTable(
-      queryRunner,
-      'package_item',
-      `${this.baseCols()},
-      \`package_id\` bigint NOT NULL,
-      \`course_id\` bigint NOT NULL,
-      \`hours\` int NULL COMMENT '子项固定课时(空=通用包仅圈范围)',
-      \`seq\` int NOT NULL DEFAULT 0,
-      PRIMARY KEY (\`id\`),
-      UNIQUE KEY \`uk_package_item\` (\`tenant_id\`,\`package_id\`,\`course_id\`),
-      KEY \`idx_package_item_package\` (\`tenant_id\`,\`package_id\`)`,
-    );
-    await this.createTable(
-      queryRunner,
-      'package_tier',
-      `${this.baseCols()},
-      \`package_id\` bigint NOT NULL,
-      \`hours\` int NOT NULL,
-      \`price\` decimal(10,2) NOT NULL,
-      \`sort\` int NOT NULL DEFAULT 0,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_package_tier_package\` (\`tenant_id\`,\`package_id\`)`,
-    );
-    await this.createTable(
-      queryRunner,
-      'package_price_rule',
-      `${this.baseCols()},
-      \`package_id\` bigint NOT NULL,
-      \`dimension\` varchar(16) NOT NULL COMMENT 'CAMPUS/TEACHER_LEVEL/CLASS_TYPE',
-      \`dim_value\` varchar(64) NOT NULL,
-      \`price\` decimal(10,2) NOT NULL,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_package_price_rule\` (\`tenant_id\`,\`package_id\`)`,
-    );
+    await createTableIfMissing(queryRunner, new Table({
+      name: 'package_item',
+      columns: [
+        ...baseColumns(),
+        new TableColumn({ name: 'package_id', type: 'bigint' }),
+        new TableColumn({ name: 'course_id', type: 'bigint' }),
+        new TableColumn({
+          name: 'hours', type: 'int', isNullable: true,
+          comment: '子项固定课时(空=通用包仅圈范围)',
+        }),
+        new TableColumn({ name: 'seq', type: 'int', default: '0' }),
+      ],
+    }));
+    await ensureIndex(queryRunner, 'package_item', 'idx_package_item_package', ['tenant_id', 'package_id']);
+    await ensureIndex(queryRunner, 'package_item', 'uk_package_item', ['tenant_id', 'package_id', 'course_id'], true);
+
+    await createTableIfMissing(queryRunner, new Table({
+      name: 'package_tier',
+      columns: [
+        ...baseColumns(),
+        new TableColumn({ name: 'package_id', type: 'bigint' }),
+        new TableColumn({ name: 'hours', type: 'int' }),
+        new TableColumn({ name: 'price', type: 'decimal', precision: 10, scale: 2 }),
+        new TableColumn({ name: 'sort', type: 'int', default: '0' }),
+      ],
+    }));
+    await ensureIndex(queryRunner, 'package_tier', 'idx_package_tier_package', ['tenant_id', 'package_id']);
+
+    await createTableIfMissing(queryRunner, new Table({
+      name: 'package_price_rule',
+      columns: [
+        ...baseColumns(),
+        new TableColumn({ name: 'package_id', type: 'bigint' }),
+        new TableColumn({
+          name: 'dimension', type: 'varchar', length: '16',
+          comment: 'CAMPUS/TEACHER_LEVEL/CLASS_TYPE/AUDIENCE',
+        }),
+        new TableColumn({ name: 'dim_value', type: 'varchar', length: '64' }),
+        new TableColumn({ name: 'price', type: 'decimal', precision: 10, scale: 2 }),
+      ],
+    }));
+    await ensureIndex(queryRunner, 'package_price_rule', 'idx_package_price_rule', ['tenant_id', 'package_id']);
 
     // ---------- 课时账户 ----------
-    await this.addColumn(queryRunner, 'hour_account', 'unit_value', '`unit_value` decimal(12,2) NOT NULL DEFAULT 0');
-    await this.addColumn(queryRunner, 'hour_account', 'is_granted', '`is_granted` tinyint NOT NULL DEFAULT 0 COMMENT \'1=赠课\'');
-    await this.addColumn(queryRunner, 'hour_account', 'grant_type', "`grant_type` varchar(16) NOT NULL DEFAULT 'PAID'");
-    await this.addColumn(queryRunner, 'hour_account', 'status', "`status` varchar(16) NOT NULL DEFAULT 'ACTIVE'");
-    await this.addColumn(queryRunner, 'hour_account', 'start_at', '`start_at` datetime NULL');
-    await this.addColumn(queryRunner, 'hour_account', 'order_item_id', '`order_item_id` bigint NULL');
-    await this.ensureIndex(queryRunner, 'hour_account', 'idx_hour_account_student_status', [
-      'tenant_id', 'student_id', 'status',
-    ]);
+    await addColumnIfMissing(queryRunner, 'hour_account',
+      new TableColumn({ name: 'unit_value', type: 'decimal', precision: 12, scale: 2, default: '0' }));
+    await addColumnIfMissing(queryRunner, 'hour_account',
+      new TableColumn({
+        name: 'is_granted', type: 'tinyint', default: '0',
+        comment: '1=赠课(独立成户,优先消耗,退费不计入)',
+      }));
+    await addColumnIfMissing(queryRunner, 'hour_account',
+      new TableColumn({ name: 'grant_type', type: 'varchar', length: '16', default: "'PAID'" }));
+    await addColumnIfMissing(queryRunner, 'hour_account',
+      new TableColumn({ name: 'status', type: 'varchar', length: '16', default: "'ACTIVE'" }));
+    await addColumnIfMissing(queryRunner, 'hour_account',
+      new TableColumn({ name: 'start_at', type: 'datetime', isNullable: true }));
+    await addColumnIfMissing(queryRunner, 'hour_account',
+      new TableColumn({ name: 'order_item_id', type: 'bigint', isNullable: true }));
+    await ensureIndex(queryRunner, 'hour_account', 'idx_hour_account_student_status',
+      ['tenant_id', 'student_id', 'status']);
 
     // ---------- 一课一消 ----------
-    await this.addColumn(queryRunner, 'hour_consumption', 'confirm_status', '`confirm_status` varchar(16) NULL');
-    await this.addColumn(queryRunner, 'hour_consumption', 'confirm_at', '`confirm_at` datetime NULL');
-    await this.addColumn(queryRunner, 'hour_consumption', 'attendance_id', '`attendance_id` bigint NULL');
-    await this.ensureIndex(queryRunner, 'hour_consumption', 'idx_hour_consumption_lesson', ['tenant_id', 'lesson_id']);
+    await addColumnIfMissing(queryRunner, 'hour_consumption',
+      new TableColumn({ name: 'confirm_status', type: 'varchar', length: '16', isNullable: true }));
+    await addColumnIfMissing(queryRunner, 'hour_consumption',
+      new TableColumn({ name: 'confirm_at', type: 'datetime', isNullable: true }));
+    await addColumnIfMissing(queryRunner, 'hour_consumption',
+      new TableColumn({ name: 'attendance_id', type: 'bigint', isNullable: true }));
+    await ensureIndex(queryRunner, 'hour_consumption', 'idx_hour_consumption_lesson',
+      ['tenant_id', 'lesson_id']);
 
     // ---------- 时间型权益 / 期课报名 ----------
-    await this.createTable(
-      queryRunner,
-      'entitlement',
-      `${this.baseCols()},
-      \`student_id\` bigint NOT NULL,
-      \`package_id\` bigint NULL,
-      \`course_id\` bigint NULL,
-      \`start_at\` datetime NOT NULL,
-      \`expire_at\` datetime NOT NULL,
-      \`status\` varchar(16) NOT NULL DEFAULT 'ACTIVE',
-      \`ref_order_id\` bigint NULL,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_entitlement_student\` (\`tenant_id\`,\`student_id\`),
-      KEY \`idx_entitlement_status\` (\`tenant_id\`,\`student_id\`,\`status\`)`,
-    );
-    await this.createTable(
-      queryRunner,
-      'enrollment',
-      `${this.baseCols()},
-      \`student_id\` bigint NOT NULL,
-      \`class_group_id\` bigint NULL,
-      \`course_id\` bigint NULL,
-      \`package_id\` bigint NULL,
-      \`joined_at\` datetime NOT NULL,
-      \`join_type\` varchar(16) NOT NULL DEFAULT 'FULL',
-      \`discount_hours\` int NOT NULL DEFAULT 0,
-      \`discount_amount\` decimal(12,2) NOT NULL DEFAULT 0,
-      \`total_lessons\` int NOT NULL DEFAULT 0,
-      \`attended_lessons\` int NOT NULL DEFAULT 0,
-      \`status\` varchar(16) NOT NULL DEFAULT 'ACTIVE',
-      \`ref_order_id\` bigint NULL,
-      PRIMARY KEY (\`id\`),
-      KEY \`idx_enrollment_student\` (\`tenant_id\`,\`student_id\`),
-      KEY \`idx_enrollment_class\` (\`tenant_id\`,\`class_group_id\`)`,
-    );
+    await createTableIfMissing(queryRunner, new Table({
+      name: 'entitlement',
+      columns: [
+        ...baseColumns(),
+        new TableColumn({ name: 'student_id', type: 'bigint' }),
+        new TableColumn({ name: 'package_id', type: 'bigint', isNullable: true }),
+        new TableColumn({ name: 'course_id', type: 'bigint', isNullable: true }),
+        new TableColumn({ name: 'start_at', type: 'datetime' }),
+        new TableColumn({ name: 'expire_at', type: 'datetime' }),
+        new TableColumn({ name: 'status', type: 'varchar', length: '16', default: "'ACTIVE'" }),
+        new TableColumn({ name: 'ref_order_id', type: 'bigint', isNullable: true }),
+      ],
+    }));
+    await ensureIndex(queryRunner, 'entitlement', 'idx_entitlement_student', ['tenant_id', 'student_id']);
+    await ensureIndex(queryRunner, 'entitlement', 'idx_entitlement_status', ['tenant_id', 'student_id', 'status']);
 
-    // ---------- 考勤：唯一约束（先清重复，保留最小 id） ----------
-    await this.addColumn(queryRunner, 'attendance', 'consume_mode', '`consume_mode` varchar(16) NULL');
+    await createTableIfMissing(queryRunner, new Table({
+      name: 'enrollment',
+      columns: [
+        ...baseColumns(),
+        new TableColumn({ name: 'student_id', type: 'bigint' }),
+        new TableColumn({ name: 'class_group_id', type: 'bigint', isNullable: true }),
+        new TableColumn({ name: 'course_id', type: 'bigint', isNullable: true }),
+        new TableColumn({ name: 'package_id', type: 'bigint', isNullable: true }),
+        new TableColumn({ name: 'joined_at', type: 'datetime' }),
+        new TableColumn({ name: 'join_type', type: 'varchar', length: '16', default: "'FULL'" }),
+        new TableColumn({ name: 'discount_hours', type: 'int', default: '0' }),
+        new TableColumn({ name: 'discount_amount', type: 'decimal', precision: 12, scale: 2, default: '0' }),
+        new TableColumn({ name: 'total_lessons', type: 'int', default: '0' }),
+        new TableColumn({ name: 'attended_lessons', type: 'int', default: '0' }),
+        new TableColumn({ name: 'status', type: 'varchar', length: '16', default: "'ACTIVE'" }),
+        new TableColumn({ name: 'ref_order_id', type: 'bigint', isNullable: true }),
+      ],
+    }));
+    await ensureIndex(queryRunner, 'enrollment', 'idx_enrollment_student', ['tenant_id', 'student_id']);
+    await ensureIndex(queryRunner, 'enrollment', 'idx_enrollment_class', ['tenant_id', 'class_group_id']);
+
+    // ---------- 考勤：清重复后加唯一约束 ----------
+    await addColumnIfMissing(queryRunner, 'attendance',
+      new TableColumn({ name: 'consume_mode', type: 'varchar', length: '16', isNullable: true }));
+
+    // 先清理历史重复行（同一课次同一学员只保留最小 id），再建唯一索引
     await queryRunner.query(`
-      DELETE a FROM \`attendance\` a
-      JOIN (
-        SELECT tenant_id, lesson_id, student_id, MIN(id) AS keep_id
-        FROM \`attendance\` GROUP BY tenant_id, lesson_id, student_id
-      ) k
-      ON a.tenant_id = k.tenant_id AND a.lesson_id = k.lesson_id AND a.student_id = k.student_id
-      WHERE a.id > k.keep_id
+      DELETE FROM attendance WHERE id NOT IN (
+        SELECT keep_id FROM (
+          SELECT MIN(id) AS keep_id FROM attendance GROUP BY tenant_id, lesson_id, student_id
+        ) k
+      )
     `);
-    await this.ensureIndex(
-      queryRunner, 'attendance', 'uk_attendance_lesson_student',
-      ['tenant_id', 'lesson_id', 'student_id'], true,
-    );
+    await ensureIndex(queryRunner, 'attendance', 'uk_attendance_lesson_student',
+      ['tenant_id', 'lesson_id', 'student_id'], true);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
