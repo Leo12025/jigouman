@@ -81,6 +81,13 @@ export class Order extends BaseEntity {
   @Column({ name: 'deposit_order_id', type: 'bigint', nullable: true, comment: '来源定金单' })
   depositOrderId?: number;
 
+  /**
+   * 拼团订单：关联的拼团实例。
+   * 参团即生成订单，支付后**不立即发课时**，待成团后统一发放；未成团则退款。
+   */
+  @Column({ name: 'group_buy_team_id', type: 'bigint', nullable: true, comment: '关联拼团实例' })
+  groupBuyTeamId?: number;
+
   @Column({ name: 'pay_type', length: 16, nullable: true, comment: '支付方式' })
   payType?: PayType;
 

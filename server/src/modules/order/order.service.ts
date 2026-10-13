@@ -587,6 +587,57 @@ export class OrderService implements OnModuleInit {
       .reduce((s, a) => s + (Number(a.balance) || 0), 0);
   }
 
+  /**
+   * 发放订单课时（供拼团成团后调用）：仅已支付的订单才发放，未支付则跳过。
+   * 拼团订单在 payOrder 时**不发放**，由拼团成团或支付事件触发本方法。
+   */
+  async grantOrderItems(tenantId: number, orderId: number, operatorId?: number) {
+    const order = await this.orderRepo.findOne({ where: { tenantId, id: orderId } as any });
+    if (!order) return { orderId, granted: false, reason: '订单不存在' };
+    if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.COMPLETED) {
+      return { orderId, granted: false, reason: '订单未支付' };
+    }
+    const items = await this.itemRepo.find({ where: { tenantId, orderId } as any });
+    await this.grantItems(tenantId, order, items, operatorId);
+    return { orderId, granted: true };
+  }
+
+  /**
+   * 拼团未成团退款：已支付订单自动发起退款（走审批）；
+   * 未配置活动负责人时置为取消并备注，由财务人工处理。
+   */
+  async refundForGroupBuy(
+    tenantId: number,
+    orderId: number,
+    reason: string,
+    fallbackApproverId?: number,
+  ) {
+    const order = await this.orderRepo.findOne({ where: { tenantId, id: orderId } as any });
+    if (!order) return { orderId, handled: false, reason: '订单不存在' };
+    if (Number(order.paidAmount) <= 0) {
+      order.status = OrderStatus.CANCELLED;
+      await this.orderRepo.save(order as any);
+      return { orderId, cancelled: true };
+    }
+    if (!fallbackApproverId) {
+      order.status = OrderStatus.CANCELLED;
+      order.remark = [order.remark, `${reason}（需人工退款）`].filter(Boolean).join(' | ');
+      await this.orderRepo.save(order as any);
+      return { orderId, cancelled: true, needManualRefund: true };
+    }
+    try {
+      await this.applyRefund(
+        tenantId,
+        orderId,
+        { amount: Number(order.paidAmount), reason, approverId: fallbackApproverId },
+        { id: fallbackApproverId } as any,
+      );
+      return { orderId, refunding: true };
+    } catch {
+      return { orderId, refunding: false };
+    }
+  }
+
   /** 储值支付：用学员储值余额支付订单尾款，付清即发放课时（§2.4 #14） */
   async payOrderByStoredValue(tenantId: number, id: number, operatorId?: number) {
     const order = await this.orderRepo.findOne({ where: { tenantId, id } as any });
@@ -628,7 +679,8 @@ export class OrderService implements OnModuleInit {
     await this.orderRepo.save(order as any);
 
     const items = await this.itemRepo.find({ where: { tenantId, orderId: id } as any });
-    if (order.orderType !== 'DEPOSIT') {
+    // 定金单不发课时；拼团订单**延迟到成团后**发放（未成团则退款）
+    if (order.orderType !== 'DEPOSIT' && !order.groupBuyTeamId) {
       await this.grantItems(tenantId, order, items, operatorId);
     }
 
