@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { User } from '../rbac/user.entity';
 import { Membership } from '../rbac/membership.entity';
 import { AuthUser } from '../../common/decorators/auth.decorator';
+import { LruCache } from '../../common/lru-cache';
 
 export interface JwtPayload {
   sub: number;
@@ -31,9 +32,12 @@ export interface JwtPayload {
   status?: number;
 }
 
-/** 轻量吊销校验缓存：避免每请求重查，吊销延迟受 TTL 约束（默认 30s，可用 AUTH_STATE_TTL_MS 调整） */
-const stateCache = new Map<number, { active: boolean; ts: number }>();
 const STATE_TTL = Number(process.env.AUTH_STATE_TTL_MS) || 30_000;
+/**
+ * 轻量吊销校验缓存：LRU 上限 + TTL。
+ * 此前用裸 Map，key(用户ID)只增不减，长期运行会随登录用户数线性增长。
+ */
+const stateCache = new LruCache<boolean>({ max: 5000, ttlMs: STATE_TTL });
 
 /**
  * JWT 策略：校验 Bearer Token，读取登录时写入的鉴权声明（角色/权限/校区/数据范围），
@@ -77,9 +81,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 权限图（角色/权限/inheritsFrom）已在登录时写入 JWT，不再每请求重查（原 3 次库 ->
     // 至多 2 次轻查询且每 STATE_TTL 才一次），彻底消除 15s 超时的主要来源。
     let active: boolean | undefined;
-    const cached = stateCache.get(payload.sub);
-    if (cached && Date.now() - cached.ts < STATE_TTL) {
-      active = cached.active;
+    const cached = stateCache.get(String(payload.sub));
+    // 注意用 !== undefined 判断：false(已停用) 也是有效缓存值，不能当作未命中
+    if (cached !== undefined) {
+      active = cached;
     } else {
       const u = await this.userRepo.findOne({
         where: { id: payload.sub, tenantId: payload.tenantId },
@@ -90,7 +95,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         select: ['status'],
       });
       active = !!u && u.status === 1 && !!mb && mb.status === 'ACTIVE';
-      stateCache.set(payload.sub, { active, ts: Date.now() });
+      stateCache.set(String(payload.sub), active);
     }
     if (!active) {
       throw new UnauthorizedException('该账号已被停用或移除');

@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThanOrEqual, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
@@ -515,12 +515,13 @@ export class GroupBuyService implements OnModuleInit {
 
   /** 团到期：开启模拟成团则自动补足成团，否则失效并退已支付订单 */
   async expireTenant(tenantId: number) {
-    const now = Date.now();
-    const teams = await this.team.find({ where: { tenantId, status: 'OPEN' } as any });
+    // 条件下推到 SQL：只取已过期的团，避免全表加载所有 OPEN 团后 JS 过滤
+    const teams = await this.team.find({
+      where: { tenantId, status: 'OPEN', expireAt: LessThanOrEqual(new Date()) } as any,
+    });
     let expired = 0;
     let filled = 0;
     for (const t of teams) {
-      if (!t.expireAt || new Date(t.expireAt).getTime() > now) continue;
       const a = await this.act.findOne({ where: { tenantId, id: t.activityId } as any });
       if (a && a.autoFill) {
         await this.succeedTeam(tenantId, t, a, true);

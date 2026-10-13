@@ -6,13 +6,19 @@ import { CreateTenantDto, UpdateTenantDto, TenantQueryDto, UpdateTenantSelfDto }
 
 /** 租户服务：CRUD + 域名解析（租户中心 & 多租户网关） */
 import { orgRepo } from '../../common/org-scope';
+import { LruCache } from '../../common/lru-cache';
 
 @Injectable()
 export class TenantService {
-  /** 域名 -> 租户 解析缓存（60s），避免每请求查库；命中直接返回整对象 */
-  private cache = new Map<string, { value: Tenant | null; ts: number }>();
-  /** 用户名@品牌域 解析缓存（60s） */
-  private slugCache = new Map<string, { value: Tenant | null; ts: number }>();
+  /**
+   * 域名 -> 租户 解析缓存（60s TTL + LRU 上限）。
+   * 注意：key 来自客户端 Host 头且该查询**每请求都会执行**，
+   * 因此①不缓存解析失败(null)的结果，②必须限条数——
+   * 否则伪造随机 Host 即可让该 Map 无限增长（可远程触发的内存泄漏）。
+   */
+  private cache = new LruCache<Tenant | null>({ max: 2000, ttlMs: 60_000 });
+  /** 用户名@品牌域 解析缓存（60s TTL + LRU 上限） */
+  private slugCache = new LruCache<Tenant | null>({ max: 2000, ttlMs: 60_000 });
 
   private readonly repo: Repository<Tenant>;
   constructor(@InjectRepository(Tenant) repo: Repository<Tenant>) {
@@ -27,18 +33,20 @@ export class TenantService {
     if (!rawHost) return null;
     const host = rawHost.toLowerCase().split(':')[0];
     const cached = this.cache.get(host);
-    if (cached && Date.now() - cached.ts < 60_000) return cached.value;
+    if (cached) return cached;
     let t = host ? await this.repo.findOne({ where: { domain: host } }) : null;
     if (!t) {
       const sub = host.split('.')[0];
       if (sub && sub !== host) t = await this.repo.findOne({ where: { slug: sub } });
     }
-    this.cache.set(host, { value: t, ts: Date.now() });
+    // 只缓存成功解析的结果：解析失败的 Host 不入缓存，避免被伪造 Host 撑爆内存
+    if (t) this.cache.set(host, t);
     return t;
   }
 
   private invalidate() {
     this.cache.clear();
+    this.slugCache.clear();
   }
 
   async list(q: TenantQueryDto) {
@@ -98,10 +106,10 @@ export class TenantService {
     if (!s) return null;
     const key = s.toLowerCase().trim();
     const cached = this.slugCache.get(key);
-    if (cached && Date.now() - cached.ts < 60_000) return cached.value;
+    if (cached) return cached;
     let t = await this.repo.findOne({ where: { slug: key } });
     if (!t) t = await this.repo.findOne({ where: { domain: key } });
-    this.slugCache.set(key, { value: t, ts: Date.now() });
+    if (t) this.slugCache.set(key, t);
     return t;
   }
 

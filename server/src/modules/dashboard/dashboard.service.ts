@@ -1,4 +1,4 @@
-import { orgRepo as orgScoped } from '../../common/org-scope';
+import { orgRepo as orgScoped, resolveOrgFilter } from '../../common/org-scope';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -131,6 +131,87 @@ export class DashboardService {
     return typeof v === 'number' ? v : Number(v || 0);
   }
 
+  // ---------------- SQL 聚合助手 ----------------
+  /**
+   * 校区隔离条件。注意：orgRepo 代理只对 find/findOne/findAndCount/count 等方法注入过滤，
+   * createQueryBuilder 会直接透传，因此这里必须手动补上，否则看板会跨校区泄漏。
+   */
+  private scopeOf(repo: Repository<any>): { sql?: string; params?: any } {
+    const f = resolveOrgFilter(repo) as any;
+    if (!f) return {};
+    const v = f.orgId;
+    if (v == null) return {};
+    const arr = v && typeof v === 'object' ? (v.value ?? v._value) : v;
+    if (Array.isArray(arr)) {
+      return arr.length ? { sql: 'e.org_id IN (:...orgIds)', params: { orgIds: arr } } : { sql: '1 = 0' };
+    }
+    return { sql: 'e.org_id = :orgId', params: { orgId: v } };
+  }
+
+  private applyScope(qb: any, repo: Repository<any>, extra?: { sql?: string; params?: any }) {
+    const s = this.scopeOf(repo);
+    if (s.sql) qb.andWhere(s.sql, s.params || {});
+    if (extra?.sql) qb.andWhere(extra.sql, extra.params || {});
+  }
+
+  /**
+   * 单值聚合（COUNT/SUM）：只回传标量。
+   * 相比 find({where:{tenantId}}) 全表加载，内存从 O(表行数) 降到 O(1)。
+   * 注意手动补 deleted_at IS NULL：QueryBuilder 不会像 find 那样自动排除软删除行。
+   */
+  private async scalar(
+    repo: Repository<any>,
+    select: string,
+    t: number,
+    extra?: { sql?: string; params?: any },
+  ): Promise<number> {
+    const qb = repo
+      .createQueryBuilder('e')
+      .select(select, 'v')
+      .where('e.tenant_id = :t', { t })
+      .andWhere('e.deleted_at IS NULL');
+    this.applyScope(qb, repo, extra);
+    const raw = await qb.getRawOne();
+    return Number(raw?.v || 0);
+  }
+
+  /** 分组聚合：每组一行，内存 O(分组数)。支持单/多分组表达式 */
+  private async grouped(
+    repo: Repository<any>,
+    groupExpr: string | string[],
+    selects: string[],
+    t: number,
+    extra?: { sql?: string; params?: any },
+  ): Promise<any[]> {
+    const exprs = Array.isArray(groupExpr) ? groupExpr : [groupExpr];
+    const qb = repo
+      .createQueryBuilder('e')
+      .where('e.tenant_id = :t', { t })
+      .andWhere('e.deleted_at IS NULL');
+    exprs.forEach((g, i) => qb.addSelect(g, exprs.length === 1 ? 'k' : `k${i}`));
+    for (const s of selects) qb.addSelect(s);
+    this.applyScope(qb, repo, extra);
+    qb.groupBy(exprs.join(', '));
+    return (await qb.getRawMany()) || [];
+  }
+
+  /** 月份表达式：MySQL 与 SQLite 方言不同，按驱动分支 */
+  private monthExpr(alias = 'e'): string {
+    const type = (this.ds.options as any).type;
+    return type === 'mysql'
+      ? `DATE_FORMAT(${alias}.created_at, '%Y-%m')`
+      : `strftime('%Y-%m', ${alias}.created_at)`;
+  }
+
+  private dateRange(start?: string, end?: string): { sql?: string; params?: any } {
+    if (!start && !end) return {};
+    const parts: string[] = [];
+    const params: any = {};
+    if (start) { parts.push('e.created_at >= :dStart'); params.dStart = new Date(start); }
+    if (end) { parts.push('e.created_at <= :dEnd'); params.dEnd = new Date(end); }
+    return { sql: parts.join(' AND '), params };
+  }
+
   // ---------------- 动态指标配置（§4.10 看板增强） ----------------
   async createMetricDef(t: number, d: any) {
     const m = this.metricRepo.create({ tenantId: t, ...d } as MetricDef);
@@ -171,75 +252,59 @@ export class DashboardService {
     return out;
   }
 
-  /** 内置指标注册表：code -> 计算函数（复用已注入仓储，规避 SQL 方言差异） */
+  /** 内置指标注册表：code -> 计算函数（全部下推 SQL 聚合，不再全表加载实体） */
   private async computeMetric(code: string, t: number): Promise<number | null> {
+    const cnt = (repo: Repository<any>, where?: string) =>
+      this.scalar(repo, 'COUNT(*)', t, where ? { sql: where } : undefined);
+    const sum = (repo: Repository<any>, field: string, where?: string) =>
+      this.scalar(repo, `COALESCE(SUM(e.${field}),0)`, t, where ? { sql: where } : undefined);
+
     switch (code) {
       case 'REVENUE_RECEIVED':
-        return this.sum(
-          (await this.orderRepo.find({ where: { tenantId: t } })).filter(
-            (o) => o.status === OrderStatus.PAID || o.status === OrderStatus.COMPLETED,
-          ),
-          'paidAmount',
-        );
+        return sum(this.orderRepo, 'paidAmount', `e.status IN ('${OrderStatus.PAID}','${OrderStatus.COMPLETED}')`);
       case 'REVENUE_RECEIVABLE':
-        return this.sum(await this.orderRepo.find({ where: { tenantId: t } }), 'payableAmount');
+        return sum(this.orderRepo, 'payableAmount');
       case 'REFUND_AMOUNT':
-        return this.sum(
-          (await this.orderRepo.find({ where: { tenantId: t } })).filter(
-            (o) => o.status === OrderStatus.REFUNDED,
-          ),
-          'payableAmount',
-        );
+        return sum(this.orderRepo, 'payableAmount', `e.status = '${OrderStatus.REFUNDED}'`);
       case 'TOTAL_STUDENTS':
-        return (await this.studentRepo.find({ where: { tenantId: t } })).length;
+        return cnt(this.studentRepo);
       case 'STUDYING_STUDENTS':
-        return (await this.studentRepo.find({ where: { tenantId: t } })).filter(
-          (s) => s.status === StudentStatus.STUDYING,
-        ).length;
+        return cnt(this.studentRepo, `e.status = '${StudentStatus.STUDYING}'`);
       case 'REFUNDED_STUDENTS':
-        return (await this.studentRepo.find({ where: { tenantId: t } })).filter(
-          (s) => s.status === StudentStatus.REFUNDED,
-        ).length;
+        return cnt(this.studentRepo, `e.status = '${StudentStatus.REFUNDED}'`);
       case 'CONSUME_RATE': {
-        const hc = await this.hcRepo.find({ where: { tenantId: t } });
-        const granted = this.sum(hc.filter((h) => h.type === 'GRANT'), 'hours');
-        const consumed = -this.sum(hc.filter((h) => h.type === 'CONSUME'), 'hours');
+        const granted = await sum(this.hcRepo, 'hours', "e.type = 'GRANT'");
+        const consumed = -(await sum(this.hcRepo, 'hours', "e.type = 'CONSUME'"));
         return granted ? Number((consumed / granted).toFixed(4)) : 0;
       }
       case 'FULL_RATE': {
-        const cgs = await this.cgRepo.find({ where: { tenantId: t } });
-        const enrolled = (await this.scRepo.find({ where: { tenantId: t } })).filter(
-          (s) => s.status === 'ACTIVE',
-        ).length;
-        const cap = this.sum(cgs, 'capacity');
+        const cap = await sum(this.cgRepo, 'capacity');
+        const enrolled = await cnt(this.scRepo, "e.status = 'ACTIVE'");
         return cap ? Number((enrolled / cap).toFixed(4)) : 0;
       }
       case 'ATTENDANCE_RATE': {
-        const att = await this.attRepo.find({ where: { tenantId: t } });
-        if (!att.length) return 0;
-        const present = att.filter((a) => a.status === 'PRESENT').length;
-        return Number((present / att.length).toFixed(4));
+        const total = await cnt(this.attRepo);
+        if (!total) return 0;
+        const present = await cnt(this.attRepo, "e.status = 'PRESENT'");
+        return Number((present / total).toFixed(4));
       }
       case 'TRIAL_CONVERSION': {
-        const leads = await this.leadRepo.find({ where: { tenantId: t } });
-        if (!leads.length) return 0;
-        const signed = leads.filter((l) => l.stage === LeadStage.SIGNED).length;
-        return Number((signed / leads.length).toFixed(4));
+        const total = await cnt(this.leadRepo);
+        if (!total) return 0;
+        const signed = await cnt(this.leadRepo, `e.stage = '${LeadStage.SIGNED}'`);
+        return Number((signed / total).toFixed(4));
       }
       case 'TOTAL_LEADS':
-        return (await this.leadRepo.find({ where: { tenantId: t } })).length;
+        return cnt(this.leadRepo);
       case 'PENDING_HOMEWORK':
-        return (await this.hsRepo.find({ where: { tenantId: t } })).filter(
-          (s) => s.status === 'SUBMITTED',
-        ).length;
+        return cnt(this.hsRepo, "e.status = 'SUBMITTED'");
       case 'PENDING_REVIEW':
-        return (await this.taskRepo.find({ where: { tenantId: t } })).filter(
-          (x) => x.status === TaskStatus.TODO,
-        ).length;
+        return cnt(this.taskRepo, `e.status = '${TaskStatus.TODO}'`);
       case 'PENDING_COURSE_REVIEW':
-        return (await this.taskRepo.find({ where: { tenantId: t } })).filter(
-          (x) => x.status === TaskStatus.TODO && x.type === 'AFTER_CLASS_REVIEW',
-        ).length;
+        return cnt(
+          this.taskRepo,
+          `e.status = '${TaskStatus.TODO}' AND e.type = 'AFTER_CLASS_REVIEW'`,
+        );
       default:
         return null;
     }
@@ -268,94 +333,155 @@ export class DashboardService {
     return out;
   }
 
+  /** 合并日期范围条件与额外条件 */
+  private mergeWhere(
+    a?: { sql?: string; params?: any },
+    b?: string,
+    extraParams?: any,
+  ): { sql?: string; params?: any } {
+    if (!b) return a || {};
+    const sql = a?.sql ? `${a.sql} AND ${b}` : b;
+    return { sql, params: { ...(a?.params || {}), ...(extraParams || {}) } };
+  }
+
+  /** 月度趋势（按月份分组聚合，O(月份数) 内存） */
+  private async monthTrendAgg(t: number, months: number, dr: { sql?: string; params?: any }) {
+    const mExpr = this.monthExpr();
+    const [ordRows, hcRows] = await Promise.all([
+      this.grouped(
+        this.orderRepo, mExpr,
+        ['COALESCE(SUM(e.payable_amount),0) AS receivable', 'COALESCE(SUM(e.paid_amount),0) AS received'],
+        t, dr,
+      ),
+      this.grouped(
+        this.hcRepo, mExpr, ['COALESCE(SUM(e.hours),0) AS hours'],
+        t, this.mergeWhere(dr, "e.type = 'CONSUME'"),
+      ),
+    ]);
+    const ordMap = new Map<string, any>(ordRows.map((r) => [String(r.k), r]));
+    const hcMap = new Map<string, any>(hcRows.map((r) => [String(r.k), r]));
+    const arr: any[] = [];
+    const now = new Date();
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const o = ordMap.get(ym);
+      const c = hcMap.get(ym);
+      arr.push({
+        month: ym,
+        receivable: Number(o?.receivable || 0),
+        received: Number(o?.received || 0),
+        consumed: -Number(c?.hours || 0),
+      });
+    }
+    return arr;
+  }
+
   // ---------------- 经营看板（校长视角） ----------------
   private async principal(t: number, q: any, months: number) {
-    const [orders, students, ha, hc, cgs, leads] = await Promise.all([
-      this.orderRepo.find({ where: { tenantId: t } }),
-      this.studentRepo.find({ where: { tenantId: t } }),
-      this.haRepo.find({ where: { tenantId: t } }),
-      this.hcRepo.find({ where: { tenantId: t } }),
-      this.cgRepo.find({ where: { tenantId: t } }),
-      this.leadRepo.find({ where: { tenantId: t } }),
+    const dr = this.dateRange(q?.start, q?.end);
+    const paidCond = `e.status IN ('${OrderStatus.PAID}','${OrderStatus.COMPLETED}')`;
+    const refundCond = `e.status = '${OrderStatus.REFUNDED}'`;
+
+    const [
+      orderCount, paidOrderCount, receivable, received, refundAmount,
+      totalStudents, studying, refundedStu,
+      granted, consumedAbs, balance, capacity, enrolled, cgCount,
+    ] = await Promise.all([
+      this.scalar(this.orderRepo, 'COUNT(*)', t, dr),
+      this.scalar(this.orderRepo, 'COUNT(*)', t, this.mergeWhere(dr, paidCond)),
+      this.scalar(this.orderRepo, 'COALESCE(SUM(e.payable_amount),0)', t, dr),
+      this.scalar(this.orderRepo, 'COALESCE(SUM(e.paid_amount),0)', t, dr),
+      this.scalar(this.orderRepo, 'COALESCE(SUM(e.payable_amount),0)', t, this.mergeWhere(dr, refundCond)),
+      this.scalar(this.studentRepo, 'COUNT(*)', t),
+      this.scalar(this.studentRepo, 'COUNT(*)', t, { sql: `e.status = '${StudentStatus.STUDYING}'` }),
+      this.scalar(this.studentRepo, 'COUNT(*)', t, { sql: `e.status = '${StudentStatus.REFUNDED}'` }),
+      this.scalar(this.hcRepo, 'COALESCE(SUM(e.hours),0)', t, { sql: "e.type = 'GRANT'" }),
+      this.scalar(this.hcRepo, 'COALESCE(SUM(e.hours),0)', t, { sql: "e.type = 'CONSUME'" }),
+      this.scalar(this.haRepo, 'COALESCE(SUM(e.balance),0)', t),
+      this.scalar(this.cgRepo, 'COALESCE(SUM(e.capacity),0)', t),
+      this.scalar(this.scRepo, 'COUNT(*)', t, { sql: "e.status = 'ACTIVE'" }),
+      this.scalar(this.cgRepo, 'COUNT(*)', t),
     ]);
 
-    const filtered = this.filterByDate(orders, q?.start, q?.end);
-    const paidOrders = filtered.filter(
-      (o) => o.status === OrderStatus.PAID || o.status === OrderStatus.COMPLETED,
-    );
-    const refunded = filtered.filter((o) => o.status === OrderStatus.REFUNDED);
-    const receivable = this.sum(filtered, 'payableAmount');
-    const received = this.sum(filtered, 'paidAmount');
-    const refundAmount = this.sum(refunded, 'payableAmount');
-
-    const studying = students.filter((s) => s.status === StudentStatus.STUDYING).length;
-    const refundedStu = students.filter((s) => s.status === StudentStatus.REFUNDED).length;
-
-    const granted = this.sum(
-      hc.filter((h) => h.type === 'GRANT'),
-      'hours',
-    );
-    const consumed = -this.sum(
-      hc.filter((h) => h.type === 'CONSUME'),
-      'hours',
-    );
+    const consumed = -consumedAbs;
     const consumeRate = granted ? Number((consumed / granted).toFixed(4)) : 0;
+    const fullRate = capacity ? Number((enrolled / capacity).toFixed(4)) : 0;
 
-    const totalCapacity = this.sum(cgs, 'capacity');
-    const enrolled = (await this.scRepo.find({ where: { tenantId: t } })).filter(
-      (s) => s.status === 'ACTIVE',
-    ).length;
-    const fullRate = totalCapacity ? Number((enrolled / totalCapacity).toFixed(4)) : 0;
+    // 招生漏斗（按阶段分组）
+    const stageRows = await this.grouped(this.leadRepo, 'e.stage', ['COUNT(*) AS c'], t, dr);
+    const byStage: Record<string, number> = {};
+    for (const s of Object.values(LeadStage)) byStage[s] = 0;
+    for (const r of stageRows) byStage[String(r.k)] = Number(r.c);
+    const leadTotal = stageRows.reduce((a, r) => a + Number(r.c), 0);
+    const funnel = {
+      total: leadTotal,
+      byStage,
+      trialed: byStage[LeadStage.TRIALED] || 0,
+      signed: byStage[LeadStage.SIGNED] || 0,
+      conversionRate: leadTotal ? Number(((byStage[LeadStage.SIGNED] || 0) / leadTotal).toFixed(4)) : 0,
+    };
 
     return {
       revenue: {
-        orderCount: filtered.length,
-        paidOrderCount: paidOrders.length,
+        orderCount,
+        paidOrderCount,
         receivable,
         received,
         refundAmount,
         netCashflow: received - refundAmount,
       },
-      students: {
-        total: students.length,
-        studying,
-        refunded: refundedStu,
-      },
-      hours: {
-        totalGranted: granted,
-        totalConsumed: consumed,
-        consumeRate,
-        balance: this.sum(ha, 'balance'),
-      },
-      classGroups: {
-        count: cgs.length,
-        totalCapacity,
-        enrolled,
-        fullRate,
-      },
-      admissionSummary: this.funnelOf(leads),
-      trend: this.monthTrend(orders, hc, months),
+      students: { total: totalStudents, studying, refunded: refundedStu },
+      hours: { totalGranted: granted, totalConsumed: consumed, consumeRate, balance },
+      classGroups: { count: cgCount, totalCapacity: capacity, enrolled, fullRate },
+      admissionSummary: funnel,
+      trend: await this.monthTrendAgg(t, months, dr),
     };
   }
 
   // ---------------- 招生看板（顾问视角） ----------------
   private async admission(t: number, q: any) {
-    const [leads, channels, campaigns] = await Promise.all([
-      this.leadRepo.find({ where: { tenantId: t } }),
+    const dr = this.dateRange(q?.start, q?.end);
+    // 渠道/活动字典表本身很小（几十条），可整表加载用于名称映射
+    const [channels, campaigns] = await Promise.all([
       this.channelRepo.find({ where: { tenantId: t } }),
       this.campaignRepo.find({ where: { tenantId: t } }),
     ]);
-    const filtered = this.filterByDate(leads, q?.start, q?.end);
-    const funnel = this.funnelOf(filtered);
     const chMap = new Map(channels.map((c) => [c.id, c.name]));
     const cpMap = new Map(campaigns.map((c) => [c.id, c.name]));
 
-    const now = Date.now();
-    const pendingFollow = filtered.filter(
-      (l) =>
-        (l.stage === LeadStage.NEW || l.stage === LeadStage.FOLLOWING) &&
-        (!l.lastFollowAt || new Date(l.lastFollowAt).getTime() < now - 7 * 864e5),
-    ).length;
+    const stageRows = await this.grouped(this.leadRepo, 'e.stage', ['COUNT(*) AS c'], t, dr);
+    const byStage: Record<string, number> = {};
+    for (const s of Object.values(LeadStage)) byStage[s] = 0;
+    for (const r of stageRows) byStage[String(r.k)] = Number(r.c);
+    const total = stageRows.reduce((a, r) => a + Number(r.c), 0);
+    const funnel = {
+      total,
+      byStage,
+      trialed: byStage[LeadStage.TRIALED] || 0,
+      signed: byStage[LeadStage.SIGNED] || 0,
+      conversionRate: total ? Number(((byStage[LeadStage.SIGNED] || 0) / total).toFixed(4)) : 0,
+    };
+
+    const toGroups = (rows: any[], nameMap: Map<number, string>) =>
+      rows
+        .filter((r) => r.k != null)
+        .map((r) => ({ id: Number(r.k), name: nameMap.get(Number(r.k)) || `ID:${r.k}`, count: Number(r.c) }));
+
+    const [chRows, cpRows, pendingFollow] = await Promise.all([
+      this.grouped(this.leadRepo, 'e.channel_id', ['COUNT(*) AS c'], t, dr),
+      this.grouped(this.leadRepo, 'e.campaign_id', ['COUNT(*) AS c'], t, dr),
+      this.scalar(
+        this.leadRepo,
+        'COUNT(*)',
+        t,
+        this.mergeWhere(
+          dr,
+          `e.stage IN ('${LeadStage.NEW}','${LeadStage.FOLLOWING}') AND (e.last_follow_at IS NULL OR e.last_follow_at < :followCut)`,
+          { followCut: new Date(Date.now() - 7 * 864e5) },
+        ),
+      ),
+    ]);
 
     return {
       funnel: {
@@ -365,87 +491,91 @@ export class DashboardService {
         conversionRate: funnel.conversionRate,
         byStage: funnel.byStage,
       },
-      byChannel: this.groupCount(filtered, 'channelId', chMap),
-      byCampaign: this.groupCount(filtered, 'campaignId', cpMap),
+      byChannel: toGroups(chRows, chMap),
+      byCampaign: toGroups(cpRows, cpMap),
       pendingFollow,
     };
   }
 
   // ---------------- 教学看板（教务视角） ----------------
   private async teaching(t: number) {
-    const [att, hw, hs, hr, tasks, reviews] = await Promise.all([
-      this.attRepo.find({ where: { tenantId: t } }),
-      this.hwRepo.find({ where: { tenantId: t } }),
-      this.hsRepo.find({ where: { tenantId: t } }),
-      this.hrRepo.find({ where: { tenantId: t } }),
-      this.taskRepo.find({ where: { tenantId: t } }),
-      this.reviewRepo.find({ where: { tenantId: t } }),
+    const todo = `e.status = '${TaskStatus.TODO}'`;
+    const [
+      attTotal, attPresent, hwCount, hsTotal, hsReviewed, hsLate, hsPending, hrExcellent,
+      taskTodo, taskCourseReview, reviewCount,
+    ] = await Promise.all([
+      this.scalar(this.attRepo, 'COUNT(*)', t),
+      this.scalar(this.attRepo, 'COUNT(*)', t, { sql: "e.status = 'PRESENT'" }),
+      this.scalar(this.hwRepo, 'COUNT(*)', t),
+      this.scalar(this.hsRepo, 'COUNT(*)', t),
+      this.scalar(this.hsRepo, 'COUNT(*)', t, { sql: "e.status = 'REVIEWED'" }),
+      this.scalar(this.hsRepo, 'COUNT(*)', t, { sql: 'e.is_late = 1' }),
+      this.scalar(this.hsRepo, 'COUNT(*)', t, { sql: "e.status = 'SUBMITTED'" }),
+      this.scalar(this.hrRepo, 'COUNT(*)', t, { sql: 'e.is_excellent = 1' }),
+      this.scalar(this.taskRepo, 'COUNT(*)', t, { sql: todo }),
+      this.scalar(this.taskRepo, 'COUNT(*)', t, { sql: `${todo} AND e.type = 'AFTER_CLASS_REVIEW'` }),
+      this.scalar(this.reviewRepo, 'COUNT(*)', t),
     ]);
 
-    const total = att.length;
-    const present = att.filter((a) => a.status === 'PRESENT').length;
-    const attendanceRate = total ? Number((present / total).toFixed(4)) : 0;
-
-    const submitted = hs.length;
-    const reviewed = hs.filter((s) => s.status === 'REVIEWED').length;
-    const late = hs.filter((s) => s.isLate === 1).length;
-    const excellent = hr.filter((r) => r.isExcellent === 1).length;
-    const pendingHomework = hs.filter((s) => s.status === 'SUBMITTED').length;
-    const reviewedRate = submitted ? Number((reviewed / submitted).toFixed(4)) : 0;
-
-    const pendingReview = tasks.filter((x) => x.status === TaskStatus.TODO).length;
-    const pendingCourseReview = tasks.filter(
-      (x) => x.status === TaskStatus.TODO && x.type === 'AFTER_CLASS_REVIEW',
-    ).length;
+    const attendanceRate = attTotal ? Number((attPresent / attTotal).toFixed(4)) : 0;
+    const reviewedRate = hsTotal ? Number((hsReviewed / hsTotal).toFixed(4)) : 0;
+    const taskByType = (await this.grouped(this.taskRepo, 'e.type', ['COUNT(*) AS c'], t)).map((r) => ({
+      type: String(r.k),
+      count: Number(r.c),
+    }));
 
     return {
-      attendance: { total, present, attendanceRate },
+      attendance: { total: attTotal, present: attPresent, attendanceRate },
       homework: {
-        assigned: hw.length,
-        submitted,
-        reviewed,
+        assigned: hwCount,
+        submitted: hsTotal,
+        reviewed: hsReviewed,
         reviewedRate,
-        late,
-        excellent,
-        pendingHomework,
+        late: hsLate,
+        excellent: hrExcellent,
+        pendingHomework: hsPending,
       },
-      courseReview: { count: reviews.length },
-      tasks: { pending: pendingReview, byType: this.groupTask(tasks) },
+      courseReview: { count: reviewCount },
+      tasks: { pending: taskTodo, byType: taskByType },
       alerts: [
-        { code: 'PENDING_HOMEWORK', label: '待批改作业', value: pendingHomework },
-        { code: 'PENDING_COURSE_REVIEW', label: '待写课后点评', value: pendingCourseReview },
-        { code: 'PENDING_TASK', label: '待办任务总数', value: pendingReview },
+        { code: 'PENDING_HOMEWORK', label: '待批改作业', value: hsPending },
+        { code: 'PENDING_COURSE_REVIEW', label: '待写课后点评', value: taskCourseReview },
+        { code: 'PENDING_TASK', label: '待办任务总数', value: taskTodo },
       ],
     };
   }
 
   // ---------------- 多校区汇总对标（§4.11 / §10 M8 多校区） ----------------
   async campusBenchmark(t: number) {
-    const orgs = await this.orgRepo.find({ where: { tenantId: t } as any });
-    const costs = await this.costRepo.find({ where: { tenantId: t } as any });
-    const materials = await this.materialRepo.find({ where: { tenantId: t } as any });
+    // orgs 是配置数据（量极小）可整表；成本/物料改为按 org_id 分组聚合，避免全表加载
+    const [orgs, costRows, matRows, allCost] = await Promise.all([
+      this.orgRepo.find({ where: { tenantId: t } as any }),
+      this.grouped(this.costRepo, 'e.org_id', ['COALESCE(SUM(e.amount),0) AS costTotal'], t),
+      this.grouped(this.materialRepo, 'e.org_id', [
+        'COUNT(*) AS cnt',
+        'COALESCE(SUM(e.stock_qty * e.price),0) AS stockValue',
+      ], t),
+      this.scalar(this.costRepo, 'COALESCE(SUM(e.amount),0)', t),
+    ]);
+    const costMap = new Map<string, any>(costRows.map((r) => [String(r.k), r]));
+    const matMap = new Map<string, any>(matRows.map((r) => [String(r.k), r]));
 
     const campuses = orgs
       .filter((o) => o.type === 'CAMPUS' || o.type === 'BRANCH')
       .map((o) => {
-        const orgCosts = costs.filter((c) => c.orgId === o.id);
-        const orgMat = materials.filter((m) => m.orgId === o.id);
-        const costTotal = this.sum(orgCosts, 'amount');
-        const stockValue = orgMat.reduce(
-          (a, m) => a + (Number(m.stockQty) || 0) * (Number(m.price) || 0),
-          0,
-        );
+        const mat = matMap.get(String(o.id));
+        const costTotal = Number(costMap.get(String(o.id))?.costTotal || 0);
+        const stockValue = Number(mat?.stockValue || 0);
         return {
           id: o.id,
           name: o.name,
           type: o.type,
           costTotal: Number(costTotal.toFixed(2)),
-          materialCount: orgMat.length,
+          materialCount: Number(mat?.cnt || 0),
           stockValue: Number(stockValue.toFixed(2)),
         };
       });
 
-    const allCost = this.sum(costs, 'amount');
     const ranked = [...campuses].sort((a, b) => b.costTotal - a.costTotal);
     return {
       campuses,
@@ -454,9 +584,7 @@ export class DashboardService {
       compare: {
         highestCost: ranked[0] || null,
         lowestCost: ranked[ranked.length - 1] || null,
-        avgCost: campuses.length
-          ? Number((allCost / campuses.length).toFixed(2))
-          : 0,
+        avgCost: campuses.length ? Number((allCost / campuses.length).toFixed(2)) : 0,
       },
     };
   }
@@ -469,117 +597,131 @@ export class DashboardService {
    */
   async campusOverview(t: number) {
     const ds = this.ds;
-    const [orgs, leads, students, orders, ha, hc, att, hs, costs, materials] = await Promise.all([
+    const g = 'e.org_id';
+    // 全部改为「按 org_id 分组聚合」：内存从 O(全表行数) 降到 O(校区数)
+    const [
+      orgs,
+      leadRows, stuRows, ordRows, haRows, hcRows, attRows, hsRows, costRows, matRows,
+    ] = await Promise.all([
       ds.getRepository(Organization).find({ where: { tenantId: t } } as any),
-      ds.getRepository(Lead).find({ where: { tenantId: t } } as any),
-      ds.getRepository(Student).find({ where: { tenantId: t } } as any),
-      ds.getRepository(Order).find({ where: { tenantId: t } } as any),
-      ds.getRepository(HourAccount).find({ where: { tenantId: t } } as any),
-      ds.getRepository(HourConsumption).find({ where: { tenantId: t } } as any),
-      ds.getRepository(Attendance).find({ where: { tenantId: t } } as any),
-      ds.getRepository(HomeworkSubmit).find({ where: { tenantId: t } } as any),
-      ds.getRepository(CostRecord).find({ where: { tenantId: t } } as any),
-      ds.getRepository(Material).find({ where: { tenantId: t } } as any),
+      this.grouped(ds.getRepository(Lead), g, [
+        'COUNT(*) AS leads',
+        `COALESCE(SUM(CASE WHEN e.stage='${LeadStage.TRIALED}' THEN 1 ELSE 0 END),0) AS trialed`,
+        `COALESCE(SUM(CASE WHEN e.stage='${LeadStage.SIGNED}' THEN 1 ELSE 0 END),0) AS signed`,
+      ], t),
+      this.grouped(ds.getRepository(Student), g, [
+        'COUNT(*) AS total',
+        `COALESCE(SUM(CASE WHEN e.status='${StudentStatus.STUDYING}' THEN 1 ELSE 0 END),0) AS studying`,
+        `COALESCE(SUM(CASE WHEN e.status='${StudentStatus.REFUNDED}' THEN 1 ELSE 0 END),0) AS refunded`,
+      ], t),
+      this.grouped(ds.getRepository(Order), g, [
+        'COUNT(*) AS orderCount',
+        'COALESCE(SUM(e.payable_amount),0) AS receivable',
+        'COALESCE(SUM(e.paid_amount),0) AS received',
+        `COALESCE(SUM(CASE WHEN e.status='${OrderStatus.REFUNDED}' THEN e.payable_amount ELSE 0 END),0) AS refundAmount`,
+      ], t),
+      this.grouped(ds.getRepository(HourAccount), g, ['COALESCE(SUM(e.balance),0) AS balance'], t),
+      this.grouped(ds.getRepository(HourConsumption), g, [
+        "COALESCE(SUM(CASE WHEN e.type='GRANT' THEN e.hours ELSE 0 END),0) AS granted",
+        "COALESCE(SUM(CASE WHEN e.type='CONSUME' THEN -e.hours ELSE 0 END),0) AS consumed",
+      ], t),
+      this.grouped(ds.getRepository(Attendance), g, [
+        'COUNT(*) AS total',
+        "COALESCE(SUM(CASE WHEN e.status='PRESENT' THEN 1 ELSE 0 END),0) AS present",
+      ], t),
+      this.grouped(ds.getRepository(HomeworkSubmit), g, [
+        'COUNT(*) AS total',
+        "COALESCE(SUM(CASE WHEN e.status='REVIEWED' THEN 1 ELSE 0 END),0) AS reviewed",
+        "COALESCE(SUM(CASE WHEN e.status='SUBMITTED' THEN 1 ELSE 0 END),0) AS pending",
+      ], t),
+      this.grouped(ds.getRepository(CostRecord), g, ['COALESCE(SUM(e.amount),0) AS costTotal'], t),
+      this.grouped(ds.getRepository(Material), g, [
+        'COUNT(*) AS materialCount',
+        'COALESCE(SUM(e.stock_qty * e.price),0) AS stockValue',
+      ], t),
     ]);
 
-    // 按 orgId 分组（无 orgId 的记录不计入任何校区，保持统计一致性）
-    const groupByOrg = <T extends { orgId?: number }>(arr: T[]) => {
-      const m = new Map<number, T[]>();
-      for (const x of arr) {
-        if (x.orgId == null) continue;
-        const list = m.get(x.orgId) || [];
-        list.push(x);
-        m.set(x.orgId, list);
+    // 无 org_id 的记录不计入任何校区（与旧实现保持一致的统计口径）
+    const toMap = (rows: any[]) => {
+      const m = new Map<number, any>();
+      for (const r of rows) {
+        if (r.k == null) continue;
+        m.set(Number(r.k), r);
       }
       return m;
     };
-    const leadM = groupByOrg(leads);
-    const stuM = groupByOrg(students);
-    const ordM = groupByOrg(orders);
-    const haM = groupByOrg(ha);
-    const hcM = groupByOrg(hc);
-    const attM = groupByOrg(att);
-    const hsM = groupByOrg(hs);
-    const costM = groupByOrg(costs);
-    const matM = groupByOrg(materials);
+    const leadM = toMap(leadRows);
+    const stuM = toMap(stuRows);
+    const ordM = toMap(ordRows);
+    const haM = toMap(haRows);
+    const hcM = toMap(hcRows);
+    const attM = toMap(attRows);
+    const hsM = toMap(hsRows);
+    const costM = toMap(costRows);
+    const matM = toMap(matRows);
 
     const campuses = orgs
       .filter((o) => o.type === 'CAMPUS' || o.type === 'BRANCH')
       .map((o) => {
-        const orgLeads = (leadM.get(o.id) || []) as Lead[];
-        const orgStu = (stuM.get(o.id) || []) as Student[];
-        const orgOrd = (ordM.get(o.id) || []) as Order[];
-        const orgHa = (haM.get(o.id) || []) as HourAccount[];
-        const orgHc = (hcM.get(o.id) || []) as HourConsumption[];
-        const orgAtt = (attM.get(o.id) || []) as Attendance[];
-        const orgHs = (hsM.get(o.id) || []) as HomeworkSubmit[];
-        const orgCost = (costM.get(o.id) || []) as CostRecord[];
-        const orgMat = (matM.get(o.id) || []) as Material[];
+        const lead = leadM.get(o.id);
+        const stu = stuM.get(o.id);
+        const ord = ordM.get(o.id);
+        const ha = haM.get(o.id);
+        const hc = hcM.get(o.id);
+        const att = attM.get(o.id);
+        const hs = hsM.get(o.id);
+        const cost = costM.get(o.id);
+        const mat = matM.get(o.id);
 
-        const funnel = this.funnelOf(orgLeads);
-        const paidOrders = orgOrd.filter(
-          (x) => x.status === OrderStatus.PAID || x.status === OrderStatus.COMPLETED,
-        );
-        const refunded = orgOrd.filter((x) => x.status === OrderStatus.REFUNDED);
-        const receivable = this.sum(orgOrd, 'payableAmount');
-        const received = this.sum(orgOrd, 'paidAmount');
-        const refundAmount = this.sum(refunded, 'payableAmount');
-
-        const studying = orgStu.filter((s) => s.status === StudentStatus.STUDYING).length;
-        const refundedStu = orgStu.filter((s) => s.status === StudentStatus.REFUNDED).length;
-
-        const granted = this.sum(
-          orgHc.filter((h) => h.type === 'GRANT'),
-          'hours',
-        );
-        const consumed = -this.sum(
-          orgHc.filter((h) => h.type === 'CONSUME'),
-          'hours',
-        );
+        const leads = Number(lead?.leads || 0);
+        const signed = Number(lead?.signed || 0);
+        const receivable = Number(ord?.receivable || 0);
+        const received = Number(ord?.received || 0);
+        const refundAmount = Number(ord?.refundAmount || 0);
+        const studying = Number(stu?.studying || 0);
+        const granted = Number(hc?.granted || 0);
+        const consumed = Number(hc?.consumed || 0);
         const consumeRate = granted ? Number((consumed / granted).toFixed(4)) : 0;
-
-        const present = orgAtt.filter((a) => a.status === 'PRESENT').length;
-        const attendanceRate = orgAtt.length ? Number((present / orgAtt.length).toFixed(4)) : 0;
-
-        const reviewed = orgHs.filter((s) => s.status === 'REVIEWED').length;
-        const reviewedRate = orgHs.length ? Number((reviewed / orgHs.length).toFixed(4)) : 0;
-        const homeworkPending = orgHs.filter((s) => s.status === 'SUBMITTED').length;
-
-        const costTotal = this.sum(orgCost, 'amount');
-        const stockValue = orgMat.reduce(
-          (a, m) => a + (Number((m as any).stockQty) || 0) * (Number((m as any).price) || 0),
-          0,
-        );
+        const attTotal = Number(att?.total || 0);
+        const attPresent = Number(att?.present || 0);
+        const attendanceRate = attTotal ? Number((attPresent / attTotal).toFixed(4)) : 0;
+        const hsTotal = Number(hs?.total || 0);
+        const reviewed = Number(hs?.reviewed || 0);
+        const reviewedRate = hsTotal ? Number((reviewed / hsTotal).toFixed(4)) : 0;
 
         return {
           id: o.id,
           name: o.name,
           type: o.type,
           admission: {
-            leads: funnel.total,
-            trialed: funnel.trialed,
-            signed: funnel.signed,
-            conversionRate: funnel.conversionRate,
+            leads,
+            trialed: Number(lead?.trialed || 0),
+            signed,
+            conversionRate: leads ? Number((signed / leads).toFixed(4)) : 0,
           },
           revenue: {
-            orderCount: orgOrd.length,
+            orderCount: Number(ord?.orderCount || 0),
             receivable: Number(receivable.toFixed(2)),
             received: Number(received.toFixed(2)),
             refundAmount: Number(refundAmount.toFixed(2)),
             netCashflow: Number((received - refundAmount).toFixed(2)),
           },
-          students: { total: orgStu.length, studying, refunded: refundedStu },
+          students: { total: Number(stu?.total || 0), studying, refunded: Number(stu?.refunded || 0) },
           hours: {
             granted,
             consumed,
-            balance: this.sum(orgHa, 'balance'),
+            balance: Number(ha?.balance || 0),
             consumeRate,
           },
-          teaching: { attendanceRate, reviewedRate, homeworkPending },
+          teaching: {
+            attendanceRate,
+            reviewedRate,
+            homeworkPending: Number(hs?.pending || 0),
+          },
           cost: {
-            costTotal: Number(costTotal.toFixed(2)),
-            stockValue: Number(stockValue.toFixed(2)),
-            materialCount: orgMat.length,
+            costTotal: Number(Number(cost?.costTotal || 0).toFixed(2)),
+            stockValue: Number(Number(mat?.stockValue || 0).toFixed(2)),
+            materialCount: Number(mat?.materialCount || 0),
           },
           rank: 0,
         };
@@ -662,41 +804,61 @@ export class DashboardService {
     for (const met of d.metrics || [])
       if (!allowedMet[d.source].includes(met)) throw new BadRequestException(`不支持指标 ${met}`);
 
-    const rows = d.source === 'order'
-      ? await this.orderRepo.find({ where: { tenantId: t } })
-      : await this.leadRepo.find({ where: { tenantId: t } });
-    const filtered = this.filterByDate(rows as any, d.start, d.end);
+    const repo = d.source === 'order' ? this.orderRepo : this.leadRepo;
+    const dims: string[] = d.dimensions || [];
+    const mets: string[] = d.metrics || [];
 
-    const map = new Map<string, any>();
-    for (const r of filtered) {
-      const dimVals: any = {};
-      for (const dim of d.dimensions) dimVals[dim] = this.dimValue(d.source, dim, r);
-      const key = d.dimensions.map((dm: string) => String(dimVals[dm])).join('|');
-      if (!map.has(key)) {
-        map.set(key, { key, dims: dimVals, _students: new Set<number>() });
+    const dimExpr = (dim: string) => {
+      if (dim === 'month') return this.monthExpr();
+      if (dim === 'channel') return 'e.channel_id';
+      if (dim === 'campaign') return 'e.campaign_id';
+      return d.source === 'order' ? 'e.status' : 'e.stage';
+    };
+    const metExpr = (met: string) => {
+      switch (met) {
+        case 'orderCount':
+        case 'leadCount':
+          return 'COUNT(*)';
+        case 'receivable':
+          return 'COALESCE(SUM(e.payable_amount),0)';
+        case 'received':
+          return `COALESCE(SUM(CASE WHEN e.status='${OrderStatus.PAID}' OR e.status='${OrderStatus.COMPLETED}' THEN e.paid_amount ELSE 0 END),0)`;
+        case 'refundAmount':
+          return `COALESCE(SUM(CASE WHEN e.status='${OrderStatus.REFUNDED}' THEN e.payable_amount ELSE 0 END),0)`;
+        case 'studentCount':
+          return 'COUNT(DISTINCT e.student_id)';
+        case 'trial':
+          return `COALESCE(SUM(CASE WHEN e.stage='${LeadStage.TRIALED}' THEN 1 ELSE 0 END),0)`;
+        case 'signed':
+          return `COALESCE(SUM(CASE WHEN e.stage='${LeadStage.SIGNED}' THEN 1 ELSE 0 END),0)`;
+        default:
+          return null;
       }
-      const agg = map.get(key)!;
-      agg._students.add((r as any).studentId);
-      agg.orderCount = (agg.orderCount || 0) + 1;
-      agg.leadCount = (agg.leadCount || 0) + 1;
-      agg.receivable = (agg.receivable || 0) + Number((r as any).payableAmount || 0);
-      agg.received = (agg.received || 0) + (d.source === 'order' && ((r as any).status === OrderStatus.PAID || (r as any).status === OrderStatus.COMPLETED) ? Number((r as any).paidAmount || 0) : 0);
-      agg.refundAmount = (agg.refundAmount || 0) + (d.source === 'order' && (r as any).status === OrderStatus.REFUNDED ? Number((r as any).payableAmount || 0) : 0);
-      agg.trial = (agg.trial || 0) + (d.source === 'lead' && (r as any).stage === LeadStage.TRIALED ? 1 : 0);
-      agg.signed = (agg.signed || 0) + (d.source === 'lead' && (r as any).stage === LeadStage.SIGNED ? 1 : 0);
-    }
+    };
+    const fmtDim = (dim: string, k: any) => {
+      if (k == null) return 'null';
+      if (dim === 'channel') return `channel:${k}`;
+      if (dim === 'campaign') return `campaign:${k}`;
+      return String(k);
+    };
 
-    const out = [...map.values()]
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((a) => {
-        const row: any = { key: a.key };
-        for (const dm of d.dimensions) row[dm] = a.dims[dm];
-        for (const met of d.metrics) {
-          if (met === 'studentCount') row[met] = a._students.size;
-          else row[met] = Number((a[met] || 0).toFixed ? (a[met] || 0) : 0);
-        }
+    const selects = mets.map((m) => `${metExpr(m)} AS m_${m}`);
+    const raw = await this.grouped(
+      repo,
+      dims.map(dimExpr),
+      selects,
+      t,
+      this.dateRange(d.start, d.end),
+    );
+
+    const out = raw
+      .map((r) => {
+        const row: any = { key: dims.map((dm, i) => fmtDim(dm, dims.length === 1 ? r.k : r[`k${i}`])).join('|') };
+        dims.forEach((dm, i) => { row[dm] = fmtDim(dm, dims.length === 1 ? r.k : r[`k${i}`]); });
+        for (const met of mets) row[met] = Number(r[`m_${met}`] || 0);
         return row;
-      });
+      })
+      .sort((a, b) => a.key.localeCompare(b.key));
     return { source: d.source, dimensions: d.dimensions, metrics: d.metrics, rows: out };
   }
 
@@ -754,94 +916,5 @@ export class DashboardService {
     };
     const title = `多校区对标_${new Date().toISOString().slice(0, 10)}`;
     return buildCsv({ title, columns, rows: [...b.campuses, summary] });
-  }
-
-  private dimValue(source: string, dim: string, r: any): string {
-    if (dim === 'month') {
-      if (!r.createdAt) return 'unknown';
-      const d = new Date(r.createdAt);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }
-    if (source === 'lead' && dim === 'channel') return `channel:${r.channelId ?? 'null'}`;
-    if (source === 'lead' && dim === 'campaign') return `campaign:${r.campaignId ?? 'null'}`;
-    return String(r[dim] ?? 'null');
-  }
-
-  // ---------------- 聚合辅助 ----------------
-  private filterByDate<T extends { createdAt?: Date }>(
-    rows: T[],
-    start?: string,
-    end?: string,
-  ): T[] {
-    if (!start && !end) return rows;
-    const s = start ? new Date(start).getTime() : -Infinity;
-    const e = end ? new Date(end).getTime() : Infinity;
-    return rows.filter((r) => {
-      const ts = r.createdAt ? new Date(r.createdAt).getTime() : NaN;
-      return ts >= s && ts <= e;
-    });
-  }
-
-  private sum(arr: any[], key: string): number {
-    return arr.reduce((a, b) => a + (Number(b[key]) || 0), 0);
-  }
-
-  private funnelOf(leads: Lead[]) {
-    const byStage: Record<string, number> = {};
-    for (const s of Object.values(LeadStage)) byStage[s] = 0;
-    for (const l of leads) byStage[l.stage] = (byStage[l.stage] || 0) + 1;
-    const total = leads.length;
-    const trialed = byStage[LeadStage.TRIALED] || 0;
-    const signed = byStage[LeadStage.SIGNED] || 0;
-    return {
-      total,
-      byStage,
-      trialed,
-      signed,
-      conversionRate: total ? Number((signed / total).toFixed(4)) : 0,
-    };
-  }
-
-  private groupCount(rows: any[], key: string, nameMap: Map<number, string>) {
-    const m = new Map<number, number>();
-    for (const r of rows) {
-      const k = r[key];
-      if (k == null) continue;
-      m.set(Number(k), (m.get(Number(k)) || 0) + 1);
-    }
-    return [...m.entries()].map(([id, count]) => ({
-      id,
-      name: nameMap.get(id) || `ID:${id}`,
-      count,
-    }));
-  }
-
-  private groupTask(tasks: Task[]) {
-    const m = new Map<string, number>();
-    for (const t of tasks) m.set(t.type, (m.get(t.type) || 0) + 1);
-    return [...m.entries()].map(([type, count]) => ({ type, count }));
-  }
-
-  private monthTrend(orders: Order[], hc: HourConsumption[], months: number) {
-    const arr: any[] = [];
-    const now = new Date();
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const inMonth = (x: { createdAt?: Date }) => {
-        if (!x.createdAt) return false;
-        const dt = new Date(x.createdAt);
-        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}` === ym;
-      };
-      const o = orders.filter(inMonth);
-      const c = hc.filter((h) => h.type === 'CONSUME' && inMonth(h));
-      arr.push({
-        month: ym,
-        receivable: this.sum(o, 'payableAmount'),
-        received: this.sum(o, 'paidAmount'),
-        consumed: -this.sum(c, 'hours'),
-      });
-    }
-    return arr;
   }
 }

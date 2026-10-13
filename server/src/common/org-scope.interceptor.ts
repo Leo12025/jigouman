@@ -13,9 +13,14 @@ import { orgAls } from './org-context';
 import { orgScopeSetAls, orgScopeAllAls } from './org-scope';
 import { AuthUser } from './decorators/auth.decorator';
 
-/** 组织子树缓存（默认 60s）：组织树极少变更，缓存可避免 ORG_AND_BELOW 每请求查库 */
-const subtreeCache = new Map<string, { ids: number[]; ts: number }>();
+import { LruCache } from './lru-cache';
+
 const SUBTREE_TTL = Number(process.env.ORG_SUBTREE_TTL_MS) || 60_000;
+/**
+ * 组织子树缓存（TTL + LRU 上限）：组织树极少变更，缓存可避免 ORG_AND_BELOW 每请求查库。
+ * 裸 Map 会让 key(tenantId:orgId) 只增不减，故限制条数并淘汰最久未使用。
+ */
+const subtreeCache = new LruCache<number[]>({ max: 2000, ttlMs: SUBTREE_TTL });
 
 /**
  * 校区级作用域拦截器（★S0 安全补丁，对应架构文档 P0-1 / P1 数据范围）。
@@ -97,13 +102,13 @@ export class OrgScopeInterceptor implements NestInterceptor {
   private async subtree(tenantId: number, orgId: number): Promise<number[]> {
     const key = `${tenantId}:${orgId}`;
     const cached = subtreeCache.get(key);
-    if (cached && Date.now() - cached.ts < SUBTREE_TTL) return cached.ids;
+    if (cached) return cached;
     const rows = await this.ds.query(
       `SELECT id FROM organizations WHERE tenant_id = ? AND (id = ? OR ancestors LIKE ?)`,
       [tenantId, orgId, `${orgId}/%`],
     );
     const ids = (rows as any[]).map((r) => r.id);
-    subtreeCache.set(key, { ids, ts: Date.now() });
+    subtreeCache.set(key, ids);
     return ids;
   }
 }

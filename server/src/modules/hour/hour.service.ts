@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager, EntityTarget, Repository } from 'typeorm';
+import { DataSource, EntityManager, EntityTarget, LessThanOrEqual, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { orgRepo } from '../../common/org-scope';
 import { calcLateJoin } from '../../common/late-join';
@@ -601,11 +601,11 @@ export class HourService {
   }
 
   async expireTenant(tenantId: number) {
-    const now = Date.now();
-    const accs = await this.$r(this.ds, HourAccount).find({ where: { tenantId, status: 'ACTIVE' } as any });
-    const expired = accs.filter(
-      (a) => a.expireAt && new Date(a.expireAt).getTime() <= now && (a.balance || 0) > 0,
-    );
+    const now = new Date();
+    // 条件下推到 SQL：只取已到期且有余额的账户，避免"全表加载后 JS 过滤"的内存尖峰
+    const expired = (await this.$r(this.ds, HourAccount).find({
+      where: { tenantId, status: 'ACTIVE', expireAt: LessThanOrEqual(now) } as any,
+    })).filter((a) => (a.balance || 0) > 0);
     for (const a of expired) {
       await this.ds.transaction(async (m) => {
         const repo = this.$r(m, HourAccount);
@@ -629,9 +629,10 @@ export class HourService {
         );
       });
     }
-    // 时间型权益到期
-    const ents = await this.$r(this.ds, Entitlement).find({ where: { tenantId, status: 'ACTIVE' } as any });
-    const expiredEnts = ents.filter((e) => new Date(e.expireAt).getTime() <= now);
+    // 时间型权益到期（同样条件下推）
+    const expiredEnts = await this.$r(this.ds, Entitlement).find({
+      where: { tenantId, status: 'ACTIVE', expireAt: LessThanOrEqual(now) } as any,
+    });
     for (const e of expiredEnts) {
       e.status = 'EXPIRED';
       await this.$r(this.ds, Entitlement).save(e as any);
