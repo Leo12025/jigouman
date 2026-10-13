@@ -18,7 +18,7 @@ export type PayType = 'WECHAT' | 'ALIPAY' | 'OFFLINE' | 'CARD';
  * - DEPOSIT 定金单（如集训营预约定金，约定"付 200 抵 800"），支付后**不发课时**，
  *   后续转正式订单时按 depositDeductAmount 抵扣，并把已付定金结转到正式订单。
  */
-export type OrderType = 'NORMAL' | 'DEPOSIT';
+export type OrderType = 'NORMAL' | 'DEPOSIT' | 'UPGRADE';
 
 /** 金额列：数据库 decimal ↔ TS number 互转（避免字符串比较问题） */
 export const MONEY: { from: (v: any) => any; to: (v: any) => any } = {
@@ -66,7 +66,7 @@ export class Order extends BaseEntity {
   status: OrderStatus;
 
   /** 订单类型：NORMAL 普通 / DEPOSIT 定金单 */
-  @Column({ name: 'order_type', length: 16, default: 'NORMAL', comment: 'NORMAL 普通订单/DEPOSIT 定金单' })
+  @Column({ name: 'order_type', length: 16, default: 'NORMAL', comment: 'NORMAL 普通/DEPOSIT 定金/UPGRADE 套餐升级补差价' })
   orderType: OrderType;
 
   /** 定金单：转正式订单时可抵扣的金额（付 200 抵 800 → 填 800） */

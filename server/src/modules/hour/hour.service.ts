@@ -662,8 +662,17 @@ export class HourService {
     return acc;
   }
 
-  /** 结课：清空剩余课时（学费转机构手续费）——与停课的财务口径差异 */
-  async closeAccount(tenantId: number, accountId: number, operatorId?: number) {
+  /** 取单个课时账户 */
+  async getAccount(tenantId: number, accountId: number) {
+    const acc = await this.$r(this.ds, HourAccount).findOne({
+      where: { tenantId, id: accountId } as any,
+    });
+    if (!acc) throw new BusinessException(ResCode.NOT_FOUND, '课时账户不存在');
+    return acc;
+  }
+
+  /** 结课/转出：清空剩余课时（学费转机构手续费）——与停课的财务口径差异 */
+  async closeAccount(tenantId: number, accountId: number, operatorId?: number, remark?: string) {
     return this.ds.transaction(async (m) => {
       const repo = this.$r(m, HourAccount);
       const acc = await repo.findOne({ where: { tenantId, id: accountId } as any });
@@ -682,7 +691,7 @@ export class HourService {
           type: 'EXPIRE',
           hours: -remain,
           operatorId,
-          remark: '结课清空剩余课时（学费转机构手续费）',
+          remark: remark || '结课清空剩余课时（学费转机构手续费）',
         } as any),
       );
       return acc;

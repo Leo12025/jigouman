@@ -51,6 +51,7 @@ import { DistributionModule } from './modules/distribution/distribution.module';
 import { TeachingModule } from './modules/teaching/teaching.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { ClassChangeModule } from './modules/class-change/class-change.module';
+import { PackageUpgradeModule } from './modules/package-upgrade/package-upgrade.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { ClassChangeModule } from './modules/class-change/class-change.module';
     TeachingModule,
     AttendanceModule,
     ClassChangeModule,
+    PackageUpgradeModule,
     TenantModule,
   ],
   providers: [

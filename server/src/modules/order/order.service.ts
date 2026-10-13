@@ -27,6 +27,7 @@ import { CouponService } from '../../modules/coupon/coupon.service';
 import { StudentService } from '../../modules/student/student.service';
 import { AuthUser } from '../../common/decorators/auth.decorator';
 import { approvalEvents, ApprovalEventPayload } from '../../common/approval-events';
+import { orderEvents, OrderPaidPayload } from '../../common/order-events';
 import { ApprovalService } from '../approval/approval.service';
 
 function genOrderNo(): string {
@@ -227,6 +228,14 @@ export class OrderService implements OnModuleInit {
     if (order.orderType !== 'DEPOSIT') {
       await this.grantItems(tenantId, order, items, operatorId);
     }
+
+    // 支付成功事件：供下游业务联动（如套餐升级补差价付清后自动执行升级）
+    orderEvents.emit('order.paid', {
+      tenantId,
+      orderId: id,
+      orderType: order.orderType,
+    } as OrderPaidPayload);
+
     return this.getOrder(tenantId, id);
   }
 
