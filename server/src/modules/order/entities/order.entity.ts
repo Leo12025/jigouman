@@ -12,6 +12,14 @@ export enum OrderStatus {
 
 export type PayType = 'WECHAT' | 'ALIPAY' | 'OFFLINE' | 'CARD';
 
+/**
+ * 订单类型（文档 §2.4 #15 定金/订金）：
+ * - NORMAL  普通订单（购课，支付后发放课时）
+ * - DEPOSIT 定金单（如集训营预约定金，约定"付 200 抵 800"），支付后**不发课时**，
+ *   后续转正式订单时按 depositDeductAmount 抵扣，并把已付定金结转到正式订单。
+ */
+export type OrderType = 'NORMAL' | 'DEPOSIT';
+
 /** 金额列：数据库 decimal ↔ TS number 互转（避免字符串比较问题） */
 export const MONEY: { from: (v: any) => any; to: (v: any) => any } = {
   from: (v: any) => (v === null || v === undefined ? v : Number(v)),
@@ -56,6 +64,22 @@ export class Order extends BaseEntity {
 
   @Column({ type: 'varchar', length: 32, default: OrderStatus.PENDING, comment: '订单状态(§11.3)' })
   status: OrderStatus;
+
+  /** 订单类型：NORMAL 普通 / DEPOSIT 定金单 */
+  @Column({ name: 'order_type', length: 16, default: 'NORMAL', comment: 'NORMAL 普通订单/DEPOSIT 定金单' })
+  orderType: OrderType;
+
+  /** 定金单：转正式订单时可抵扣的金额（付 200 抵 800 → 填 800） */
+  @Column({ name: 'deposit_deduct_amount', type: 'decimal', precision: 12, scale: 2, default: 0, transformer: MONEY, comment: '定金可抵扣金额' })
+  depositDeductAmount: number;
+
+  /** 定金单：被哪张正式订单抵扣（防同一笔定金重复使用） */
+  @Column({ name: 'used_by_order_id', type: 'bigint', nullable: true, comment: '定金被抵扣的正式订单' })
+  usedByOrderId?: number;
+
+  /** 正式订单：引用的定金单 */
+  @Column({ name: 'deposit_order_id', type: 'bigint', nullable: true, comment: '来源定金单' })
+  depositOrderId?: number;
 
   @Column({ name: 'pay_type', length: 16, nullable: true, comment: '支付方式' })
   payType?: PayType;

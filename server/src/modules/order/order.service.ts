@@ -18,7 +18,10 @@ import {
 import { OrderItem } from './entities/order-item.entity';
 import { Payment, PayChannel } from './entities/payment.entity';
 import { Refund, RefundStatus } from './entities/refund.entity';
-import { OrderPageQueryDto, CreateOrderDto, PayOrderDto, RefundDto } from './dto/order.dto';
+import {
+  OrderPageQueryDto, CreateOrderDto, PayOrderDto, RefundDto,
+  CreateDepositOrderDto, ConvertDepositDto,
+} from './dto/order.dto';
 import { HourService } from '../../modules/hour/hour.service';
 import { CouponService } from '../../modules/coupon/coupon.service';
 import { StudentService } from '../../modules/student/student.service';
@@ -220,12 +223,25 @@ export class OrderService implements OnModuleInit {
         .catch(() => undefined);
     }
 
+    // 定金单不发课时（转正式订单时才发放）
+    if (order.orderType !== 'DEPOSIT') {
+      await this.grantItems(tenantId, order, items, operatorId);
+    }
+    return this.getOrder(tenantId, id);
+  }
+
+  /** 按订单项发放课时（定金单不调用） */
+  private async grantItems(
+    tenantId: number,
+    order: Order,
+    items: OrderItem[],
+    operatorId?: number,
+  ) {
     for (const it of items) {
       if (it.hours > 0) {
         await this.grantByItem(tenantId, order, it, operatorId);
       }
     }
-    return this.getOrder(tenantId, id);
   }
 
   /**
@@ -533,6 +549,201 @@ export class OrderService implements OnModuleInit {
       order.status = OrderStatus.PAID;
       await this.orderRepo.save(order as any);
     }
+  }
+
+  // ---------------- 定金 / 订金（§2.4 #15） ----------------
+
+  /**
+   * 创建定金单：仅收款，**不发课时**。
+   * deductAmount = 转正式订单时的抵扣额（付 200 抵 800 → 填 800）；不传则等于定金金额。
+   */
+  async createDepositOrder(tenantId: number, d: CreateDepositOrderDto) {
+    const amount = r2(Number(d.amount));
+    if (amount <= 0) throw new BusinessException(ResCode.BAD_REQUEST, '定金金额必须大于 0');
+    const deduct = d.deductAmount != null ? r2(Number(d.deductAmount)) : amount;
+
+    const order = this.orderRepo.create({
+      tenantId,
+      orderNo: genOrderNo(),
+      studentId: d.studentId,
+      totalAmount: amount,
+      discountAmount: 0,
+      payableAmount: amount,
+      paidAmount: 0,
+      status: OrderStatus.PENDING,
+      orderType: 'DEPOSIT',
+      depositDeductAmount: deduct,
+      ownerId: d.ownerId,
+      remark: d.remark,
+    } as any);
+    const saved = await this.orderRepo.save(order as any);
+    await this.itemRepo.save(
+      this.itemRepo.create({
+        tenantId,
+        orderId: saved.id,
+        courseId: d.courseId ?? 0,
+        itemType: 'DEPOSIT',
+        packageId: d.packageId,
+        name: d.name || '定金',
+        qty: 1,
+        unitPrice: amount,
+        amount,
+        hours: 0, // 定金不发课时
+      } as any),
+    );
+    return this.getOrder(tenantId, saved.id);
+  }
+
+  /** 定金单列表（usable = 已支付且未被抵扣） */
+  async listDepositOrders(tenantId: number, studentId?: number) {
+    const where: any = { tenantId, orderType: 'DEPOSIT' };
+    if (studentId) where.studentId = studentId;
+    const list = await this.orderRepo.find({ where, order: { id: 'DESC' } as any });
+    return list.map((o) => ({
+      id: o.id,
+      orderNo: o.orderNo,
+      studentId: o.studentId,
+      paidAmount: Number(o.paidAmount),
+      depositDeductAmount: Number(o.depositDeductAmount),
+      status: o.status,
+      usedByOrderId: o.usedByOrderId ?? null,
+      usable: o.status === OrderStatus.PAID && !o.usedByOrderId,
+    }));
+  }
+
+  /** 转正式订单前的定金校验 */
+  private async getDepositForConvert(tenantId: number, depositOrderId: number) {
+    const dep = await this.orderRepo.findOne({ where: { tenantId, id: depositOrderId } as any });
+    if (!dep) throw new NotFoundException('定金单不存在');
+    if (dep.orderType !== 'DEPOSIT') {
+      throw new BusinessException(ResCode.BAD_REQUEST, '该订单不是定金单');
+    }
+    if (dep.status !== OrderStatus.PAID) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '定金单未支付，不可转正式订单');
+    }
+    if (dep.usedByOrderId) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '该定金已被使用，不可重复抵扣');
+    }
+    return dep;
+  }
+
+  /** 试算：正式订单金额 - 定金抵扣额 */
+  private async previewOrderAmount(tenantId: number, studentId: number, d: ConvertDepositDto) {
+    let total = 0;
+    for (const it of d.items) total = r2(total + it.qty * it.unitPrice);
+    const student = await this.studentSvc.getStudent(tenantId, studentId).catch(() => null);
+    const codes = d.couponCodes || (d.couponCode ? [d.couponCode] : []);
+    const promo = await this.couponSvc
+      .calcPromotion(tenantId, {
+        amount: total,
+        items: d.items.map((it) => ({
+          courseId: it.courseId,
+          classGroupId: (it as any).classGroupId,
+          qty: it.qty,
+          unitPrice: it.unitPrice,
+        })),
+        studentTags: parseTags(student?.tags),
+        codes,
+        includeAuto: true,
+      })
+      .catch(() => null as any);
+    const couponDiscount = promo?.totalDiscount || 0;
+    const discount = r2((d.discountAmount || 0) + couponDiscount);
+    return {
+      totalAmount: total,
+      discountAmount: discount,
+      couponDiscount,
+      payableAmount: Math.max(0, r2(total - discount)),
+    };
+  }
+
+  /** 定金转正式订单试算（抵扣后应付、抵扣后仍需补款） */
+  async previewDepositConvert(tenantId: number, depositOrderId: number, d: ConvertDepositDto) {
+    const dep = await this.getDepositForConvert(tenantId, depositOrderId);
+    const quote = await this.previewOrderAmount(tenantId, dep.studentId, d);
+    const deduct = Number(dep.depositDeductAmount) || Number(dep.paidAmount) || 0;
+    const payable = Math.max(0, r2(Number(quote.payableAmount) - deduct));
+    const carried = Number(dep.paidAmount) || 0;
+    return {
+      depositOrderId: dep.id,
+      depositPaidAmount: r2(carried),
+      deductAmount: r2(deduct),
+      totalAmount: quote.totalAmount,
+      discountAmount: quote.discountAmount,
+      payableAmount: payable,
+      afterDepositPayable: Math.max(0, r2(payable - carried)),
+    };
+  }
+
+  /**
+   * 定金转正式订单：
+   * 1) 复用下单逻辑（含人群资格与合规校验）
+   * 2) 抵扣 depositDeductAmount（付 200 抵 800）
+   * 3) 定金已付金额结转到正式订单（生成"定金结转"收款流水，便于对账）
+   * 4) 已付清即发放课时
+   * 5) 定金单置 COMPLETED 并记录 usedByOrderId，防重复使用
+   */
+  async convertDeposit(
+    tenantId: number,
+    depositOrderId: number,
+    d: ConvertDepositDto,
+    operatorId?: number,
+  ) {
+    const dep = await this.getDepositForConvert(tenantId, depositOrderId);
+    const created: any = await this.createOrder(tenantId, {
+      studentId: dep.studentId,
+      items: d.items,
+      discountAmount: d.discountAmount,
+      couponCode: d.couponCode,
+      couponCodes: d.couponCodes,
+      ownerId: d.ownerId,
+      remark: d.remark,
+    } as CreateOrderDto);
+
+    const order = await this.orderRepo.findOne({ where: { tenantId, id: created.id } as any });
+    if (!order) throw new NotFoundException('订单不存在');
+
+    // 抵扣定金
+    const deduct = Number(dep.depositDeductAmount) || Number(dep.paidAmount) || 0;
+    const discount = r2(Number(order.discountAmount) + deduct);
+    const payable = Math.max(0, r2(Number(order.totalAmount) - discount));
+    order.discountAmount = discount;
+    order.payableAmount = payable;
+    order.depositOrderId = dep.id;
+    await this.orderRepo.save(order as any);
+
+    // 结转定金已付金额
+    const carried = Number(dep.paidAmount) || 0;
+    if (carried > 0) {
+      await this.payRepo.save(
+        this.payRepo.create({
+          tenantId,
+          orderId: order.id,
+          channel: 'OTHER' as PayChannel,
+          amount: carried,
+          tradeNo: `DEPOSIT-${dep.orderNo}`,
+          status: 'SUCCESS',
+          operatorId,
+          paidAt: new Date(),
+        } as any),
+      );
+      order.paidAmount = r2(Number(order.paidAmount) + carried);
+      if (order.paidAmount >= order.payableAmount) order.status = OrderStatus.PAID;
+      await this.orderRepo.save(order as any);
+    }
+
+    // 已付清则发放课时（此时才真正发课时，定金阶段不发）
+    if (order.status === OrderStatus.PAID) {
+      const items = await this.itemRepo.find({ where: { tenantId, orderId: order.id } as any });
+      await this.grantItems(tenantId, order, items, operatorId);
+    }
+
+    // 标记定金已使用
+    dep.usedByOrderId = order.id;
+    dep.status = OrderStatus.COMPLETED;
+    await this.orderRepo.save(dep as any);
+
+    return this.getOrder(tenantId, order.id);
   }
 
   async listOrders(tenantId: number, q: OrderPageQueryDto) {
