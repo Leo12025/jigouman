@@ -476,6 +476,28 @@ export const createTeam = (d: any) => apiPost<any>('/group-buy/teams', d);
 export const joinTeam = (d: any) => apiPost<any>('/group-buy/teams/join', d);
 export const listTeams = (activityId: number) => apiGet<any[]>('/group-buy/teams', { activityId });
 export const redeemGroupBuy = (code: string) => apiPost<any>('/group-buy/redeem', { code });
+// 阶梯团 / 凑团 / 成员 / 埋点
+export const listGroupBuyTiers = (id: number) => apiGet<any[]>(`/group-buy/activities/${id}/tiers`);
+export const setGroupBuyTiers = (
+  id: number, tiers: any[], extra?: { confirmCompliance?: boolean },
+) => apiPost<any[]>(`/group-buy/activities/${id}/tiers`, { tiers, ...(extra || {}) });
+export const listOpenTeams = (activityId: number, limit?: number) =>
+  apiGet<any[]>(`/group-buy/activities/${activityId}/open-teams`, { limit });
+export const listTeamMembers = (teamId: number) => apiGet<any[]>(`/group-buy/teams/${teamId}/members`);
+export const trackActivityEvent = (d: any) => apiPost<any>('/group-buy/events/track', d);
+export const getGroupBuyFunnel = (activityId: number) =>
+  apiGet<any>(`/group-buy/activities/${activityId}/funnel`);
+export const getStaffRanking = (activityId: number) =>
+  apiGet<any[]>(`/group-buy/activities/${activityId}/staff-ranking`);
+// 晒单 / 战队 / 营销物料
+export const createShowoff = (d: any) => apiPost<any>('/group-buy/showoffs', d);
+export const listShowoffs = (params?: any) => apiGet<any[]>('/group-buy/showoffs', params);
+export const createSquad = (d: any) => apiPost<any>('/group-buy/squads', d);
+export const listSquads = (activityId?: number) => apiGet<any[]>('/group-buy/squads', { activityId });
+// 营销物料（注意：与「教材库存」的 materials 是两套独立接口）
+export const createMarketingMaterial = (d: any) => apiPost<any>('/group-buy/materials', d);
+export const listMarketingMaterials = (params?: any) =>
+  apiGet<any[]>('/group-buy/materials', params);
 
 // ---------- 分销裂变 (§4.28) ----------
 export const listDistributors = (params: any) => apiGet<PageResult<any>>('/distribution/distributors', params);
