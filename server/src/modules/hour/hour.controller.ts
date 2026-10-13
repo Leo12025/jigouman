@@ -7,7 +7,7 @@ import { RequirePermissions } from '../../common/decorators/roles.decorator';
 import { OperationLog } from '../../common/decorators/operation-log.decorator';
 import {
   HourAccountPageQueryDto, HourConsumptionPageQueryDto, AttendLessonDto, LeaveLessonDto,
-  GrantHourDto, ScheduleMakeupDto, GrantEntitlementDto, EnrollDto,
+  GrantHourDto, ScheduleMakeupDto, GrantEntitlementDto, EnrollDto, LateJoinPreviewDto,
   AccountActionDto, ExtendExpiryDto, ConfirmConsumptionDto,
 } from './dto/hour.dto';
 import { HourService } from './hour.service';
@@ -138,7 +138,20 @@ export class HourController {
       discountHours: d.discountHours,
       discountAmount: d.discountAmount,
       totalLessons: d.totalLessons,
+      finishedLessons: d.finishedLessons,
+      tuition: d.tuition,
       refOrderId: d.refOrderId,
+    });
+  }
+
+  @Post('enrollments/late-preview')
+  @RequirePermissions('hour:view')
+  @ApiOperation({ summary: '插班折减试算(按剩余课次折减学费)' })
+  latePreview(@TenantId() t: number, @Body() d: LateJoinPreviewDto) {
+    return this.svc.previewLateJoin({
+      totalLessons: Number(d.totalLessons),
+      finishedLessons: Number(d.finishedLessons),
+      tuition: Number(d.tuition),
     });
   }
 

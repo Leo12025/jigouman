@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, EntityTarget, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { orgRepo } from '../../common/org-scope';
+import { calcLateJoin } from '../../common/late-join';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { HourAccount, HourGrantType } from './entities/hour-account.entity';
@@ -170,10 +171,29 @@ export class HourService {
       discountHours?: number;
       discountAmount?: number;
       totalLessons?: number;
+      /** 插班：报名时班期已上过的课次（配合 tuition 自动折算学费） */
+      finishedLessons?: number;
+      /** 插班：全程学费（用于按剩余课次折减） */
+      tuition?: number;
       refOrderId?: number;
     },
   ) {
     const repo = this.$r(this.ds, Enrollment);
+
+    // 插班自动折减：按已过课次折算学费，可上课次相应减少（§2.3 #12）
+    let totalLessons = Number(p.totalLessons) || 0;
+    let discountHours = Number(p.discountHours) || 0;
+    let discountAmount = Number(p.discountAmount) || 0;
+    if (p.joinType === 'LATE' && (p.finishedLessons || 0) > 0) {
+      const c = calcLateJoin({
+        totalLessons,
+        finishedLessons: Number(p.finishedLessons) || 0,
+        tuition: Number(p.tuition) || 0,
+      });
+      discountHours = c.discountHours;
+      discountAmount = c.discountAmount;
+      totalLessons = c.remainLessons; // 该生实际可上课次
+    }
     const e = repo.create({
       tenantId,
       studentId: p.studentId,
@@ -182,14 +202,19 @@ export class HourService {
       packageId: p.packageId,
       joinedAt: new Date(),
       joinType: p.joinType || 'FULL',
-      discountHours: p.discountHours || 0,
-      discountAmount: p.discountAmount || 0,
-      totalLessons: p.totalLessons || 0,
+      discountHours,
+      discountAmount,
+      totalLessons,
       attendedLessons: 0,
       status: 'ACTIVE',
       refOrderId: p.refOrderId,
     } as any);
     return repo.save(e as any);
+  }
+
+  /** 插班折减试算：按剩余课次折减学费（§2.3 #12） */
+  previewLateJoin(d: { totalLessons: number; finishedLessons: number; tuition: number }) {
+    return calcLateJoin(d);
   }
 
   // ---------------------------------------------------------------- 消耗模式解析

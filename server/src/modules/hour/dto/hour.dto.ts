@@ -80,7 +80,18 @@ export class EnrollDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) discountHours?: number;
   @IsOptional() @Type(() => Number) discountAmount?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) totalLessons?: number;
+  /** 插班：报名时班期已上过的课次（配合 tuition 自动按剩余课次折减学费） */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) finishedLessons?: number;
+  /** 插班：全程学费（用于折减计算） */
+  @IsOptional() @Type(() => Number) @Min(0) tuition?: number;
   @IsOptional() @Type(() => Number) @IsInt() refOrderId?: number;
+}
+
+/** 插班折减试算（§2.3 #12） */
+export class LateJoinPreviewDto {
+  @Type(() => Number) @IsInt() @Min(1) totalLessons: number;
+  @Type(() => Number) @IsInt() @Min(0) finishedLessons: number;
+  @Type(() => Number) @Min(0) tuition: number;
 }
 
 /** 停课/复课/结课：账户级生命周期操作 */
