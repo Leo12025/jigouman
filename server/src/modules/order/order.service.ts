@@ -5,6 +5,7 @@ import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { orgRepo } from '../../common/org-scope';
 import { parseTenantConfig } from '../../common/compliance';
+import { isReturningStudent } from '../../common/student-audience';
 import { CoursePackage } from '../course-package/entities/course-package.entity';
 import { PackageItem } from '../course-package/entities/package-item.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
@@ -85,6 +86,31 @@ export class OrderService implements OnModuleInit {
 
   async createOrder(tenantId: number, d: CreateOrderDto) {
     if (!d.items?.length) throw new BusinessException(ResCode.BAD_REQUEST, '订单至少需要一个订单项');
+
+    // 人群资格校验（§2.4 #17）：老生续费专享包 / 新签专享包
+    const orderedPkgIds = d.items
+      .map((it) => (it as any).packageId)
+      .filter((x) => x != null)
+      .map((x) => Number(x));
+    if (orderedPkgIds.length) {
+      const pkgs = await this.pkgRepo.find({ where: { tenantId, id: In(orderedPkgIds) } as any });
+      const returning = await isReturningStudent(this.orderRepo, tenantId, d.studentId);
+      for (const p of pkgs) {
+        if (p.audience === 'RETURNING' && !returning) {
+          throw new BusinessException(
+            ResCode.BAD_REQUEST,
+            `套餐「${p.name}」为老生续费专享，当前学员无有效订单（非老生）`,
+          );
+        }
+        if (p.audience === 'NEW' && returning) {
+          throw new BusinessException(
+            ResCode.BAD_REQUEST,
+            `套餐「${p.name}」仅限新签学员，当前学员为老生`,
+          );
+        }
+      }
+    }
+
     let total = 0;
     const items = d.items.map((it) => {
       const amount = Math.round(it.qty * it.unitPrice * 100) / 100;

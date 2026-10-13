@@ -17,6 +17,9 @@ export type PackageConsumeMode = 'BY_HOUR' | 'BY_TIME' | 'BY_PERIOD';
 /** 适用范围：通用包(全部课程) / 限定包(指定课程) */
 export type PackageScopeType = 'ALL_COURSE' | 'SPECIFIED_COURSE';
 
+/** 适用人群（文档 §2.4 #17 老生续费专享包）：全部 / 仅新签 / 仅老生续费 */
+export type PackageAudience = 'ALL' | 'NEW' | 'RETURNING';
+
 /** 课包/售卖套餐（文档 §4.1：产品维度"卖什么"——含多少课时、可上哪些课程） */
 @Entity({ name: 'course_package' })
 @Index(['tenantId', 'status'])
@@ -57,6 +60,10 @@ export class CoursePackage extends BaseEntity {
   /** BY_PERIOD 期课绑定的班期（报名时写入 enrollment） */
   @Column({ name: 'class_group_id', type: 'bigint', nullable: true, comment: '期课绑定班期' })
   classGroupId?: number;
+
+  /** 适用人群：ALL 全部 / NEW 仅新签 / RETURNING 仅老生续费专享 */
+  @Column({ name: 'audience', length: 16, default: 'ALL', comment: 'ALL/NEW 仅新生/RETURNING 仅老生' })
+  audience: PackageAudience;
 
   @Column({ name: 'list_price', type: 'decimal', precision: 10, scale: 2, default: 0, transformer: MONEY, comment: '标价(划线价)' })
   listPrice: number;

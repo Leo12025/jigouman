@@ -11,6 +11,8 @@ import { PackageTier } from './entities/package-tier.entity';
 import { PackagePriceRule } from './entities/package-price-rule.entity';
 import { Course } from '../course/entities/course.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
+import { Order } from '../order/entities/order.entity';
+import { isReturningStudent } from '../../common/student-audience';
 import {
   CreateCoursePackageDto, UpdateCoursePackageDto, AddPackageCoursesDto,
   PurchasePackageDto, CoursePackagePageQueryDto, SetPackageTiersDto,
@@ -46,6 +48,7 @@ export class CoursePackageService {
     @InjectRepository(PackagePriceRule) ruleRepo: Repository<PackagePriceRule>,
     @InjectRepository(Course) courseRepo: Repository<Course>,
     @InjectRepository(Tenant) tenantRepo: Repository<Tenant>,
+    @InjectRepository(Order) orderRepo: Repository<Order>,
     private readonly hourSvc: HourService,
   ) {
     this.pkgRepo = orgRepo(pkgRepo);
@@ -55,7 +58,9 @@ export class CoursePackageService {
     this.ruleRepo = orgRepo(ruleRepo);
     this.courseRepo = orgRepo(courseRepo);
     this.tenantRepo = tenantRepo;
+    this.orderRepo = orgRepo(orderRepo);
   }
+  private readonly orderRepo: Repository<Order>;
 
   // ---------------- 合规（§0 / §4.4） ----------------
 
@@ -104,6 +109,7 @@ export class CoursePackageService {
       totalHours: d.totalHours,
       validDays: d.validDays,
       classGroupId: d.classGroupId,
+      audience: d.audience || 'ALL',
       listPrice: d.listPrice ?? d.price,
       price: d.price,
       status: d.status ?? 1,
@@ -133,6 +139,7 @@ export class CoursePackageService {
       totalHours: nextHours,
       validDays: nextDays,
       classGroupId: d.classGroupId ?? p.classGroupId,
+      audience: d.audience ?? p.audience,
       listPrice: d.listPrice ?? p.listPrice,
       price: nextPrice,
       status: d.status ?? p.status,
@@ -339,7 +346,13 @@ export class CoursePackageService {
   async resolvePrice(
     tenantId: number,
     packageId: number,
-    dims: { campusId?: number | string; teacherLevel?: string; classType?: string } = {},
+    dims: {
+      campusId?: number | string;
+      teacherLevel?: string;
+      classType?: string;
+      /** 人群：NEW 新签 / RETURNING 老生续费（§2.4 #17 续费专享价） */
+      audience?: string;
+    } = {},
   ) {
     const p = await this.get(tenantId, Number(packageId));
     const rules = await this.ruleRepo.find({ where: { tenantId, packageId } as any });
@@ -347,6 +360,7 @@ export class CoursePackageService {
       ['CAMPUS', dims.campusId],
       ['TEACHER_LEVEL', dims.teacherLevel],
       ['CLASS_TYPE', dims.classType],
+      ['AUDIENCE', dims.audience],
     ];
     for (const [dim, val] of checks) {
       if (val == null || val === '') continue;
@@ -354,6 +368,31 @@ export class CoursePackageService {
       if (hit) return r2(Number(hit.price));
     }
     return r2(Number(p.price));
+  }
+
+  // ---------------- 人群判定（§2.4 #17 老生续费专享） ----------------
+
+  /**
+   * 老生判定：存在有效订单（已支付/已完成）即为老生。
+   * 即"有订单且不是退掉/作废的"就是老生。
+   */
+  async isReturning(tenantId: number, studentId: number): Promise<boolean> {
+    return isReturningStudent(this.orderRepo, tenantId, Number(studentId));
+  }
+
+  /** 人群资格校验：老生续费专享包 / 新签专享包 */
+  private async assertAudience(tenantId: number, studentId: number, audience?: string) {
+    if (!audience || audience === 'ALL') return;
+    const returning = await this.isReturning(tenantId, studentId);
+    if (audience === 'RETURNING' && !returning) {
+      throw new BusinessException(
+        ResCode.BAD_REQUEST,
+        '该套餐为老生续费专享，当前学员无有效订单（非老生）',
+      );
+    }
+    if (audience === 'NEW' && returning) {
+      throw new BusinessException(ResCode.BAD_REQUEST, '该套餐仅限新签学员，当前学员为老生');
+    }
   }
 
   // ---------------- 购课发放 ----------------
@@ -367,11 +406,18 @@ export class CoursePackageService {
   async purchase(tenantId: number, packageId: number, d: PurchasePackageDto, operatorId?: number) {
     const p = await this.get(tenantId, Number(packageId));
 
+    // 人群资格校验：老生续费专享 / 新签专享
+    await this.assertAudience(tenantId, d.studentId, p.audience);
+
     const tier = d.tierId
       ? await this.tierRepo.findOne({ where: { tenantId, id: d.tierId, packageId: p.id } as any })
       : undefined;
     const hours = d.hours ?? (tier ? Number(tier.hours) : Number(p.totalHours));
-    const amount = tier ? Number(tier.price) : Number(p.price);
+    let amount = tier ? Number(tier.price) : Number(p.price);
+    // 老生续费专享价：命中 AUDIENCE 定价规则（未配置则仍用套餐售价）
+    if (!tier && p.audience === 'RETURNING') {
+      amount = await this.resolvePrice(tenantId, p.id, { audience: 'RETURNING' });
+    }
 
     // 合规硬校验：单笔（课时 / 金额 / 时长）
     await this.assertCompliance(tenantId, {

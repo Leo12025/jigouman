@@ -151,8 +151,16 @@ export class CoursePackageController {
     @Query('campusId') campusId?: string,
     @Query('teacherLevel') teacherLevel?: string,
     @Query('classType') classType?: string,
+    @Query('audience') audience?: string,
   ) {
-    return this.svc.resolvePrice(t, Number(id), { campusId, teacherLevel, classType });
+    return this.svc.resolvePrice(t, Number(id), { campusId, teacherLevel, classType, audience });
+  }
+
+  @Get('students/:id/returning')
+  @RequirePermissions('course-package:view')
+  @ApiOperation({ summary: '老生判定：存在有效订单(已支付/已完成)即为老生' })
+  returning(@TenantId() t: number, @Param('id') id: number) {
+    return this.svc.isReturning(t, Number(id));
   }
 
   @Post(':id/purchase')

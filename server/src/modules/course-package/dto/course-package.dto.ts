@@ -29,6 +29,8 @@ export class CreateCoursePackageDto {
   @IsOptional() @IsInt() @Min(0) validDays?: number;
   /** 期课绑定的班期（BY_PERIOD） */
   @IsOptional() @Type(() => Number) @IsInt() classGroupId?: number;
+  /** 适用人群：ALL 全部 / NEW 仅新签 / RETURNING 仅老生续费专享 */
+  @IsOptional() @IsIn(['ALL', 'NEW', 'RETURNING'] as const) audience?: 'ALL' | 'NEW' | 'RETURNING';
   @IsOptional() @IsNumber() @Min(0) listPrice?: number;
   @IsNumber() @Min(0) price: number;
   @IsOptional() @IsInt() status?: number;
@@ -51,6 +53,7 @@ export class UpdateCoursePackageDto {
   @IsOptional() @IsInt() @Min(0) totalHours?: number;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
   @IsOptional() @Type(() => Number) @IsInt() classGroupId?: number;
+  @IsOptional() @IsIn(['ALL', 'NEW', 'RETURNING'] as const) audience?: 'ALL' | 'NEW' | 'RETURNING';
   @IsOptional() @IsNumber() @Min(0) listPrice?: number;
   @IsOptional() @IsNumber() @Min(0) price?: number;
   @IsOptional() @IsInt() status?: number;
@@ -86,7 +89,8 @@ export class SetPackageItemsDto {
 
 /** 差异化定价：按校区 / 老师级别 / 班型 */
 export class PackagePriceRuleDto {
-  @IsIn(['CAMPUS', 'TEACHER_LEVEL', 'CLASS_TYPE'] as const) dimension: 'CAMPUS' | 'TEACHER_LEVEL' | 'CLASS_TYPE';
+  @IsIn(['CAMPUS', 'TEACHER_LEVEL', 'CLASS_TYPE', 'AUDIENCE'] as const)
+  dimension: 'CAMPUS' | 'TEACHER_LEVEL' | 'CLASS_TYPE' | 'AUDIENCE';
   @IsString() @IsNotEmpty() dimValue: string;
   @IsNumber() @Min(0) price: number;
 }
