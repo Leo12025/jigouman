@@ -10,6 +10,14 @@ export enum ChannelType {
   OTHER = 'OTHER',
 }
 
+/** 外部直连来源类型（渠道直连入库，§4.2 营销增强） */
+export enum ChannelExternalType {
+  NONE = 'NONE', // 非直连（手工录入）
+  DOUYIN = 'DOUYIN', // 抖音广告
+  MEITUAN = 'MEITUAN', // 美团/大众点评
+  WECHAT_ADS = 'WECHAT_ADS', // 微信广告
+}
+
 /**
  * 渠道（文档 §4.2 / §5.2）。标记成本与来源，用于转化漏斗 ROI 统计。
  */
@@ -33,4 +41,22 @@ export class Channel extends BaseEntity {
 
   @Column({ type: 'tinyint', default: 1, comment: '状态 1启用 0停用' })
   status: number;
+
+  /** 是否开启外部线索直连入库（§4.2 营销增强） */
+  @Column({ name: 'ingest_enabled', type: 'tinyint', default: 0, comment: '外部线索直连开关' })
+  ingestEnabled?: number;
+
+  /** 外部直连来源类型（抖音/美团/微信广告） */
+  @Column({
+    name: 'external_type',
+    type: 'varchar',
+    length: 16,
+    default: ChannelExternalType.NONE,
+    comment: '外部直连来源类型',
+  })
+  externalType?: ChannelExternalType;
+
+  /** 直连配置（凭证/参数 JSON，如 accessToken；生产应加密存储） */
+  @Column({ type: 'text', nullable: true, comment: '直连配置 JSON（凭证等）' })
+  configJson?: string;
 }

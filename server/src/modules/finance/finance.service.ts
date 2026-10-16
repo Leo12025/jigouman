@@ -16,6 +16,7 @@ import {
   SplitPageQueryDto, SettleSplitDto, GenerateSalaryDto, SalaryPageQueryDto,
   ApplyInvoiceDto, InvoicePageQueryDto, FinanceSummaryQueryDto, UpsertSplitConfigDto,
 } from './dto/finance.dto';
+import { AiService } from '../../common/ai/ai.service';
 
 function periodOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -41,6 +42,7 @@ export class FinanceService {
     @InjectRepository(Invoice) invoiceRepo: Repository<Invoice>,
     @InjectRepository(HourAccount) accRepo: Repository<HourAccount>,
     @InjectRepository(HourConsumption) consRepo: Repository<HourConsumption>,
+    private readonly aiSvc: AiService,
   ) {
     this.cfgRepo = orgRepo(cfgRepo);
     this.splitRepo = orgRepo(splitRepo);
@@ -348,5 +350,57 @@ export class FinanceService {
       .andWhere("r.status = 'REFUNDED'")
       .andWhere('r.approved_at BETWEEN :from AND :to', { from, to })
       .getCount();
+  }
+
+  // ---------------- AI 智能对账（§9.5 资损防控，人工复核兜底） ----------------
+  /**
+   * 日终对账（订单流水 vs 收款 vs 退款）：校验收款合计与订单已付一致、退款不超过已付，
+   * 标记差异供人工挂账处理。纯聚合即可运行；若配置 AI_PROVIDER 则用 LLM 生成自然语言结论。
+   * 所有对账结论均为辅助，不自动修改任何财务记录。
+   */
+  async reconcile(tenantId: number): Promise<{
+    checked: number;
+    discrepancies: string[];
+    aiSummary: string;
+    aiPowered: boolean;
+  }> {
+    const mgr = this.splitRepo.manager;
+    const orders = await mgr.getRepository('orders').find({ where: { tenantId } as any });
+    const payments = await mgr.getRepository('payment').find({ where: { tenantId } as any });
+    const refunds = await mgr.getRepository('refund').find({ where: { tenantId } as any });
+
+    const payByOrder = new Map<number, number>();
+    for (const p of payments as any[]) {
+      if (p.status === 'SUCCESS') {
+        payByOrder.set(p.orderId, r2((payByOrder.get(p.orderId) || 0) + Number(p.amount)));
+      }
+    }
+    const refundByOrder = new Map<number, number>();
+    for (const r of refunds as any[]) {
+      if (r.status === 'REFUNDED') {
+        refundByOrder.set(r.orderId, r2((refundByOrder.get(r.orderId) || 0) + Number(r.amount)));
+      }
+    }
+
+    const discrepancies: string[] = [];
+    for (const o of orders as any[]) {
+      const paid = r2(Number(o.paidAmount) || 0);
+      const paySum = payByOrder.get(o.id) || 0;
+      if (Math.abs(paid - paySum) > 0.01) {
+        discrepancies.push(`订单#${o.id} 收款流水合计 ${paySum} 与订单已付 ${paid} 不一致`);
+      }
+      const refunded = refundByOrder.get(o.id) || 0;
+      if (refunded > paid + 0.01) {
+        discrepancies.push(`订单#${o.id} 退款 ${refunded} 超过已付 ${paid}，存在资损风险`);
+      }
+    }
+
+    const aiText = await this.aiSvc.llm(
+      '你是财务对账专家，依据对账差异清单用 1-2 句话给出结论与处理建议。若无差异，说明账目一致。',
+      discrepancies.length ? discrepancies.join('\n') : '本次对账无差异',
+    );
+    const aiSummary = aiText || (discrepancies.length ? `发现 ${discrepancies.length} 项差异，需财务人工复核挂账处理` : '对账一致，未发现差异');
+
+    return { checked: orders.length, discrepancies, aiSummary, aiPowered: this.aiSvc.enabled };
   }
 }

@@ -6,14 +6,21 @@ import PageContainer from '../components/PageContainer';
 import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import {
   listApprovalFlows, createApprovalFlow, updateApprovalFlow, deleteApprovalFlow,
-  listAllUsers, listRoles,
+  listAllUsers, listRoles, seedApprovalFlows,
 } from '../api/crm';
+
+const BIZ_TYPE_OPTIONS = [
+  'STORED_VALUE_RECHARGE', 'STORED_VALUE_REFUND', 'REFUND',
+  'LESSON_RESCHEDULE', 'CLASS_TRANSFER', 'PACKAGE_UPGRADE', 'DISCOUNT',
+].map((v) => ({ value: v, label: v }));
 
 interface NodeRow {
   name: string;
   approverType: 'USER' | 'ROLE';
   approverId?: number;
   approverRole?: string;
+  /** AND=会签(全部通过才推进) / OR=或签(任一通过即推进)，默认 OR */
+  mode?: 'AND' | 'OR';
 }
 
 export default function ApprovalFlowPage() {
@@ -56,12 +63,13 @@ export default function ApprovalFlowPage() {
       approverType: n.approverType,
       approverId: n.approverId,
       approverRole: n.approverRole,
+      mode: n.mode || 'OR',
     })));
     setOpen(true);
   };
 
   const addNode = () =>
-    setNodes([...nodes, { name: `节点${nodes.length + 1}`, approverType: 'USER', approverId: undefined, approverRole: undefined }]);
+    setNodes([...nodes, { name: `节点${nodes.length + 1}`, approverType: 'USER', approverId: undefined, approverRole: undefined, mode: 'OR' }]);
 
   const updateNode = (i: number, patch: Partial<NodeRow>) =>
     setNodes(nodes.map((n, idx) => (idx === i ? { ...n, ...patch } : n)));
@@ -95,6 +103,7 @@ export default function ApprovalFlowPage() {
         approverType: n.approverType,
         approverId: n.approverType === 'USER' ? n.approverId : undefined,
         approverRole: n.approverType === 'ROLE' ? n.approverRole : undefined,
+        mode: n.mode || 'OR',
       })),
     };
     setSaving(true);
@@ -112,6 +121,17 @@ export default function ApprovalFlowPage() {
     catch { /* ignore */ }
   };
 
+  const [seeding, setSeeding] = useState(false);
+  const onSeed = async () => {
+    setSeeding(true);
+    try {
+      const created = await seedApprovalFlows();
+      if (created.length) message.success(`已预置 ${created.length} 条资金联动审批流模板`);
+      else message.info('预置模板已存在，无需重复创建');
+      await load();
+    } finally { setSeeding(false); }
+  };
+
   const userOpts = useMemo(() => users.map((u) => ({ value: u.id, label: u.name || u.username })), [users]);
   const roleOpts = useMemo(() => roles.map((r) => ({ value: r.code, label: r.name })), [roles]);
 
@@ -126,6 +146,14 @@ export default function ApprovalFlowPage() {
     {
       title: '节点数', width: 80,
       render: (_: any, r: any) => (r.nodesJson || []).length,
+    },
+    {
+      title: '节点(模式)', width: 220,
+      render: (_: any, r: any) => (r.nodesJson || []).map((n: any, idx: number) => (
+        <Tag key={idx} color={n.mode === 'AND' ? 'purple' : 'default'}>
+          {n.name}/{n.mode === 'AND' ? '会签' : '或签'}
+        </Tag>
+      )),
     },
     {
       title: '操作', width: 160,
@@ -145,7 +173,12 @@ export default function ApprovalFlowPage() {
       <Card
         size="small"
         title="审批流模板配置（§4.16 增强）"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建审批流</Button>}
+        extra={
+          <Space>
+            <Button icon={<PlusOutlined />} loading={seeding} onClick={onSeed}>初始化预置模板</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建审批流</Button>
+          </Space>
+        }
       >
         <Table rowKey="id" size="small" dataSource={rows} columns={cols} pagination={false}  scroll={{ x: 'max-content' }} />
       </Card>
@@ -162,8 +195,10 @@ export default function ApprovalFlowPage() {
         <Form layout="vertical">
           <Space size="large" style={{ display: 'flex' }}>
             <Form.Item label="业务类型" required style={{ flex: 1 }}>
-              <Input value={bizType} onChange={(e) => setBizType(e.target.value)}
-                placeholder="如 REFUND / TRANSFER / DISCOUNT" />
+              <Select
+                value={bizType || undefined} onChange={(v) => setBizType(v || '')} showSearch
+                options={BIZ_TYPE_OPTIONS} placeholder="如 REFUND / STORED_VALUE_RECHARGE"
+              />
             </Form.Item>
             <Form.Item label="名称" required style={{ flex: 1 }}>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如 退费审批流" />
@@ -190,6 +225,9 @@ export default function ApprovalFlowPage() {
                 <Select style={{ width: 160 }} placeholder="审批角色" value={n.approverRole}
                   onChange={(v) => updateNode(i, { approverRole: v })} options={roleOpts} />
               )}
+              <Select style={{ width: 100 }} value={n.mode || 'OR'}
+                onChange={(v) => updateNode(i, { mode: v })}
+                options={[{ value: 'OR', label: '或签' }, { value: 'AND', label: '会签' }]} />
               <Button type="text" icon={<ArrowUpOutlined />} disabled={i === 0}
                 onClick={() => moveNode(i, -1)} />
               <Button type="text" icon={<ArrowDownOutlined />} disabled={i === nodes.length - 1}

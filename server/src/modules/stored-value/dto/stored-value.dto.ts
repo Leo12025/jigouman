@@ -14,6 +14,8 @@ export class RechargeDto {
   @IsOptional() @Type(() => Number) @IsInt() refOrderId?: number;
   /** 合规二次确认 */
   @IsOptional() @Type(() => Boolean) @IsBoolean() confirmCompliance?: boolean;
+  /** 兜底审批人（未配置审批流模板时使用） */
+  @IsOptional() @Type(() => Number) @IsInt() approverId?: number;
 }
 
 /** 储值消费（订单支付等） */
@@ -30,6 +32,8 @@ export class RefundToStoredValueDto {
   @Type(() => Number) @IsNumber() @Min(0) amount: number;
   @IsOptional() @Type(() => Number) @IsInt() refOrderId?: number;
   @IsOptional() @IsString() remark?: string;
+  /** 兜底审批人（未配置审批流模板时使用） */
+  @IsOptional() @Type(() => Number) @IsInt() approverId?: number;
 }
 
 export class StoredValueAccountPageQueryDto extends PageQueryDto {

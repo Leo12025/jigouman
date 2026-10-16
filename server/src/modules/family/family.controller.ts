@@ -19,6 +19,13 @@ export class FamilyController {
   create(@TenantId() t: number, @Body() d: CreateCourseReviewDto, @CurrentUser() u: AuthUser) {
     return this.svc.createReview(t, d, u.id);
   }
+
+  @Post('draft')
+  @RequirePermissions('review:create')
+  @ApiOperation({ summary: 'AI 生成课后点评草稿(需人工复核后正式提交)' })
+  draft(@TenantId() t: number, @Body() d: any) {
+    return this.svc.draftReview(t, { studentId: Number(d.studentId), classGroupId: d.classGroupId ? Number(d.classGroupId) : undefined, lessonId: d.lessonId ? Number(d.lessonId) : undefined });
+  }
 }
 
 @ApiTags('家校服务 Family')

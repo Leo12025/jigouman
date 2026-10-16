@@ -33,4 +33,12 @@ export class ApprovalNode extends BaseEntity {
 
   @Column({ name: 'acted_at', type: 'datetime', nullable: true })
   actedAt?: Date;
+
+  /** 本节点审批模式：AND=会签(全部通过才推进) / OR=或签(任一通过即推进)，默认 OR */
+  @Column({ name: 'mode', type: 'varchar', length: 8, default: 'OR', nullable: true, comment: '节点审批模式 AND会签/OR或签' })
+  mode?: 'AND' | 'OR';
+
+  /** 本节点已审批用户 ID 集合(会签累计；或签记录首批准人) */
+  @Column({ name: 'acted_user_ids', type: 'json', nullable: true, comment: '本节点已审批用户ID集合' })
+  actedUserIds?: number[];
 }

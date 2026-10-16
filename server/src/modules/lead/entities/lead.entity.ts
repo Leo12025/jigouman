@@ -65,6 +65,18 @@ export class Lead extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true, comment: '备注' })
   remark?: string;
 
+  /** AI 线索评分（§4.2 营销增强：按来源/行为预测转化概率，0-100） */
+  @Column({ type: 'float', nullable: true, comment: 'AI 转化评分 0-100' })
+  score?: number;
+
+  /** 评分等级 HIGH/MID/LOW（由 score 派生） */
+  @Column({ type: 'varchar', length: 8, nullable: true, comment: '评分等级 HIGH/MID/LOW' })
+  scoreLevel?: string;
+
+  /** 评分理由（AI 辅助产出，需人工复核） */
+  @Column({ type: 'text', nullable: true, comment: 'AI 评分理由' })
+  scoreReason?: string;
+
   /** 转化后学员 ID（线索→学员打通，§4.3 关键规则） */
   @Column({ name: 'converted_student_id', type: 'bigint', nullable: true, comment: '转化后学员ID' })
   convertedStudentId?: number;

@@ -11,6 +11,7 @@ export class FlowNodeDto {
   @IsIn(['USER', 'ROLE']) approverType: 'USER' | 'ROLE';
   @IsOptional() @Type(() => Number) @IsInt() approverId?: number;
   @IsOptional() @IsString() approverRole?: string;
+  @IsOptional() @IsIn(['AND', 'OR']) mode?: 'AND' | 'OR';
 }
 
 export class CreateApprovalFlowDto {

@@ -4,13 +4,14 @@ import { CourseReview } from './entities/course-review.entity';
 import { Notice } from './entities/notice.entity';
 import { RenewalReminder } from './entities/renewal-reminder.entity';
 import { TaskModule } from '../task/task.module';
+import { AiModule } from '../../common/ai/ai.module';
 import { FamilyService } from './family.service';
 import {
   FamilyController, StudentReviewController, NoticeController, RenewalController,
 } from './family.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CourseReview, Notice, RenewalReminder]), TaskModule],
+  imports: [TypeOrmModule.forFeature([CourseReview, Notice, RenewalReminder]), TaskModule, AiModule],
   providers: [FamilyService],
   controllers: [FamilyController, StudentReviewController, NoticeController, RenewalController],
   exports: [FamilyService],

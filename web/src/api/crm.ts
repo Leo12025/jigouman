@@ -36,12 +36,21 @@ export const listChannels = () => apiGet<Channel[]>('/channels');
 export const createChannel = (d: any) => apiPost<Channel>('/channels', d);
 export const updateChannel = (id: number, d: any) => apiPut<Channel>(`/channels/${id}`, d);
 export const deleteChannel = (id: number) => apiDelete(`/channels/${id}`);
+/** 渠道直连入库（抖音/美团/微信广告线索自动入库，§4.2 营销增强） */
+export const ingestChannelLeads = (id: number, d: any) => apiPost<any>(`/channels/${id}/ingest`, d);
 
 // ---------- 活动 ----------
 export const listCampaigns = () => apiGet<Campaign[]>('/campaigns');
 export const createCampaign = (d: any) => apiPost<Campaign>('/campaigns', d);
 export const updateCampaign = (id: number, d: any) => apiPut<Campaign>(`/campaigns/${id}`, d);
 export const deleteCampaign = (id: number) => apiDelete(`/campaigns/${id}`);
+
+// ---------- 活动模板库（§4.2 营销增强：拼团/砍价/分销/体验卡等一键发起） ----------
+export const listCampaignTemplates = () => apiGet<any[]>('/campaign-templates');
+export const createCampaignTemplate = (d: any) => apiPost<any>('/campaign-templates', d);
+export const updateCampaignTemplate = (id: number, d: any) => apiPut<any>(`/campaign-templates/${id}`, d);
+export const deleteCampaignTemplate = (id: number) => apiDelete(`/campaign-templates/${id}`);
+export const launchFromTemplate = (id: number, d: any) => apiPost<any>(`/campaign-templates/${id}/launch`, d);
 
 // ---------- 线索 ----------
 export const listLeads = (params: any) => apiGet<PageResult<Lead>>('/leads', params);
@@ -58,6 +67,10 @@ export const createTrial = (id: number, d: any) => apiPost<TrialLesson>(`/leads/
 export const listTrials = (id: number) => apiGet<TrialLesson[]>(`/leads/${id}/trials`);
 export const listFollows = (id: number) => apiGet<LeadFollow[]>(`/leads/${id}/follows`);
 export const getFunnel = (params: any) => apiGet<Funnel>('/leads/funnel', params);
+// ---------- AI 线索评分（§4.2 营销增强：确定性启发式+可选LLM，需人工复核） ----------
+export const scoreLead = (id: number) => apiPost<any>(`/leads/${id}/score`);
+export const scoreAllLeads = (d: any) => apiPost<any>('/leads/score-all', d);
+export const rankedLeads = (params: any) => apiGet<any>('/leads/ranked', params);
 
 // ---------- 课程 / 班级 / 课次 ----------
 export const listCourseCategories = () => apiGet<any[]>('/courses/categories');
@@ -159,6 +172,8 @@ export const issueInvoice = (id: number) => apiPut<any>(`/finance/invoices/${id}
 export const listInvoices = (params: any) => apiGet<PageResult<any>>('/finance/invoices', params);
 export const getInvoice = (id: number) => apiGet<any>(`/finance/invoices/${id}`);
 export const financeSummary = (params: any) => apiGet<any>('/finance/summary', params);
+/** AI 智能对账（订单vs收款vs退款，差异需人工复核，§9.5 资损防控） */
+export const financeReconcile = () => apiGet<any>('/finance/reconcile');
 
 // ---------- 待办中心 (§4.26) ----------
 export const listTasks = (params: any) => apiGet<PageResult<any>>('/tasks', params);
@@ -206,6 +221,8 @@ export const listApprovalFlows = (params: any) =>
   apiGet<PageResult<any>>('/approvals/flows', params);
 export const getApprovalFlow = (id: number) => apiGet<any>(`/approvals/flows/${id}`);
 export const createApprovalFlow = (d: any) => apiPost<any>('/approvals/flows', d);
+/** 初始化预置审批流模板（资金联动类，幂等，仅缺的才建） */
+export const seedApprovalFlows = () => apiPost<any[]>('/approvals/flows/seed-defaults');
 export const updateApprovalFlow = (id: number, d: any) => apiPut<any>(`/approvals/flows/${id}`, d);
 export const deleteApprovalFlow = (id: number) => apiDelete(`/approvals/flows/${id}`);
 // 审批人选择器：拉取全部用户（角色/用户节点共用）
@@ -227,6 +244,8 @@ export const homeworkUnsubmitted = (id: number) => apiGet<any[]>(`/homework/${id
 
 // ---------- 家校点评 (§6.6) ----------
 export const createCourseReview = (d: any) => apiPost<any>('/course-reviews', d);
+/** AI 课后点评草稿（需人工复核后正式提交，§11.8） */
+export const draftCourseReview = (d: any) => apiPost<any>('/course-reviews/draft', d);
 export const listStudentReviews = (studentId: number, params?: any) =>
   apiGet<PageResult<any>>(`/students/${studentId}/reviews`, params);
 
@@ -322,6 +341,9 @@ export const getStoredValueBalance = (studentId: number) =>
   apiGet<any>(`/stored-value/balance/${studentId}`);
 export const payOrderByStoredValue = (orderId: number) =>
   apiPost<any>(`/orders/${orderId}/pay-stored-value`);
+/** 储值资金操作审批请求列表（充值/退回储值走审批中心，§4.16） */
+export const listStoredValueRequests = (params: any) =>
+  apiGet<PageResult<any>>('/stored-value/requests', params);
 
 // ---------- 期课报名 / 插班折减（§2.3 #12）/ 时间型权益 ----------
 export const lateJoinPreview = (d: { totalLessons: number; finishedLessons: number; tuition: number }) =>

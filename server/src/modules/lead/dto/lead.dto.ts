@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PageQueryDto } from '../../../common/dto/pagination.dto';
-import { ChannelType } from '../entities/channel.entity';
+import { ChannelType, ChannelExternalType } from '../entities/channel.entity';
 import { CampaignType } from '../entities/campaign.entity';
 import { LeadStage } from '../entities/lead.entity';
 import { FollowType } from '../entities/lead-follow.entity';
@@ -22,6 +22,12 @@ export class CreateChannelDto {
   @IsOptional() @IsNumber() cost?: number;
   @IsOptional() @IsString() source?: string;
   @IsOptional() @IsInt() status?: number;
+  /** 外部线索直连开关 */
+  @IsOptional() @Type(() => Number) @IsInt() ingestEnabled?: number;
+  /** 外部直连来源类型（抖音/美团/微信广告） */
+  @IsOptional() @IsIn(Object.values(ChannelExternalType)) externalType?: ChannelExternalType;
+  /** 直连配置 JSON（凭证等） */
+  @IsOptional() @IsString() configJson?: string;
 }
 export class UpdateChannelDto {
   @IsOptional() @IsString() name?: string;
@@ -29,6 +35,9 @@ export class UpdateChannelDto {
   @IsOptional() @IsNumber() cost?: number;
   @IsOptional() @IsString() source?: string;
   @IsOptional() @IsInt() status?: number;
+  @IsOptional() @Type(() => Number) @IsInt() ingestEnabled?: number;
+  @IsOptional() @IsIn(Object.values(ChannelExternalType)) externalType?: ChannelExternalType;
+  @IsOptional() @IsString() configJson?: string;
 }
 
 // ---------- 活动 ----------
@@ -111,4 +120,53 @@ export class FunnelQueryDto {
   @IsOptional() @IsInt() @Type(() => Number) campaignId?: number;
   @IsOptional() @IsDateString() start?: string;
   @IsOptional() @IsDateString() end?: string;
+}
+
+// ---------- 活动模板库（§4.2 营销增强） ----------
+export class CreateCampaignTemplateDto {
+  @IsString() @IsNotEmpty() name: string;
+  @IsOptional() @IsString() type?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() configJson?: string;
+  @IsOptional() @IsInt() status?: number;
+}
+export class UpdateCampaignTemplateDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() type?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() configJson?: string;
+  @IsOptional() @IsInt() status?: number;
+}
+/** 一键发起：从模板复制为正式活动 */
+export class LaunchFromTemplateDto {
+  @IsOptional() @IsDateString() startTime?: string;
+  @IsOptional() @IsDateString() endTime?: string;
+  @IsOptional() @IsNumber() budget?: number;
+}
+
+// ---------- 渠道直连入库（§4.2 营销增强） ----------
+export class IngestLeadItemDto {
+  @IsString() @IsNotEmpty() name: string;
+  @IsString() @IsNotEmpty() phone: string;
+  @IsOptional() @IsString() intentionCourse?: string;
+  @IsOptional() @IsInt() gender?: number;
+  @IsOptional() @IsInt() age?: number;
+  @IsOptional() @IsNumber() budget?: number;
+  @IsOptional() @IsString() remark?: string;
+  /** 外部唯一标识（用于去重，避免重复入库） */
+  @IsOptional() @IsString() externalId?: string;
+}
+export class IngestLeadsDto {
+  @IsInt() channelId: number;
+  @IsOptional() @IsString() campaignId?: string;
+  @IsOptional() @Type(() => Number) @IsInt() campaignIdNum?: number;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() simulated?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() simulateCount?: number;
+  @IsOptional() item?: IngestLeadItemDto[];
+}
+
+// ---------- AI 线索评分（§4.2 营销增强） ----------
+export class ScoreLeadsDto {
+  /** 仅对未转化(NEW/FOLLOWING/TRIALED)线索评分 */
+  @IsOptional() @Type(() => Boolean) @IsBoolean() onlyActive?: boolean;
 }

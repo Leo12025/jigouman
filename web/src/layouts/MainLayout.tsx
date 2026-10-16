@@ -157,6 +157,7 @@ export default function MainLayout() {
         { key: '/homework', icon: <FileTextOutlined />, label: '作业管理' },
         { key: '/scores', icon: <LineChartOutlined />, label: '成绩管理' },
         { key: '/teaching', icon: <VideoCameraOutlined />, label: '在线课堂/督学' },
+        { key: '/reviews', icon: <FileTextOutlined />, label: '课后点评' },
       ],
     },
     {

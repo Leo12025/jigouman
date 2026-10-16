@@ -51,6 +51,13 @@ export class ApprovalController {
     return this.flowSvc.create(t, d);
   }
 
+  @Post('flows/seed-defaults')
+  @RequirePermissions('approval:create')
+  @ApiOperation({ summary: '初始化预置审批流模板(资金联动类，幂等)' })
+  seedDefaults(@TenantId() t: number) {
+    return this.flowSvc.seedDefaults(t);
+  }
+
   @Get('flows')
   @RequirePermissions('approval:view')
   @ApiOperation({ summary: '审批流模板列表' })

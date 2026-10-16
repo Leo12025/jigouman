@@ -23,6 +23,7 @@ import { Channel } from '../lead/entities/channel.entity';
 import { Campaign } from '../lead/entities/campaign.entity';
 import { DashboardRole, DASHBOARD_ROLES } from './dto/dashboard.dto';
 import { buildCsv, buildPdf, ExportColumn, ExportFile } from './export.util';
+import { AiService } from '../../common/ai/ai.service';
 
 /**
  * 数据经营分析（M6，文档 §4.10 / §6.7）。
@@ -52,6 +53,7 @@ export class DashboardService {
     @InjectRepository(CostRecord) private costRepo: Repository<CostRecord>,
     @InjectRepository(Material) private materialRepo: Repository<Material>,
     @InjectDataSource() private ds: DataSource,
+    private readonly aiSvc: AiService,
   ) {
     // 看板按校区口径聚合：套用校区隔离（读自动过滤 org_id）
     // 注意：本类已有字段 orgRepo(Organization 仓库)，故用别名引入隔离助手
@@ -916,5 +918,93 @@ export class DashboardService {
     };
     const title = `多校区对标_${new Date().toISOString().slice(0, 10)}`;
     return buildCsv({ title, columns, rows: [...b.campuses, summary] });
+  }
+
+  // ---------------- AI 经营诊断（§11.8，低风险只读辅助） ----------------
+  /**
+   * 基于现有看板指标做经营诊断：识别风险与机会，给出行动建议。
+   * 纯聚合+启发式（无外部依赖即可运行）；若配置了 AI_PROVIDER 则用 LLM 生成自然语言诊断，
+   * 但所有结论均属辅助、需经营者人工判断，不自动执行任何写操作。
+   */
+  async aiDiagnose(t: number): Promise<{
+    metrics: Record<string, number>;
+    risks: string[];
+    opportunities: string[];
+    suggestions: string[];
+    summary: string;
+    aiPowered: boolean;
+  }> {
+    const [p, a, te] = await Promise.all([
+      this.principal(t, {}, 6),
+      this.admission(t, {}),
+      this.teaching(t),
+    ]);
+    const m = {
+      received: this.num(p.revenue?.received),
+      refundAmount: this.num(p.revenue?.refundAmount),
+      netCashflow: this.num(p.revenue?.netCashflow),
+      consumeRate: this.num(p.hours?.consumeRate),
+      fullRate: this.num(p.classGroups?.fullRate),
+      studying: this.num(p.students?.studying),
+      conversionRate: this.num(a.funnel?.conversionRate),
+      leads: this.num(a.funnel?.total),
+      attendanceRate: this.num(te.attendance?.attendanceRate),
+      reviewedRate: this.num(te.homework?.reviewedRate),
+      pendingHomework: this.num(te.homework?.pendingHomework),
+      pendingCourseReview: this.num(te.alerts?.find((x: any) => x.code === 'PENDING_COURSE_REVIEW')?.value || 0),
+    };
+    const risks: string[] = [];
+    const opportunities: string[] = [];
+    const suggestions: string[] = [];
+
+    if (m.refundAmount > 0 && m.received > 0 && m.refundAmount / Math.max(1, m.received) > 0.15) {
+      risks.push(`退款金额占已收 ${((m.refundAmount / m.received) * 100).toFixed(1)}%，高于 15% 预警线`);
+      suggestions.push('排查高退费班级/顾问，复盘退费原因并优化课前沟通');
+    }
+    if (m.consumeRate < 0.5) {
+      risks.push(`课消率仅 ${(m.consumeRate * 100).toFixed(1)}%，课时沉淀严重`);
+      suggestions.push('对低消课学员推送补课/约课提醒，激活存量课时');
+    } else if (m.consumeRate > 0.85) {
+      opportunities.push(`课消率 ${(m.consumeRate * 100).toFixed(1)}% 健康，可引导续费扩科`);
+      suggestions.push('对高消课学员触发续费/扩科提醒（§4.9）');
+    }
+    if (m.fullRate < 0.6) {
+      opportunities.push(`班级满班率 ${(m.fullRate * 100).toFixed(1)}%，仍有招生空间`);
+      suggestions.push('对未满班课程加投体验课/拼团活动（§4.2）');
+    }
+    if (m.conversionRate < 0.2 && m.leads > 0) {
+      risks.push(`线索转化率 ${(m.conversionRate * 100).toFixed(1)}% 偏低`);
+      suggestions.push('用 AI 评分聚焦高价值线索（§4.2），并优化试听到报名路径');
+    }
+    if (m.attendanceRate < 0.8) {
+      risks.push(`出勤率 ${(m.attendanceRate * 100).toFixed(1)}% 偏低，存在流失风险`);
+      suggestions.push('加强缺勤回访与督学打卡（§4.13）');
+    }
+    if (m.pendingHomework > 0) {
+      risks.push(`存在 ${m.pendingHomework} 份待批改作业`);
+      suggestions.push('优先处理待批改作业以保障教学反馈时效');
+    }
+    if (!risks.length && !opportunities.length) {
+      opportunities.push('当前核心指标平稳，建议维持常态化运营');
+    }
+
+    // 可选 LLM 自然语言诊断（未配置则保留启发式摘要）
+    const metricsText = Object.entries(m)
+      .map(([k, v]) => `${k}=${typeof v === 'number' ? v : v}`)
+      .join('，');
+    const aiText = await this.aiSvc.llm(
+      '你是教培机构经营顾问，依据关键指标用 2-3 句话给出总体诊断，指出最该关注的一件事。不要罗列数字，只给结论与一句建议。',
+      metricsText,
+    );
+    const summary = aiText || `综合诊断：当前有 ${risks.length} 项风险、${opportunities.length} 项机会；优先建议：${suggestions[0] || '维持常态化运营'}`;
+
+    return {
+      metrics: m,
+      risks,
+      opportunities,
+      suggestions,
+      summary,
+      aiPowered: this.aiSvc.enabled,
+    };
   }
 }

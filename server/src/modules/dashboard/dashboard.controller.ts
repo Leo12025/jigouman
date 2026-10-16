@@ -59,6 +59,13 @@ export class DashboardController {
     return this.svc.screenOverview(t);
   }
 
+  @Get('ai-diagnose')
+  @RequirePermissions('dashboard:view')
+  @ApiOperation({ summary: 'AI 经营诊断(启发式+可选LLM, 只读辅助, 需人工判断)' })
+  aiDiagnose(@TenantId() t: number) {
+    return this.svc.aiDiagnose(t);
+  }
+
   @Get(':role')
   @RequirePermissions('dashboard:view')
   @ApiOperation({ summary: '经营/招生/教学看板(role=principal|admission|teaching)' })

@@ -210,4 +210,66 @@ describe('审批中心 Approval (e2e, SQLite)', () => {
       .send({ bizType: 'X', title: 'no approver' })
       .expect(400);
   });
+
+  it('会签(AND)：同节点多人需全部通过才推进，且已审人退出自己待办', async () => {
+    // 取 finance 角色 id，并创建第二个财务成员以凑齐会签两人
+    const roles = await request(app.getHttpServer()).get('/api/v1/roles').set(auth()).expect(200);
+    const financeRole = roles.body.data.find((r: any) => r.code === 'finance');
+    await request(app.getHttpServer()).post('/api/v1/users').set(auth())
+      .send({ username: 'finance2', name: '财务2', password: 'finance@123456', roleIds: [financeRole.id] })
+      .expect((res: any) => expect([201, 409]).toContain(res.status));
+
+    const fin1Login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login').send({ username: 'finance_default', password: 'finance@123456' }).expect(201);
+    const fin1Token = fin1Login.body.data.accessToken;
+    const fin1Id = fin1Login.body.data.id;
+    const fin2Login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login').send({ username: 'finance2', password: 'finance@123456' }).expect(201);
+    const fin2Token = fin2Login.body.data.accessToken;
+
+    // 会签模板：节点0=财务角色(两人) AND；节点1=admin OR 终审
+    const flow = await request(app.getHttpServer()).post('/api/v1/approvals/flows').set(auth())
+      .send({
+        bizType: 'REFUND', name: '退费会签流', enabled: true,
+        nodes: [
+          { order: 0, name: '财务会签', approverType: 'ROLE', approverRole: 'finance', mode: 'AND' },
+          { order: 1, name: '终审', approverType: 'USER', approverId: userId, mode: 'OR' },
+        ],
+      })
+      .expect(201);
+    const flowId = flow.body.data.id;
+
+    const create = await request(app.getHttpServer()).post('/api/v1/approvals').set(auth())
+      .send({ bizType: 'REFUND', title: '退费-会签', flowId }).expect(201);
+    const id = create.body.data.id;
+
+    let detail = await request(app.getHttpServer()).get(`/api/v1/approvals/${id}`).set(auth()).expect(200);
+    expect(detail.body.data.nodes[0].mode).toBe('AND');
+
+    // fin1 通过 → 会签未齐，仍 PENDING 且停留在节点0
+    await request(app.getHttpServer())
+      .post(`/api/v1/approvals/${id}/approve`).set('Authorization', `Bearer ${fin1Token}`).send({ comment: 'fin1' }).expect(201);
+    detail = await request(app.getHttpServer()).get(`/api/v1/approvals/${id}`).set(auth()).expect(200);
+    expect(detail.body.data.status).toBe('PENDING');
+    expect(detail.body.data.currentNode).toBe(0);
+    expect(detail.body.data.nodes[0].actedUserIds).toContain(fin1Id);
+    // fin1 已审，退出自己待办
+    const fin1Todos = await request(app.getHttpServer()).get('/api/v1/approvals/todos').set('Authorization', `Bearer ${fin1Token}`).expect(200);
+    expect(fin1Todos.body.data.some((x: any) => x.id === id)).toBe(false);
+    // fin2 仍在待办
+    const fin2Todos = await request(app.getHttpServer()).get('/api/v1/approvals/todos').set('Authorization', `Bearer ${fin2Token}`).expect(200);
+    expect(fin2Todos.body.data.some((x: any) => x.id === id)).toBe(true);
+
+    // fin2 通过 → 会签齐，推进到节点1
+    await request(app.getHttpServer())
+      .post(`/api/v1/approvals/${id}/approve`).set('Authorization', `Bearer ${fin2Token}`).send({ comment: 'fin2' }).expect(201);
+    detail = await request(app.getHttpServer()).get(`/api/v1/approvals/${id}`).set(auth()).expect(200);
+    expect(detail.body.data.currentNode).toBe(1);
+    expect(detail.body.data.status).toBe('PENDING');
+
+    // 终审(OR) admin 通过 → APPROVED
+    await request(app.getHttpServer()).post(`/api/v1/approvals/${id}/approve`).set(auth()).send({ comment: '终审' }).expect(201);
+    detail = await request(app.getHttpServer()).get(`/api/v1/approvals/${id}`).set(auth()).expect(200);
+    expect(detail.body.data.status).toBe('APPROVED');
+  });
 });

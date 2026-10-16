@@ -17,9 +17,9 @@ export class StoredValueController {
   @Post('recharge')
   @RequirePermissions('order:update')
   @OperationLog({ action: 'stored-value:recharge', target: 'stored_value_account' })
-  @ApiOperation({ summary: '储值充值(含预存赠送,如充5000送500)' })
+  @ApiOperation({ summary: '发起储值充值申请(进入审批中心,含预存赠送)' })
   recharge(@TenantId() t: number, @Body() d: RechargeDto, @CurrentUser() u: AuthUser) {
-    return this.svc.recharge(t, d, u.id);
+    return this.svc.requestRecharge(t, d, u);
   }
 
   @Post('consume')
@@ -33,9 +33,16 @@ export class StoredValueController {
   @Post('refund')
   @RequirePermissions('order:update')
   @OperationLog({ action: 'stored-value:refund', target: 'stored_value_account' })
-  @ApiOperation({ summary: '退费退回储值(仅退本金,赠送不退)' })
+  @ApiOperation({ summary: '发起退费退回储值申请(进入审批中心,仅退本金)' })
   refund(@TenantId() t: number, @Body() d: RefundToStoredValueDto, @CurrentUser() u: AuthUser) {
-    return this.svc.refundToStoredValue(t, d, u.id);
+    return this.svc.requestRefund(t, d, u);
+  }
+
+  @Get('requests')
+  @RequirePermissions('order:view')
+  @ApiOperation({ summary: '储值资金操作审批请求列表' })
+  requests(@TenantId() t: number, @Query() q: any) {
+    return this.svc.listRequests(t, q);
   }
 
   @Get('accounts')

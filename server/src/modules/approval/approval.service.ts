@@ -37,14 +37,17 @@ export class ApprovalService {
    *  为当前节点审批人(集合)生成 APPROVAL 任务并入待办中心（§4.26 与审批打通）。 */
   async create(tenantId: number, d: CreateApprovalDto, applicant: AuthUser) {
     let sets: number[][];
+    let nodeModes: ('AND' | 'OR')[] = [];
     if (d.flowId) {
       const flow = await this.flowSvc.detail(tenantId, d.flowId);
       sets = await this.flowSvc.resolveNodes(tenantId, flow.nodesJson || []);
+      nodeModes = (flow.nodesJson || []).map((n) => n.mode || 'OR');
     } else {
       if (!d.approverIds?.length) {
         throw new BadRequestException('需指定审批人：flowId 或 approverIds 至少其一');
       }
       sets = d.approverIds.map((id) => [id]);
+      nodeModes = d.approverIds.map(() => 'OR');
     }
     const inst = this.instanceRepo.create({
       tenantId,
@@ -66,7 +69,9 @@ export class ApprovalService {
           nodeKey: i,
           approverIdsJson: sets[i],
           approverId: sets[i].length === 1 ? sets[i][0] : undefined,
-        } as ApprovalNode),
+          mode: nodeModes[i] || 'OR',
+          actedUserIds: [],
+        } as any),
       );
     }
     await this.createNodeTasks(tenantId, saved, 0);
@@ -147,11 +152,20 @@ export class ApprovalService {
     const all = await this.instanceRepo.find({
       where: { tenantId, status: ApprovalStatus.PENDING } as any,
     });
-    return all.filter((i) => {
+    const todos: ApprovalInstance[] = [];
+    for (const i of all) {
       const sets = this.normalizeNodes(i.nodesJson);
       const cur = sets[i.currentNode] || [];
-      return cur.includes(userId);
-    });
+      if (!cur.includes(userId)) continue;
+      const node = await this.nodeRepo.findOne({
+        where: { tenantId, instanceId: i.id, nodeKey: i.currentNode } as any,
+      });
+      const acted = node?.actedUserIds || [];
+      // 会签未齐时，已审过的当前节点审批人不再出现在自己待办（等待其余审批人）
+      if (acted.includes(userId)) continue;
+      todos.push(i);
+    }
+    return todos;
   }
 
   async detail(tenantId: number, id: number) {
@@ -198,17 +212,25 @@ export class ApprovalService {
     const sets = this.normalizeNodes(inst.nodesJson);
     const currentSet = sets[inst.currentNode] || [];
     if (!currentSet.includes(operator.id)) throw new ForbiddenException('非当前节点审批人');
-    await this.nodeRepo.update(
-      { tenantId, instanceId: id, nodeKey: inst.currentNode } as any,
-      {
-        action,
-        comment,
-        actedAt: new Date(),
-        approverId: operator.id,
-        approverName: operator.username,
-      } as any,
-    );
+    // 读取当前节点记录（含会签模式与会签累计的已审批人）
+    const nodeRec = await this.nodeRepo.findOne({
+      where: { tenantId, instanceId: id, nodeKey: inst.currentNode } as any,
+    });
+    const nodeMode: 'AND' | 'OR' = (nodeRec?.mode as any) || 'OR';
+    const acted = (nodeRec?.actedUserIds || []).slice();
+    if (!acted.includes(operator.id)) acted.push(operator.id);
     if (action === ApprovalAction.REJECT) {
+      await this.nodeRepo.update(
+        { tenantId, instanceId: id, nodeKey: inst.currentNode } as any,
+        {
+          action: ApprovalAction.REJECT,
+          comment,
+          actedAt: new Date(),
+          approverId: operator.id,
+          approverName: operator.username,
+          actedUserIds: acted,
+        } as any,
+      );
       inst.status = ApprovalStatus.REJECTED;
       await this.instanceRepo.save(inst as any);
       this.emit('rejected', inst);
@@ -231,7 +253,31 @@ export class ApprovalService {
       });
       return inst;
     }
-    // APPROVE：推进节点或终审
+    // APPROVE：或签(OR)任一人通过即推进；会签(AND)需本节点全部审批人通过才推进
+    const allApproved = nodeMode === 'OR' ? true : currentSet.every((u) => acted.includes(u));
+    await this.nodeRepo.update(
+      { tenantId, instanceId: id, nodeKey: inst.currentNode } as any,
+      {
+        comment,
+        actedAt: new Date(),
+        approverId: operator.id,
+        approverName: operator.username,
+        actedUserIds: acted,
+        // 会签未齐时节点 action 保持空(待审)，仅累计已审批人；全员通过才标记通过
+        ...(allApproved ? { action: ApprovalAction.APPROVE } : {}),
+      } as any,
+    );
+    if (!allApproved) {
+      // 会签未齐：仅记录本次审批，保持当前节点等待其余审批人
+      await this.auditSvc.record({
+        user: operator,
+        action: 'approval:approve',
+        target: 'approval_instance',
+        bizId: id,
+        after: { node: inst.currentNode, mode: nodeMode, pending: currentSet.length - acted.length, comment },
+      });
+      return inst;
+    }
     if (inst.currentNode < sets.length - 1) {
       inst.currentNode += 1;
       await this.instanceRepo.save(inst as any);

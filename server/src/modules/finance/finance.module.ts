@@ -6,6 +6,7 @@ import { Salary } from './entities/salary.entity';
 import { Invoice } from './entities/invoice.entity';
 import { HourAccount } from '../hour/entities/hour-account.entity';
 import { HourConsumption } from '../hour/entities/hour-consumption.entity';
+import { AiModule } from '../../common/ai/ai.module';
 import { FinanceService } from './finance.service';
 import { FinanceController } from './finance.controller';
 
@@ -15,6 +16,7 @@ import { FinanceController } from './finance.controller';
       SplitConfig, SplitRecord, Salary, Invoice,
       HourAccount, HourConsumption,
     ]),
+    AiModule,
   ],
   providers: [FinanceService],
   controllers: [FinanceController],

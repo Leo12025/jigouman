@@ -1,14 +1,14 @@
 import { theme } from 'antd';
 import { useEffect, useState, useMemo } from 'react';
 import {
-  Tabs, Table, Button, Tag, Modal, Form, InputNumber, Input, Select, Card, Row, Col, Statistic, Space, App,
+  Tabs, Table, Button, Tag, Modal, Form, InputNumber, Input, Select, Card, Row, Col, Statistic, Space, App, Alert,
 } from 'antd';
 import PageContainer from '../components/PageContainer';
 import {
   getSplitConfig, upsertSplitConfig, listSplits, settleSplits,
   generateSalary, listSalary, confirmSalary, paySalary,
   applyInvoice, issueInvoice, listInvoices, financeSummary,
-  listStudents, listCourses,
+  listStudents, listCourses, financeReconcile,
 } from '../api/crm';
 
 const SPLIT_TYPE: Record<string, { label: string; color: string }> = {
@@ -39,6 +39,7 @@ export default function FinancePage() {
         { key: 'split', label: '分账 / 工资', children: <SplitTab /> },
         { key: 'invoice', label: '发票', children: <InvoiceTab /> },
         { key: 'report', label: '财务报表', children: <ReportTab /> },
+        { key: 'reconcile', label: 'AI 智能对账', children: <ReconcileTab /> },
       ]}
     />
     </PageContainer>
@@ -263,6 +264,54 @@ function ReportTab() {
           <Col span={6}><Card><Statistic title="订单数" value={data.orderCount} /></Card></Col>
           <Col span={6}><Card><Statistic title="退费单数" value={data.refundsCount} /></Card></Col>
         </Row>
+      )}
+    </div>
+  );
+}
+
+/** AI 智能对账（§9.5 资损防控）：核对订单 vs 收款 vs 退款，标记差异供财务人工挂账 */
+function ReconcileTab() {
+  const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      const r = await financeReconcile();
+      setData(r);
+      if (r.discrepancies?.length) message.warning(`发现 ${r.discrepancies.length} 项差异，请人工复核`);
+      else message.success('对账一致，未发现差异');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <Space style={{ marginBottom: 12 }} wrap>
+        <Button type="primary" loading={loading} onClick={run}>执行对账</Button>
+        {data && <Tag>{data.aiPowered ? 'AI 增强' : '启发式'}</Tag>}
+      </Space>
+      {!data && <div style={{ color: '#999' }}>点击「执行对账」核对订单流水、收款与退款，识别超收/超退等资损差异（仅辅助，需财务人工复核挂账）。</div>}
+      {data && (
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Alert type={data.discrepancies?.length ? 'warning' : 'success'} message={data.aiSummary} />
+          <Row gutter={16}>
+            <Col span={6}><Card size="small"><Statistic title="已核对订单" value={data.checked} /></Card></Col>
+            <Col span={6}><Card size="small"><Statistic title="差异数" value={data.discrepancies?.length || 0} valueStyle={{ color: data.discrepancies?.length ? token.colorError : token.colorSuccess }} /></Card></Col>
+          </Row>
+          {data.discrepancies?.length > 0 && (
+            <Table
+              rowKey={(r, i) => String(i)}
+              size="small"
+              dataSource={data.discrepancies}
+              pagination={false}
+              columns={[{ title: '差异明细', dataIndex: (r: string) => r, render: (v: string) => <Tag color="red">{v}</Tag> }]}
+            />
+          )}
+        </Space>
       )}
     </div>
   );

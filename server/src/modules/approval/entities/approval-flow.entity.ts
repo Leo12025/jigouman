@@ -13,6 +13,8 @@ export interface FlowNodeConfig {
   approverId?: number;
   /** approverType=ROLE 时的角色编码 */
   approverRole?: string;
+  /** 节点内多人审批模式：AND=会签(全部通过才推进) / OR=或签(任一通过即推进)，默认 OR */
+  mode?: 'AND' | 'OR';
 }
 
 /**

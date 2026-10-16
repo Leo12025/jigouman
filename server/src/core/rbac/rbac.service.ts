@@ -167,11 +167,22 @@ export class RbacService {
     await ensureRole(
       'finance',
       '财务',
-      ['order:view', 'order:create', 'order:update', 'report:view', 'hour:view', 'finance:view', 'finance:create', 'finance:update', 'task:view'].map(
+      ['order:view', 'order:create', 'order:update', 'report:view', 'hour:view', 'finance:view', 'finance:create', 'finance:update', 'task:view', 'approval:view', 'approval:update'].map(
         (c) => permMap.get(c),
       ).filter(Boolean) as Permission[],
       'org',
     );
+    // 财务需能审批资金类申请：幂等补齐 approval 权限（兼容历史租户/旧角色）
+    const finRole = await this.roleRepo.findOne({ where: { tenantId, code: 'finance' }, relations: ['permissions'] });
+    if (finRole) {
+      const haveF = new Set((finRole.permissions || []).map((p) => p.code));
+      const needF = ['approval:view', 'approval:update'].map((c) => permMap.get(c)).filter(Boolean) as Permission[];
+      const missF = needF.filter((p) => !haveF.has(p.code));
+      if (missF.length) {
+        finRole.permissions = [...(finRole.permissions || []), ...missF];
+        await this.roleRepo.save(finRole);
+      }
+    }
 
     // 3) 超级管理员账号
     const username = 'admin';
@@ -191,6 +202,25 @@ export class RbacService {
       admin = await this.userRepo.save(admin);
       this.logger.log(`租户 ${tenantId} 初始化超级管理员: ${username} / ${adminPassword}`);
     }
+    // 预置财务/教学默认成员（让对应角色审批节点可直接用，幂等）
+    const ensureDefaultMember = async (
+      uname: string, display: string, roleCode: string, pwd: string,
+    ) => {
+      const exist = await this.userRepo.findOne({ where: { tenantId, username: uname } });
+      if (exist) return;
+      const role = await this.roleRepo.findOne({ where: { tenantId, code: roleCode } });
+      const u = this.userRepo.create({
+        tenantId, username: uname, passwordHash: await bcrypt.hash(pwd, 10),
+        name: display, status: 1, roles: role ? [role] : [],
+      });
+      const saved = await this.userRepo.save(u);
+      await this.membershipRepo.save(
+        this.membershipRepo.create({ tenantId, userId: saved.id, status: 'ACTIVE' } as Membership),
+      );
+      this.logger.log(`租户 ${tenantId} 预置默认成员: ${uname} / ${pwd} (角色 ${roleCode})`);
+    };
+    await ensureDefaultMember('finance_default', '财务-默认', 'finance', 'finance@123456');
+    await ensureDefaultMember('teacher_default', '教学-默认', 'teacher', 'teacher@123456');
     // 为租户内全部用户补 membership（状态机 ACTIVE），幂等
     await this.seedMemberships(tenantId);
     return admin;

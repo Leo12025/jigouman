@@ -52,6 +52,7 @@ const TeachingPage = lazy(() => import('./pages/TeachingPage'));
 const ReportPage = lazy(() => import('./pages/ReportPage'));
 const TenantPage = lazy(() => import('./pages/TenantPage'));
 const TenantSettingsPage = lazy(() => import('./pages/TenantSettingsPage'));
+const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 
 /** 路由级代码分割：每个页面单独成 chunk，首屏只加载当前路由 */
 const L = (Comp: React.ComponentType) => (
@@ -111,6 +112,7 @@ export default function App() {
         <Route path="course-packages" element={L(CoursePackagePage)} />
         <Route path="package-upgrades" element={L(PackageUpgradePage)} />
         <Route path="stored-value" element={L(StoredValuePage)} />
+        <Route path="reviews" element={L(ReviewPage)} />
         <Route path="coursewares" element={L(CoursewarePage)} />
         <Route path="resources" element={L(ResourcePage)} />
         <Route path="employees" element={L(EmployeePage)} />

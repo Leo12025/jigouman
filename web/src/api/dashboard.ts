@@ -8,4 +8,7 @@ export const getDashboard = (role: 'principal' | 'admission' | 'teaching', param
 export const getDashboardScreen = () => apiGet<any>(`/dashboards/screen`);
 
 /** 总校区视角·跨校区汇总对比：GET /api/v1/dashboards/campus-overview */
-export const getCampusOverview = () => apiGet<any>(`/dashboards/campus-overview`);
+export const getCampusOverview = () => apiGet<any>('/dashboards/campus-overview');
+
+/** AI 经营诊断（§11.8，低风险只读辅助，需人工判断） */
+export const getAiDiagnose = () => apiGet<any>('/dashboards/ai-diagnose');

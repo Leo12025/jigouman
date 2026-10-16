@@ -112,4 +112,11 @@ export class FinanceController {
   summary(@TenantId() t: number, @Query() q: FinanceSummaryQueryDto) {
     return this.svc.summary(t, q);
   }
+
+  @Get('reconcile')
+  @RequirePermissions('finance:view')
+  @ApiOperation({ summary: 'AI 智能对账(订单vs收款vs退款, 差异需人工复核)' })
+  reconcile(@TenantId() t: number) {
+    return this.svc.reconcile(t);
+  }
 }

@@ -24,6 +24,9 @@ export interface Channel {
   cost?: number;
   source?: string;
   status: number;
+  ingestEnabled?: number;
+  externalType?: string;
+  configJson?: string;
 }
 
 export interface Campaign {
@@ -52,6 +55,9 @@ export interface Lead {
   source?: string;
   remark?: string;
   convertedStudentId?: number;
+  score?: number;
+  scoreLevel?: string;
+  scoreReason?: string;
   createdAt?: string;
 }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository, In } from 'typeorm';
 import { CourseReview } from './entities/course-review.entity';
 import { CreateCourseReviewDto, ReviewPageQueryDto } from './dto/family.dto';
 import { Notice } from './entities/notice.entity';
@@ -8,6 +8,9 @@ import { RenewalReminder } from './entities/renewal-reminder.entity';
 import { CreateNoticeDto, NoticePageQueryDto, CreateRenewalReminderDto } from './dto/notice.dto';
 import { TaskService } from '../task/task.service';
 import { TaskStatus } from '../task/entities/task.entity';
+import { AiService } from '../../common/ai/ai.service';
+import { Attendance } from '../hour/entities/attendance.entity';
+import { HomeworkSubmit } from '../homework/entities/homework-submit.entity';
 
 import { orgRepo } from '../../common/org-scope';
 
@@ -20,7 +23,9 @@ export class FamilyService {
     @InjectRepository(CourseReview) repo: Repository<CourseReview>,
     @InjectRepository(Notice) noticeRepo: Repository<Notice>,
     @InjectRepository(RenewalReminder) renewalRepo: Repository<RenewalReminder>,
+    @InjectDataSource() private readonly ds: DataSource,
     private readonly taskSvc: TaskService,
+    private readonly aiSvc: AiService,
   ) {
     this.repo = orgRepo(repo);
     this.noticeRepo = orgRepo(noticeRepo);
@@ -147,5 +152,44 @@ export class FamilyService {
       order: { id: 'DESC' } as any,
       take: 50,
     });
+  }
+
+  // ---------------- AI 课后点评草稿（§11.8，人工复核兜底） ----------------
+  /**
+   * 生成课后点评草稿（不直接落库）：基于学员近期出勤/作业/成绩聚合，给出客观描述，
+   * 可选 LLM 润色为自然语言点评。教师需复核后调用 createReview 正式提交（aiGenerated 标记）。
+   */
+  async draftReview(
+    tenantId: number,
+    d: { studentId: number; classGroupId?: number; lessonId?: number },
+  ): Promise<{ draft: string; aiPowered: boolean; facts: Record<string, any> }> {
+    const attRepo = this.ds.getRepository(Attendance);
+    const hsRepo = this.ds.getRepository(HomeworkSubmit);
+
+    const attWhere: any = { tenantId, studentId: d.studentId };
+    if (d.lessonId) attWhere.lessonId = d.lessonId;
+    const atts = await attRepo.find({ where: attWhere, order: { id: 'DESC' } as any, take: 30 });
+    const present = atts.filter((a) => (a as any).status === 'PRESENT').length;
+    const late = atts.filter((a) => (a as any).status === 'LATE').length;
+    const absent = atts.filter((a) => (a as any).status === 'ABSENT').length;
+
+    const hsWhere: any = { tenantId, studentId: d.studentId };
+    const subs = await hsRepo.find({ where: hsWhere, order: { id: 'DESC' } as any, take: 30 });
+    const submitted = subs.filter((s) => (s as any).status === 'SUBMITTED' || (s as any).status === 'REVIEWED').length;
+    const reviewed = subs.filter((s) => (s as any).status === 'REVIEWED').length;
+    const hwLate = subs.filter((s) => (s as any).isLate).length;
+
+    const facts = { present, late, absent, submitted, reviewed, hwLate, lessonId: d.lessonId, classGroupId: d.classGroupId };
+    let draft =
+      `学员近期上课 ${atts.length} 次（出勤 ${present} / 迟到 ${late} / 缺勤 ${absent}），` +
+      `作业提交 ${submitted} 份（已批改 ${reviewed} / 迟交 ${hwLate}）。`;
+
+    const llm = await this.aiSvc.llm(
+      '你是耐心专业的少儿课程老师，基于学员客观表现写一段 80 字以内的课后点评草稿，先肯定亮点再给一个具体改进建议。语言温暖、具体、不夸大。',
+      `出勤${present}次迟到${late}次缺勤${absent}次；作业提交${submitted}份已批改${reviewed}份迟交${hwLate}份。`,
+    );
+    if (llm) draft = llm;
+
+    return { draft, aiPowered: this.aiSvc.enabled, facts };
   }
 }

@@ -1,6 +1,6 @@
 import { theme } from 'antd';
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Space, Typography } from 'antd';
+import { Card, Row, Col, Space, Typography, Button, Tag, Alert, List } from 'antd';
 import PageContainer from '../components/PageContainer';
 import {
   TeamOutlined,
@@ -8,9 +8,11 @@ import {
   SolutionOutlined,
   FundProjectionScreenOutlined,
   BellOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getFunnel, getTaskStats } from '../api/crm';
+import { getAiDiagnose } from '../api/dashboard';
 
 const ENTRIES = [
   { key: '/leads', label: '线索 CRM', desc: '录入/分配/跟进/试听/转化', icon: <TeamOutlined /> },
@@ -24,11 +26,22 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [todoStats, setTodoStats] = useState<any>(null);
+  const [diag, setDiag] = useState<any>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
 
   useEffect(() => {
     getFunnel({}).then(setStats).catch(() => undefined);
     getTaskStats().then(setTodoStats).catch(() => undefined);
   }, []);
+
+  const runDiagnose = async () => {
+    setDiagLoading(true);
+    try {
+      setDiag(await getAiDiagnose());
+    } finally {
+      setDiagLoading(false);
+    }
+  };
 
   return (
     <PageContainer title="工作台">
@@ -81,6 +94,38 @@ export default function HomePage() {
             </Col>
           ))}
         </Row>
+      </Card>
+
+      <Card
+        title={<Space><RobotOutlined /> AI 经营诊断</Space>}
+        size="small"
+        style={{ marginTop: 16 }}
+        extra={<Button type="primary" loading={diagLoading} onClick={runDiagnose}>生成诊断</Button>}
+      >
+        {!diag && <Typography.Text type="secondary">基于营收/课消/转化/出勤等核心指标，识别风险与机会并给出行动建议（确定性启发式，可选 LLM 增强；仅辅助参考，需人工判断）。</Typography.Text>}
+        {diag && (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Alert type="info" message={diag.summary} description={diag.aiPowered ? '（由 AI 生成，仅供参考）' : '（启发式生成，未配置 AI 模型）'} />
+            {diag.risks?.length > 0 && (
+              <div>
+                <Typography.Text strong>风险项</Typography.Text>
+                <List size="small" dataSource={diag.risks} renderItem={(x: string) => <List.Item><Tag color="red">风险</Tag>{x}</List.Item>} />
+              </div>
+            )}
+            {diag.opportunities?.length > 0 && (
+              <div>
+                <Typography.Text strong>机会项</Typography.Text>
+                <List size="small" dataSource={diag.opportunities} renderItem={(x: string) => <List.Item><Tag color="green">机会</Tag>{x}</List.Item>} />
+              </div>
+            )}
+            {diag.suggestions?.length > 0 && (
+              <div>
+                <Typography.Text strong>行动建议</Typography.Text>
+                <List size="small" dataSource={diag.suggestions} renderItem={(x: string) => <List.Item><Tag color="blue">建议</Tag>{x}</List.Item>} />
+              </div>
+            )}
+          </Space>
+        )}
       </Card>
     </PageContainer>
   );

@@ -30,6 +30,9 @@ import {
   listFollows,
   listTrials,
   listChannels,
+  scoreAllLeads,
+  scoreLead,
+  rankedLeads,
 } from '../api/crm';
 import type { Lead, LeadStage, LeadFollow, TrialLesson, Channel } from '../api/types';
 import { LEAD_STAGES, LEAD_STAGE_LABEL } from '../api/types';
@@ -69,6 +72,10 @@ export default function LeadPage() {
   const [followOpen, setFollowOpen] = useState(false);
   const [trialOpen, setTrialOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [rankOpen, setRankOpen] = useState(false);
+  const [ranked, setRanked] = useState<any[]>([]);
+  const [rankLoading, setRankLoading] = useState(false);
+  const [scoring, setScoring] = useState(false);
   const [cur, setCur] = useState<Lead | null>(null);
   const [follows, setFollows] = useState<LeadFollow[]>([]);
   const [trials, setTrials] = useState<TrialLesson[]>([]);
@@ -118,6 +125,34 @@ export default function LeadPage() {
   }, []);
 
   const reload = () => load(page, size);
+
+  // AI 线索评分（§4.2 营销增强）
+  const onScoreAll = async () => {
+    setScoring(true);
+    try {
+      const res = await scoreAllLeads({ onlyActive: true });
+      message.success(`已评分 ${res.scanned} 条：高${res.distribution?.HIGH ?? 0} / 中${res.distribution?.MID ?? 0} / 低${res.distribution?.LOW ?? 0}`);
+      reload();
+    } finally {
+      setScoring(false);
+    }
+  };
+  const onScoreOne = async (id: number) => {
+    try {
+      const r = await scoreLead(id);
+      message.success(`评分 ${r.score}（${r.level}）`);
+      reload();
+    } catch { /* ignore */ }
+  };
+  const openRank = async () => {
+    setRankOpen(true);
+    setRankLoading(true);
+    try {
+      setRanked(await rankedLeads({ limit: 30 }));
+    } finally {
+      setRankLoading(false);
+    }
+  };
 
   const openCreate = () => {
     leadForm.resetFields();
@@ -240,6 +275,17 @@ export default function LeadPage() {
       width: 100,
       render: (v: LeadStage) => <Tag color={STAGE_COLOR[v]}>{LEAD_STAGE_LABEL[v]}</Tag>,
     },
+    {
+      title: 'AI 评分',
+      dataIndex: 'score',
+      width: 110,
+      render: (v: number, r: Lead) =>
+        v == null ? '-' : (
+          <Tag color={r.scoreLevel === 'HIGH' ? 'green' : r.scoreLevel === 'MID' ? 'blue' : 'default'}>
+            {v} {r.scoreLevel || ''}
+          </Tag>
+        ),
+    },
     { title: '归属', dataIndex: 'ownerId', width: 80, render: (v: number) => v ?? '-' },
     {
       title: '最近跟进',
@@ -263,6 +309,9 @@ export default function LeadPage() {
           </Button>
           <Button type="link" size="small" onClick={() => onConvert(r)}>
             转化
+          </Button>
+          <Button type="link" size="small" onClick={() => onScoreOne(r.id)}>
+            评分
           </Button>
           <Button type="link" size="small" onClick={() => openDetail(r)}>
             详情
@@ -337,6 +386,10 @@ export default function LeadPage() {
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           新建线索
         </Button>
+        <Button icon={<ReloadOutlined />} loading={scoring} onClick={onScoreAll}>
+          AI 评分(全部活跃)
+        </Button>
+        <Button onClick={openRank}>优先跟进(评分排序)</Button>
         <Button onClick={() => navigate('/funnel')}>转化漏斗</Button>
       </Space>
 
@@ -510,6 +563,29 @@ export default function LeadPage() {
             />
           </>
         )}
+      </Drawer>
+      {/* 优先跟进：按 AI 评分排序 */}
+      <Drawer title="优先跟进（按 AI 评分排序）" open={rankOpen} onClose={() => setRankOpen(false)} width={560}>
+        <Table
+          rowKey="id"
+          size="small"
+          loading={rankLoading}
+          dataSource={ranked}
+          pagination={false}
+          columns={[
+            { title: '排名', render: (_: any, __: any, i: number) => i + 1, width: 60 },
+            { title: '姓名', dataIndex: 'name', width: 100 },
+            { title: '阶段', dataIndex: 'stage', width: 90, render: (v: string) => LEAD_STAGE_LABEL[v as LeadStage] || v },
+            {
+              title: '评分', dataIndex: 'score', width: 100,
+              render: (v: number, r: any) => (
+                <Tag color={r.level === 'HIGH' ? 'green' : r.level === 'MID' ? 'blue' : 'default'}>{v} {r.level}</Tag>
+              ),
+            },
+            { title: '建议', dataIndex: 'reason', render: (v: string) => v || '-' },
+          ]}
+          scroll={{ x: 'max-content' }}
+        />
       </Drawer>
     </PageContainer>
   );

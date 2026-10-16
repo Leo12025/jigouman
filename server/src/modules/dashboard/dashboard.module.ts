@@ -21,6 +21,7 @@ import { MetricDef } from './entities/metric-def.entity';
 import { Organization } from '../org/entities/organization.entity';
 import { CostRecord } from '../cost/entities/cost-record.entity';
 import { Material } from '../inventory/entities/material.entity';
+import { AiModule } from '../../common/ai/ai.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { Material } from '../inventory/entities/material.entity';
       CostRecord,
       Material,
     ]),
+    AiModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],

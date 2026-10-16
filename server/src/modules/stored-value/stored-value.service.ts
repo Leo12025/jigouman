@@ -1,13 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, EntityTarget, Repository } from 'typeorm';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { ResCode } from '../../common/constants/response-code';
 import { orgRepo } from '../../common/org-scope';
 import { resolveLimits, checkCompliance, assertComplianceConfirmable } from '../../common/compliance';
+import { ApprovalService } from '../approval/approval.service';
+import { approvalEvents, ApprovalEventPayload } from '../../common/approval-events';
+import { AuthUser } from '../../common/decorators/auth.decorator';
 import { StoredValueAccount } from './entities/stored-value-account.entity';
 import { StoredValueLedger } from './entities/stored-value-ledger.entity';
+import {
+  StoredValueRequest,
+  StoredValueRequestType,
+  StoredValueRequestStatus,
+} from './entities/stored-value-request.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
+
+/** 储值资金操作审批 bizType（与调课/转班/套餐升级/退费统一走审批中心） */
+export const SV_RECHARGE_BIZ_TYPE = 'STORED_VALUE_RECHARGE';
+export const SV_REFUND_BIZ_TYPE = 'STORED_VALUE_REFUND';
 import {
   RechargeDto, ConsumeDto, RefundToStoredValueDto,
   StoredValueAccountPageQueryDto, StoredValueLedgerPageQueryDto,
@@ -18,19 +30,36 @@ function r2(n: number): number {
 }
 
 @Injectable()
-export class StoredValueService {
+export class StoredValueService implements OnModuleInit {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
     @InjectRepository(StoredValueAccount) accRepoRaw: Repository<StoredValueAccount>,
     @InjectRepository(StoredValueLedger) ledgerRepoRaw: Repository<StoredValueLedger>,
+    @InjectRepository(StoredValueRequest) reqRepoRaw: Repository<StoredValueRequest>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
+    private readonly approvalSvc: ApprovalService,
   ) {
     this.accRepo = orgRepo(accRepoRaw);
     this.ledgerRepo = orgRepo(ledgerRepoRaw);
+    this.reqRepo = orgRepo(reqRepoRaw);
   }
 
   private readonly accRepo: Repository<StoredValueAccount>;
   private readonly ledgerRepo: Repository<StoredValueLedger>;
+  private readonly reqRepo: Repository<StoredValueRequest>;
+
+  onModuleInit() {
+    approvalEvents.on('approval.approved', (p: ApprovalEventPayload) => {
+      if (p.bizType === SV_RECHARGE_BIZ_TYPE || p.bizType === SV_REFUND_BIZ_TYPE) {
+        void this.applyRequest(p.tenantId, p.bizId).catch(() => undefined);
+      }
+    });
+    approvalEvents.on('approval.rejected', (p: ApprovalEventPayload) => {
+      if (p.bizType === SV_RECHARGE_BIZ_TYPE || p.bizType === SV_REFUND_BIZ_TYPE) {
+        void this.rejectRequest(p.tenantId, p.bizId).catch(() => undefined);
+      }
+    });
+  }
 
   private $r<E extends Object>(m: DataSource | EntityManager, e: EntityTarget<E>): Repository<E> {
     return orgRepo(m.getRepository<E>(e)) as Repository<E>;
@@ -202,6 +231,131 @@ export class StoredValueService {
       );
       return { account: saved, refunded: amount };
     });
+  }
+
+  // ---------------- 审批中心资金联动（§4.16/§9.5） ----------------
+  // 充值/退回储值均先落请求(PENDING)并进入审批中心；审批通过后事件总线回写余额，驳回不改余额。
+
+  /** 发起储值充值申请：不立即变更余额，进入审批中心 */
+  async requestRecharge(tenantId: number, d: RechargeDto, applicant: AuthUser) {
+    const amount = r2(Number(d.amount));
+    if (amount <= 0) throw new BusinessException(ResCode.BAD_REQUEST, '充值金额必须大于 0');
+    const limits = await this.limits(tenantId);
+    assertComplianceConfirmable(
+      checkCompliance(limits, { amount }),
+      d.confirmCompliance,
+      '储值充值超出预收费监管上限',
+    );
+    const req = this.reqRepo.create({
+      tenantId,
+      type: StoredValueRequestType.RECHARGE,
+      studentId: Number(d.studentId),
+      amount,
+      giftAmount: r2(Number(d.giftAmount) || 0),
+      remark: d.remark || '储值充值',
+      refOrderId: d.refOrderId,
+      operatorId: applicant.id,
+      status: StoredValueRequestStatus.PENDING,
+    } as StoredValueRequest);
+    const saved = (await this.reqRepo.save(req as any)) as StoredValueRequest;
+    const inst = await this.approvalSvc.createByBizType(tenantId, {
+      bizType: SV_RECHARGE_BIZ_TYPE,
+      bizId: saved.id,
+      title: `储值充值申请-学员${d.studentId}-${amount}元`,
+      applicant,
+      fallbackApproverId: d.approverId,
+    });
+    saved.approvalInstanceId = inst.id;
+    await this.reqRepo.save(saved as any);
+    return saved;
+  }
+
+  /** 发起退费退回储值申请：不立即变更余额，进入审批中心 */
+  async requestRefund(tenantId: number, d: RefundToStoredValueDto, applicant: AuthUser) {
+    const amount = r2(Number(d.amount));
+    if (amount <= 0) throw new BusinessException(ResCode.BAD_REQUEST, '退回金额必须大于 0');
+    const req = this.reqRepo.create({
+      tenantId,
+      type: StoredValueRequestType.REFUND,
+      studentId: Number(d.studentId),
+      amount,
+      giftAmount: 0,
+      remark: d.remark || '退费退回储值（赠送部分不退）',
+      refOrderId: d.refOrderId,
+      operatorId: applicant.id,
+      status: StoredValueRequestStatus.PENDING,
+    } as StoredValueRequest);
+    const saved = (await this.reqRepo.save(req as any)) as StoredValueRequest;
+    const inst = await this.approvalSvc.createByBizType(tenantId, {
+      bizType: SV_REFUND_BIZ_TYPE,
+      bizId: saved.id,
+      title: `退回储值申请-学员${d.studentId}-${amount}元`,
+      applicant,
+      fallbackApproverId: d.approverId,
+    });
+    saved.approvalInstanceId = inst.id;
+    await this.reqRepo.save(saved as any);
+    return saved;
+  }
+
+  /** 审批通过：执行真实余额变更（充值/退回储值） */
+  private async applyRequest(tenantId: number, id?: number) {
+    if (!id) return;
+    const req = await this.reqRepo.findOne({ where: { tenantId, id } as any });
+    if (!req || req.status !== StoredValueRequestStatus.PENDING) return;
+    if (req.type === StoredValueRequestType.RECHARGE) {
+      await this.recharge(
+        tenantId,
+        {
+          studentId: req.studentId,
+          amount: Number(req.amount),
+          giftAmount: Number(req.giftAmount),
+          remark: req.remark,
+          refOrderId: req.refOrderId,
+          confirmCompliance: true,
+        } as RechargeDto,
+        req.operatorId,
+      );
+    } else {
+      await this.refundToStoredValue(
+        tenantId,
+        {
+          studentId: req.studentId,
+          amount: Number(req.amount),
+          remark: req.remark,
+          refOrderId: req.refOrderId,
+        } as RefundToStoredValueDto,
+        req.operatorId,
+      );
+    }
+    req.status = StoredValueRequestStatus.DONE;
+    req.executedAt = new Date();
+    await this.reqRepo.save(req as any);
+  }
+
+  /** 审批驳回：余额保持不变 */
+  private async rejectRequest(tenantId: number, id?: number) {
+    if (!id) return;
+    const req = await this.reqRepo.findOne({ where: { tenantId, id } as any });
+    if (!req || req.status !== StoredValueRequestStatus.PENDING) return;
+    req.status = StoredValueRequestStatus.REJECTED;
+    await this.reqRepo.save(req as any);
+  }
+
+  async listRequests(tenantId: number, q: any) {
+    const where: any = { tenantId };
+    if (q?.type) where.type = q.type;
+    if (q?.status) where.status = q.status;
+    if (q?.studentId) where.studentId = q.studentId;
+    const page = q?.page || 1;
+    const size = q?.size || 20;
+    const [list, total] = await this.reqRepo.findAndCount({
+      where,
+      order: { id: 'DESC' } as any,
+      skip: (page - 1) * size,
+      take: size,
+    });
+    return { list, total, page, size, totalPages: Math.ceil(total / size) };
   }
 
   async balance(tenantId: number, studentId: number) {

@@ -191,7 +191,8 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 > - **前端**：待办中心页支持"我的待办/全部"切换、状态/类型/逾期筛选、逾期标红与严重逾期标记、类型分布统计卡；`APPROVAL` 任务提供「通过/驳回」；首页待办概览卡；顶栏通知铃铛；新增**审批流配置页**（系统管理→审批流配置，可视化节点/审批人配置）；待办中心新增「发起审批」弹窗（可选套用模板或手动指定审批人）；新增**消息渠道配置页**（系统管理→消息渠道配置，腾讯云/阿里云短信密钥配置）。
 > - **消息渠道配置（§4.26 多渠道提醒）**：`GET/PUT/DELETE /api/v1/notifications/channels` 管理按租户的外部渠道（SMS_TENCENT / SMS_ALIYUN / WECHAT），密钥存于 `config_json`；通知创建后 `ExternalChannelService` best-effort 补发短信（有用户手机号即发），失败仅记日志、不阻断业务与站内通知。腾讯云/阿里云短信发送接口为纯 Node 实现（`crypto`+`fetch`，TC3-HMAC-SHA256 / RPC-HMAC-SHA1），无需第三方 SDK，管理员填密钥即启用；微信接口已按官方 API 实现，待「用户 openid 绑定」后启用。
 > - **客诉模块（§4.26 客诉分派 / §6.23 客诉售后）**：`POST/GET /complaints`、`PUT /complaints/:id/assign`、`POST /complaints/:id/resolve`；登记→分派/改派→处理闭环，自动生成/关闭 COMPLAINT 待办并通知处理人；前端客诉管理页（列表筛选·登记·分派·处理）。
-> - **未实现**：微信真实下发（短信已实现；微信接口已就绪，待 openid 绑定）、退费/调课/转班等具体业务与审批中心的资金联动（退费资金逻辑维持 M4 自洽、暂不接入审批中心以避免资损）。
+> - **资金联动已接入审批中心（§4.16/§9.5 资损防控）**：退费（`order` REFUND）、调课/转班（`class-change` LESSON_RESCHEDULE/CLASS_TRANSFER）、套餐升级补差价（`package-upgrade` PACKAGE_UPGRADE）、储值充值/退回（`stored-value` STORED_VALUE_RECHARGE/STORED_VALUE_REFUND）均先落待审批、审批通过后才回写真实余额/退款/分账，驳回不改账。与业务单据强关联（`biz_type`+`biz_id`），通过/驳回由事件总线 `approvalEvents` 回写业务模块，规避循环依赖。前端待办中心（APPROVAL 任务）统一处理，无需新增页面。
+> - 微信真实下发仍待 openid 绑定（短信已实现；微信接口已就绪）。
 
 ### 课程双维度：课包（管课时）+ 课件（管上课）
 课程拆为两条独立主线，解决"卖的套餐"与"上的内容"混杂的问题：
@@ -236,3 +237,22 @@ e2e 覆盖：登录/鉴权 · RBAC · 排课冲突 · 班级详情 · 线索全�
 
 > 完整字段、枚举与接口约定见 `docs/开发文档-机构管理系统.md`：
 > §4.5 订单与财务 · §4.6 课时管理 · §4.26 待办中心 · §5 数据库设计 · §6 API · §11.3 状态机。
+
+## 近期新增（2026-10）
+
+### 审批中心资金联动补全（§4.16 / §9.5）
+- 储值充值 / 退回储值（`stored-value`）接入审批中心：`POST /stored-value/recharge`、`POST /stored-value/refund` 改为「发起申请」，审批通过才回写余额；新增 `stored_value_request` 实体与 `GET /stored-value/requests` 列表。
+- 与已有的退费 / 调课 / 转班 / 套餐升级共同构成统一审批闭环，待办中心（APPROVAL 任务）统一处理。
+
+### 招生增强（§4.2 营销增强，M3 数据闭环）
+- **活动模板库**：`campaign_template` 实体 + `POST/GET/PUT/DELETE /campaign-templates` + `POST /campaign-templates/:id/launch` 一键发起正式活动（拼团/砍价/分销/体验卡等）。
+- **渠道直连入库**：渠道新增 `ingestEnabled`/`externalType`(DOUYIN/MEITUAN/WECHAT_ADS)/`configJson`；`POST /channels/:id/ingest` 将抖音/美团/微信广告线索自动入库（支持 `simulated` 联调样本、按 phone+channel 去重），与手工线索统一走 CRM 漏斗。
+- **AI 线索评分**：线索新增 `score`/`scoreLevel`/`scoreReason`；`POST /leads/:id/score`、`POST /leads/score-all`、`GET /leads/ranked` 基于来源/意向/跟进/试听/活跃度的确定性启发式评分，可选 LLM 增强建议，需人工复核。
+
+### AI 辅助（§11.8，均确定性启发式可离线运行，配置 `AI_PROVIDER`+`AI_API_KEY` 时调用 OpenAI 兼容接口增强；所有产出仅供辅助、需人工复核）
+- **AI 经营诊断**：`GET /dashboards/ai-diagnose` 聚合营收/课消/转化/出勤等指标，识别风险与机会并给出建议（低风险只读）。
+- **AI 课后点评草稿**：`POST /course-reviews/draft` 基于学员近期出勤/作业聚合生成点评草稿，教师复核后正式提交。
+- **AI 智能对账**：`GET /finance/reconcile` 核对订单 vs 收款 vs 退款，标记差异（超收/超退）供财务人工挂账，资损防控。
+
+### 前端（web）新增 API 客户端
+`src/api/crm.ts`、`src/api/dashboard.ts` 已补充以上全部接口封装；页面级 UI（活动模板页 / 渠道直连按钮 / 线索评分卡 / AI 诊断面板 / 点评草稿 / 对账面板）可基于现有 `CampaignPage`/`ChannelPage`/`LeadPage`/`HomePage`/`FinancePage` 扩展。

@@ -30,6 +30,7 @@ import { GrowthModule } from './modules/growth/growth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { ApprovalModule } from './modules/approval/approval.module';
+import { ApprovalFlowService } from './modules/approval/approval-flow.service';
 import { ComplaintModule } from './modules/complaint/complaint.module';
 import { ResourceModule } from './modules/resource/resource.module';
 import { CoursePackageModule } from './modules/course-package/course-package.module';
@@ -128,6 +129,7 @@ export class AppModule implements OnModuleInit, NestModule {
   constructor(
     private readonly rbac: RbacService,
     private readonly tenantService: TenantService,
+    private readonly approvalFlow: ApprovalFlowService,
   ) {}
 
   async onModuleInit() {
@@ -141,5 +143,11 @@ export class AppModule implements OnModuleInit, NestModule {
       process.env.DEFAULT_TENANT_NAME || '默认机构',
       process.env.DEFAULT_TENANT_DOMAIN || 'localhost',
     );
+    // 预置资金联动审批流模板（储值/退费/调课/转班/套餐升级），保证资金类申请能进入待办（幂等）
+    const seeded = await this.approvalFlow.seedDefaults(tenantId);
+    if (seeded.length) {
+      // eslint-disable-next-line no-console
+      console.log(`[seed] 预置审批流模板 ${seeded.length} 条: ${seeded.map((s) => s.bizType).join(', ')}`);
+    }
   }
 }

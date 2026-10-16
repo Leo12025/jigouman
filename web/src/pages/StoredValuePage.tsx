@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import PageContainer from '../components/PageContainer';
 import {
-  listStoredValueAccounts, listStoredValueLedgers,
+  listStoredValueAccounts, listStoredValueLedgers, listStoredValueRequests,
   rechargeStoredValue, consumeStoredValue, refundStoredValue, getStoredValueBalance,
 } from '../api/crm';
 import { withComplianceConfirm } from '../api/client';
@@ -35,6 +35,18 @@ export default function StoredValuePage() {
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [balance, setBalance] = useState<any>(null);
   const [balanceId, setBalanceId] = useState<number>();
+
+  const [reqs, setReqs] = useState<any[]>([]);
+  const [reqTotal, setReqTotal] = useState(0);
+  const [reqPage, setReqPage] = useState(1);
+  const loadReqs = async () => {
+    try {
+      const r = await listStoredValueRequests({ page: reqPage, size: 20 });
+      setReqs(r.list || []);
+      setReqTotal(r.total || 0);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { loadReqs(); }, [reqPage]);
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -165,6 +177,36 @@ export default function StoredValuePage() {
               <Table
                 rowKey="id" loading={loading} dataSource={ledgers} columns={ledColumns}
                 pagination={{ current: ledPage, total: ledTotal, pageSize: 20, onChange: setLedPage }}
+                size="small" scroll={{ x: 'max-content' }}
+              />
+            ),
+          },
+          {
+            key: 'requests',
+            label: '审批请求',
+            children: (
+              <Table
+                rowKey="id" dataSource={reqs} columns={[
+                  { title: 'ID', dataIndex: 'id', width: 70 },
+                  { title: '类型', dataIndex: 'type', width: 120, render: (t: string) => <Tag color={t === 'RECHARGE' ? 'green' : 'blue'}>{t === 'RECHARGE' ? '充值' : '退回'}</Tag> },
+                  { title: '学员ID', dataIndex: 'studentId', width: 100 },
+                  { title: '金额', dataIndex: 'amount', width: 110, render: (v: number) => `¥${Number(v || 0).toFixed(2)}` },
+                  { title: '赠送', dataIndex: 'giftAmount', width: 90, render: (v: number) => (Number(v) ? Number(v).toFixed(2) : '-') },
+                  { title: '备注', dataIndex: 'remark' },
+                  {
+                    title: '状态', dataIndex: 'status', width: 100,
+                    render: (s: string) => {
+                      const m: Record<string, { color: string; text: string }> = {
+                        PENDING: { color: 'orange', text: '待审批' },
+                        APPROVED: { color: 'blue', text: '已批准' },
+                        DONE: { color: 'green', text: '已执行' },
+                        REJECTED: { color: 'red', text: '已驳回' },
+                      };
+                      return <Tag color={m[s]?.color || 'default'}>{m[s]?.text || s}</Tag>;
+                    },
+                  },
+                ]}
+                pagination={{ current: reqPage, total: reqTotal, pageSize: 20, onChange: setReqPage }}
                 size="small" scroll={{ x: 'max-content' }}
               />
             ),
