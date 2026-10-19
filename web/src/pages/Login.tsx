@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Card, Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { loginAndStore } from '../api/crm';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [form] = Form.useForm();
 
   const onFinish = async (values: any) => {
@@ -14,7 +15,8 @@ export default function Login() {
     try {
       await loginAndStore(values.username, values.password);
       message.success('登录成功');
-      navigate('/leads', { replace: true });
+      const from = (location.state as any)?.from as string || '/';
+      navigate(from, { replace: true });
     } catch (e) {
       // 错误已由拦截器提示
     } finally {
