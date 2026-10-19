@@ -10,6 +10,8 @@
     "dev:web": "npm --prefix web run dev",
     "dev:mobile": "npm --prefix mobile run dev",
     "build": "npm --prefix server run build && npm --prefix web run build && npm --prefix mobile run build",
+    "serve": "npm --prefix server run start:prod",
+    "start:single": "npm run build && npm run serve",
     "test": "npm --prefix server run test:e2e"
   },
   "devDependencies": {

@@ -34,6 +34,31 @@ async function bootstrap() {
     app.use('/files', express.static(uploadDir));
   }
 
+  // 单端口托管前端产物（生产）：/ → PC 管理后台(web/dist)，/m → 家长端 H5(mobile/dist)
+  // 开发期(ts-node 运行 src，无 dist)自动跳过，仍走 Vite dev + 代理。
+  const webDist = path.resolve(__dirname, '..', '..', 'web', 'dist');
+  const mobileDist = path.resolve(__dirname, '..', '..', 'mobile', 'dist');
+  const webIndex = path.join(webDist, 'index.html');
+  const mobileIndex = path.join(mobileDist, 'index.html');
+  if (fs.existsSync(webIndex)) app.use(express.static(webDist));
+  if (fs.existsSync(mobileIndex)) app.use('/m', express.static(mobileDist));
+  // SPA history 回退：非 API/探针/文档/文件 的 HTML 导航请求回对应 index.html
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const p = req.path || '';
+    const isApi = p.startsWith('/api') || p.startsWith('/health') || p.startsWith('/docs') || p.startsWith('/files');
+    const hasExt = /\.[^/]+$/.test(p);
+    // 家长端 /m：带扩展名交给静态(未命中即 404)，无扩展的导航回 mobile index
+    if (p === '/m' || p.startsWith('/m/')) {
+      if (!hasExt && fs.existsSync(mobileIndex)) return res.sendFile(mobileIndex);
+      return next();
+    }
+    if (isApi || hasExt) return next();
+    // 非 API 的无扩展名导航请求一律回 PC 后台 index（SPA history 路由）
+    if (fs.existsSync(webIndex)) return res.sendFile(webIndex);
+    return next();
+  });
+
   // DTO 校验
   app.useGlobalPipes(
     new ValidationPipe({

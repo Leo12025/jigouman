@@ -37,6 +37,9 @@ import {
   SettingOutlined,
   RiseOutlined,
   WalletOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  ReadOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken, getToken, getCurrentOrg, setCurrentOrg } from '../api/client';
@@ -133,12 +136,11 @@ export default function MainLayout() {
     { key: '/', icon: <HomeOutlined />, label: '首页' },
     { key: '/dashboard', icon: <BarChartOutlined />, label: '数据看板' },
     { key: '/campus-overview', icon: <PartitionOutlined />, label: '跨校区对比' },
-    { key: '/orgs', icon: <ApartmentOutlined />, label: '校区管理' },
     { key: '/big-screen', icon: <FundProjectionScreenOutlined />, label: '数据大屏' },
     {
-      key: 'group-course',
-      type: 'group' as const,
-      label: '课程学员',
+      key: 'sub-teaching',
+      icon: <ReadOutlined />,
+      label: '教务教学',
       children: [
         { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
         { key: '/course-packages', icon: <AppstoreOutlined />, label: '课包管理' },
@@ -147,42 +149,64 @@ export default function MainLayout() {
         { key: '/class-groups', icon: <TeamOutlined />, label: '班级管理' },
         { key: '/lessons', icon: <CalendarOutlined />, label: '课次排课' },
         { key: '/class-change', icon: <SwapOutlined />, label: '调课/转班' },
-        { key: '/students', icon: <SolutionOutlined />, label: '学员档案' },
-        { key: '/orders', icon: <ReconciliationOutlined />, label: '订单与财务' },
-        { key: '/hours', icon: <ClockCircleOutlined />, label: '课时管理' },
-        { key: '/package-upgrades', icon: <RiseOutlined />, label: '套餐升级' },
-        { key: '/stored-value', icon: <WalletOutlined />, label: '储值卡' },
-        { key: '/finance', icon: <DollarOutlined />, label: '财务对账' },
-        { key: '/tasks', icon: <BellOutlined />, label: '待办中心' },
-        { key: '/homework', icon: <FileTextOutlined />, label: '作业管理' },
-        { key: '/scores', icon: <LineChartOutlined />, label: '成绩管理' },
         { key: '/teaching', icon: <VideoCameraOutlined />, label: '在线课堂/督学' },
         { key: '/reviews', icon: <FileTextOutlined />, label: '课后点评' },
       ],
     },
     {
-      key: 'group-crm',
-      type: 'group' as const,
+      key: 'sub-student',
+      icon: <SolutionOutlined />,
+      label: '学员服务',
+      children: [
+        { key: '/students', icon: <SolutionOutlined />, label: '学员档案' },
+        { key: '/hours', icon: <ClockCircleOutlined />, label: '课时管理' },
+        { key: '/homework', icon: <FileTextOutlined />, label: '作业管理' },
+        { key: '/scores', icon: <LineChartOutlined />, label: '成绩管理' },
+      ],
+    },
+    {
+      key: 'sub-finance',
+      icon: <DollarOutlined />,
+      label: '财务管理',
+      children: [
+        { key: '/orders', icon: <ReconciliationOutlined />, label: '订单与财务' },
+        { key: '/stored-value', icon: <WalletOutlined />, label: '储值卡' },
+        { key: '/package-upgrades', icon: <RiseOutlined />, label: '套餐升级' },
+        { key: '/finance', icon: <DollarOutlined />, label: '财务对账' },
+      ],
+    },
+    {
+      key: 'sub-crm',
+      icon: <ThunderboltOutlined />,
       label: '招生营销',
       children: [
         { key: '/leads', icon: <TeamOutlined />, label: '线索 CRM' },
         { key: '/funnel', icon: <FunnelPlotOutlined />, label: '转化漏斗' },
         { key: '/channels', icon: <PartitionOutlined />, label: '渠道管理' },
         { key: '/campaigns', icon: <ThunderboltOutlined />, label: '市场活动' },
-        { key: '/complaints', icon: <CustomerServiceOutlined />, label: '客诉管理' },
         { key: '/group-buy', icon: <TagsOutlined />, label: '团购拼团' },
         { key: '/distribution', icon: <ShareAltOutlined />, label: '分销裂变' },
+        { key: '/complaints', icon: <CustomerServiceOutlined />, label: '客诉管理' },
       ],
     },
     {
-      key: 'group-system',
-      type: 'group' as const,
-      label: '系统管理',
+      key: 'sub-approval',
+      icon: <AuditOutlined />,
+      label: '审批协同',
       children: [
+        { key: '/tasks', icon: <BellOutlined />, label: '待办中心' },
+        { key: '/approvals', icon: <AuditOutlined />, label: '审批中心' },
+        { key: '/approval-flows', icon: <AuditOutlined />, label: '审批流配置' },
+      ],
+    },
+    {
+      key: 'sub-system',
+      icon: <SettingOutlined />,
+      label: '系统设置',
+      children: [
+        { key: '/orgs', icon: <ApartmentOutlined />, label: '校区管理' },
         { key: '/users', icon: <UserOutlined />, label: '用户管理' },
         { key: '/roles', icon: <SafetyCertificateOutlined />, label: '角色权限' },
-        { key: '/approval-flows', icon: <AuditOutlined />, label: '审批流配置' },
-        { key: '/approvals', icon: <AuditOutlined />, label: '审批中心' },
         { key: '/notify-channels', icon: <ApiOutlined />, label: '消息渠道配置' },
         { key: '/reports', icon: <BarChartOutlined />, label: '看板配置/报表' },
         { key: '/tenants', icon: <ApiOutlined />, label: '租户中心' },
@@ -200,21 +224,40 @@ export default function MainLayout() {
         return true;
       })
       .map((it) => {
-        if (it.children) {
+        if (it.children?.length) {
           const children = filterByFeature(it.children);
-          return { ...it, children: children.length ? children : undefined };
+          return { ...it, children };
         }
         return it;
       })
-      .filter((it) => !(it.type === 'group' && (!it.children || it.children.length === 0)));
+      .filter((it) => !(it.children && it.children.length === 0));
 
   // 权限：机构设置仅 tenant:manage 可见
   const filterByPerm = (items: any[]): any[] =>
     items
       .filter((it) => !(it.key === '/tenant-settings' && !canManageTenant))
-      .map((it) => (it.children ? { ...it, children: filterByPerm(it.children) } : it));
+      .map((it) => (it.children?.length ? { ...it, children: filterByPerm(it.children) } : it));
 
   const visibleMenu = filterByPerm(filterByFeature(menuItems));
+
+  // 找到当前选中项所属的一级子菜单 key（用于自动展开二级菜单）
+  const findParentKey = (items: any[], key: string, trail: string[] = []): string | undefined => {
+    for (const it of items) {
+      if (it.key === key) return trail[trail.length - 1];
+      if (it.children?.length) {
+        const r = findParentKey(it.children, key, [...trail, it.key]);
+        if (r !== undefined) return r;
+      }
+    }
+    return undefined;
+  };
+  const parentKey = findParentKey(visibleMenu, selected);
+  const [openKeys, setOpenKeys] = useState<string[]>(parentKey ? [parentKey] : []);
+  useEffect(() => {
+    if (parentKey) {
+      setOpenKeys((prev) => (prev.includes(parentKey) ? prev : [...prev, parentKey]));
+    }
+  }, [parentKey]);
 
   const onLogout = () => {
     clearToken();
@@ -222,16 +265,38 @@ export default function MainLayout() {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       {!isNarrow && (
-        <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="light" width={208}
-          style={{ borderRight: `1px solid ${token.colorBorderSecondary}` }}>
-          <div style={{ padding: collapsed ? 12 : 16, textAlign: collapsed ? 'center' : 'left' }}>
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          theme="light"
+          width={208}
+          trigger={null}
+          style={{
+            borderRight: `1px solid ${token.colorBorderSecondary}`,
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              height: 56,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              padding: collapsed ? 0 : '0 16px',
+            }}
+          >
             {config?.brand?.logo ? (
               <img
                 src={config.brand.logo}
                 alt="机构 Logo"
-                style={{ height: collapsed ? 28 : 32, objectFit: 'contain' }}
+                style={{ height: 32, objectFit: 'contain' }}
               />
             ) : collapsed ? (
               <div style={{ fontWeight: 700, fontSize: 16 }}>机</div>
@@ -241,12 +306,30 @@ export default function MainLayout() {
               </Typography.Title>
             )}
           </div>
-          <Menu
-            mode="inline"
-            selectedKeys={[selected]}
-            items={visibleMenu}
-            onClick={(e) => navigate(e.key)}
-          />
+          {/* 侧边栏独立滚动区：仅菜单内部滚动，不影响主体（高度 = 视口 - 顶部 logo - 底部折叠按钮） */}
+          <div style={{ height: 'calc(100vh - 104px)', overflowY: 'auto', overflowX: 'hidden' }}>
+            <Menu
+              mode="inline"
+              selectedKeys={[selected]}
+              openKeys={openKeys}
+              onOpenChange={setOpenKeys}
+              items={visibleMenu}
+              onClick={(e) => { if (e.key.startsWith('/')) navigate(e.key); }}
+            />
+          </div>
+          <Button
+            type="text"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? '展开菜单' : '收起菜单'}
+            style={{
+              height: 48,
+              borderRadius: 0,
+              flexShrink: 0,
+              borderTop: `1px solid ${token.colorBorderSecondary}`,
+            }}
+          >
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </Button>
         </Sider>
       )}
 
@@ -262,24 +345,24 @@ export default function MainLayout() {
         <Menu
           mode="inline"
           selectedKeys={[selected]}
-          items={menuItems}
-          onClick={(e) => { navigate(e.key); setCollapsed(false); }}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
+          items={visibleMenu}
+          onClick={(e) => { if (e.key.startsWith('/')) { navigate(e.key); setCollapsed(false); } }}
         />
       </Drawer>
 
-      <Layout>
+      <Layout style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexShrink: 0,
             background: token.colorBgContainer,
             padding: '0 16px',
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
             boxShadow: '0 1px 4px rgba(0,0,0,.04)',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
           }}
         >
           {isNarrow && (
@@ -354,7 +437,8 @@ export default function MainLayout() {
             </Dropdown>
           </Space>
         </Header>
-        <Content style={{ padding: 16 }}>
+        {/* 主体内容独立滚动：头部固定，仅内容区滚动 */}
+        <Content style={{ flex: 1, height: 0, overflowY: 'auto', padding: 16 }}>
           <div key={refreshKey}>
             <Outlet />
           </div>
