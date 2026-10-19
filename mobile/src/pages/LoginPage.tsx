@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Input, Form, Toast, Card, Segmented } from 'antd-mobile';
 import { sendOtp, parentLogin } from '../api/parent';
 import { staffLogin } from '../api/staff';
-import { setTokens, setRole, type Role } from '../api/client';
+import { setTokens, setRole, getDomainRole, type Role } from '../api/client';
 
 const ROLE_LABEL: Record<Role, string> = {
   parent: '家长',
@@ -11,9 +11,11 @@ const ROLE_LABEL: Record<Role, string> = {
   consultant: '顾问',
 };
 
-/** 三端统一登录入口：家长走 OTP，老师/顾问走账号密码 */
+/** 三端统一登录入口：家长走 OTP，老师/顾问走账号密码。
+ *  域名含 staff/parent/sale 时锁定对应端并隐藏其它入口（详见 getDomainRole）。 */
 export default function LoginPage() {
-  const [role, setRoleState] = useState<Role>('parent');
+  const forced = getDomainRole();
+  const [role, setRoleState] = useState<Role>(forced ?? 'parent');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [username, setUsername] = useState('');
@@ -56,13 +58,20 @@ export default function LoginPage() {
   return (
     <div className="page">
       <div className="page-title">登录</div>
-      <div style={{ padding: 16 }}>
-        <Segmented
-          value={role}
-          onChange={(v) => setRoleState(v as Role)}
-          options={(['parent', 'teacher', 'consultant'] as Role[]).map((r) => ({ value: r, label: ROLE_LABEL[r] }))}
-        />
-      </div>
+      {!forced && (
+        <div style={{ padding: 16 }}>
+          <Segmented
+            value={role}
+            onChange={(v) => setRoleState(v as Role)}
+            options={(['parent', 'teacher', 'consultant'] as Role[]).map((r) => ({ value: r, label: ROLE_LABEL[r] }))}
+          />
+        </div>
+      )}
+      {forced && (
+        <div style={{ padding: '8px 16px', color: 'rgba(0,0,0,.45)', fontSize: 13 }}>
+          当前为{ROLE_LABEL[forced]}端，仅支持{ROLE_LABEL[forced]}登录
+        </div>
+      )}
       <Card style={{ margin: 16 }}>
         {role === 'parent' ? (
           <>

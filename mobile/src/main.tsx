@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd-mobile';
 import zhCN from 'antd-mobile/es/locales/zh-CN';
-import { getToken, getRole } from './api/client';
+import { getToken, getRole, getDomainRole, type Role } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 
@@ -38,14 +38,25 @@ import CFunnel from './pages/consultant/FunnelPage';
 import CMarketing from './pages/consultant/MarketingPage';
 import './index.css';
 
-/** 登录守卫：未登录跳登录页；已登录但角色不匹配则跳回该角色首页 */
-function Guard({ role, children }: { role: 'parent' | 'teacher' | 'consultant'; children: React.ReactElement }) {
+/** 登录守卫：未登录跳登录页；域名锁定角色时禁止其它端入口；已登录但角色不匹配则跳回该角色首页 */
+function Guard({ role, children }: { role: Role; children: React.ReactElement }) {
+  const forced = getDomainRole();
+  if (forced && role !== forced) return <Navigate to="/login" replace />;
   if (!getToken()) return <Navigate to="/login" replace />;
   if (getRole() !== role) {
     const home = getRole() === 'parent' ? '/p/students' : getRole() === 'teacher' ? '/t/tasks' : '/c/leads';
     return <Navigate to={home} replace />;
   }
   return children;
+}
+
+/** 根路由重定向：域名锁定时跳到对应端首页；否则按已登录角色跳首页，未登录去登录页 */
+function RootRedirect() {
+  const forced = getDomainRole();
+  if (!getToken()) return <Navigate to="/login" replace />;
+  const role: Role = forced ?? getRole();
+  const home = role === 'parent' ? '/p/students' : role === 'teacher' ? '/t/tasks' : '/c/leads';
+  return <Navigate to={home} replace />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -81,7 +92,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             {/* 拼团 C 端 H5（公开落地页，裂变分享，无需登录） */}
             <Route path="/groupon" element={<GroupBuyLandingPage />} />
             <Route path="/groupon/:id" element={<GroupBuyDetailPage />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="*" element={<RootRedirect />} />
           </Routes>
         </ErrorBoundary>
       </HashRouter>

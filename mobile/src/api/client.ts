@@ -13,6 +13,19 @@ export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY) || '';
 export const getRole = (): Role => (localStorage.getItem(ROLE_KEY) as Role) || 'parent';
 export const setRole = (r: Role) => localStorage.setItem(ROLE_KEY, r);
 
+/**
+ * 按域名锁定移动端角色：域名含 staff → 老师，含 parent → 家长，含 sale → 顾问。
+ * 命中后仅暴露对应端入口，其余端入口隐藏（详见 LoginPage / Guard）。
+ * 命中规则不冲突（staff/parent/sale 互不包容）；均未命中返回 null（不锁定，三端任选）。
+ */
+export function getDomainRole(): Role | null {
+  const h = (typeof window !== 'undefined' ? window.location.hostname : '').toLowerCase();
+  if (h.includes('staff')) return 'teacher';
+  if (h.includes('parent')) return 'parent';
+  if (h.includes('sale')) return 'consultant';
+  return null;
+}
+
 /** 当前校区(org_id)；空=全部/总校区视角。家长/员工移动端按此下发 X-Org-Id 实现校区切换 */
 export const CURRENT_ORG_KEY = 'jm_mobile_org';
 export const getCurrentOrg = (): number | null => {
