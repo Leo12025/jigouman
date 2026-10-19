@@ -15,6 +15,7 @@ import { Commission } from '../distribution/entities/commission.entity';
 import { Tenant } from '../tenant/entities/tenant.entity';
 import { GroupBuyService } from './groupbuy.service';
 import { GroupBuyController } from './groupbuy.controller';
+import { GroupBuyPublicController } from './groupbuy-public.controller';
 import { OrderModule } from '../order/order.module';
 
 @Module({
@@ -32,7 +33,7 @@ import { OrderModule } from '../order/order.module';
     OrderModule,
   ],
   providers: [GroupBuyService],
-  controllers: [GroupBuyController],
+  controllers: [GroupBuyController, GroupBuyPublicController],
   exports: [GroupBuyService],
 })
 export class GroupBuyModule {}

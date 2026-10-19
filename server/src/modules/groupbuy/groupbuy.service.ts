@@ -483,6 +483,18 @@ export class GroupBuyService implements OnModuleInit {
     return this.member.find({ where: { tenantId, teamId } as any, order: { id: 'ASC' } as any });
   }
 
+  /** C 端：我的拼团——查询某学员参与的所有团（含活动信息），用于「我的拼团」列表 */
+  async myTeams(studentId: number) {
+    const members = await this.member.find({ where: { studentId } as any });
+    const teamIds = [...new Set(members.map((m) => m.teamId))];
+    if (!teamIds.length) return [];
+    const teams = await this.team.find({ where: teamIds.map((id) => ({ id })) as any });
+    const actIds = [...new Set(teams.map((t) => t.activityId))];
+    const acts = await this.act.find({ where: actIds.map((id) => ({ id })) as any });
+    const actMap = new Map(acts.map((a) => [a.id, a]));
+    return teams.map((t) => ({ ...t, activity: actMap.get(t.activityId) || null }));
+  }
+
   // ---------------------------------------------------------------- 核销（落库防重复）
 
   async redeem(tenantId: number, d: RedeemDto, operatorId?: number) {

@@ -19,6 +19,10 @@ import POrders from './pages/parent/OrdersPage';
 import PNotices from './pages/parent/NoticesPage';
 import PService from './pages/parent/ServicePage';
 
+// 拼团 C 端 H5（公开，可分享，无需登录）
+import GroupBuyLandingPage from './pages/groupon/GroupBuyLandingPage';
+import GroupBuyDetailPage from './pages/groupon/GroupBuyDetailPage';
+
 // 老师端
 import TTasks from './pages/teacher/TasksPage';
 import TLessons from './pages/teacher/LessonsPage';
@@ -74,6 +78,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/c/trials" element={<Guard role="consultant"><CTrials /></Guard>} />
             <Route path="/c/funnel" element={<Guard role="consultant"><CFunnel /></Guard>} />
             <Route path="/c/marketing" element={<Guard role="consultant"><CMarketing /></Guard>} />
+            {/* 拼团 C 端 H5（公开落地页，裂变分享，无需登录） */}
+            <Route path="/groupon" element={<GroupBuyLandingPage />} />
+            <Route path="/groupon/:id" element={<GroupBuyDetailPage />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </ErrorBoundary>
